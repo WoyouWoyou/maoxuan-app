@@ -101,6 +101,46 @@
   background: #fbf7ef;
 }
 
+.sb-mode-row {
+  display: flex;
+  gap: 6px;
+}
+
+.sb-mode-opt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffdf8;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sb-mode-opt.is-on {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.sb-mode-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sb-mode-desc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
 .sb-new-input {
   min-height: 84px;
   font-size: 13px;
@@ -175,6 +215,13 @@
 
 .sb-badge {
   font-size: 10px;
+}
+
+.sb-mode-badge {
+  font-size: 11px;
+  background: #2f5d8a;
+  border-color: #2f5d8a;
+  color: #fff;
 }
 
 .sb-item-time {

@@ -1,0 +1,620 @@
+/* ===== 工作台通用骨架 ===== */
+.wb-step {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 4px;
+}
+
+.wb-step > * {
+  flex-shrink: 0;
+}
+
+/* ===== 原文依据一行 ===== */
+.wb-source {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+}
+
+.wb-source-quote {
+  font-family: var(--serif);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+/* ===== 操作条 ===== */
+.wb-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wb-bar-note {
+  font-size: 12px;
+}
+
+/* ===== 卡片 ===== */
+.wb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wb-card-sub {
+  font-size: 12px;
+  margin-top: -6px;
+}
+
+.wb-sub-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ===== 网格 ===== */
+.wb-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wb-grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wb-grid3 .field,
+.wb-grid2 .field {
+  margin-bottom: 0;
+}
+
+/* ===== 选项 chips ===== */
+.wb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wb-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdf8;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.wb-chip:hover {
+  border-color: var(--muted);
+}
+
+.wb-chip.is-on {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 600;
+}
+
+.wb-chip-hint {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ===== 假设版横幅 ===== */
+.wb-warn {
+  padding: 8px 12px;
+  border-left: 3px solid var(--red);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: #fbeeea;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+/* ===== 事实台账 ===== */
+.wb-ledger-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wb-col-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+.wb-fact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.wb-fact-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wb-fact-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--muted);
+}
+
+.wb-fact-content {
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: text;
+  word-break: break-word;
+}
+
+.wb-fact-input {
+  font-size: 13px;
+}
+
+.wb-conf {
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffdf8;
+  font-size: 10px;
+  line-height: 1.6;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.wb-conf-confirmed {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.wb-conf-assumed {
+  border-color: #b7791f;
+  color: #b7791f;
+}
+
+.wb-conf-uncertain {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.wb-kind {
+  max-width: 56px;
+  padding: 0 2px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #fffdf8;
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.wb-del {
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wb-del:hover {
+  color: var(--red);
+}
+
+.wb-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ===== 缺失事实 ===== */
+.wb-miss-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wb-miss {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.wb-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  vertical-align: 1px;
+}
+
+/* ===== 追问 ===== */
+.wb-q {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.wb-q-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.wb-q-text {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wb-q-why {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ===== 主线 ===== */
+.wb-mainline {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.8;
+  margin: 0;
+}
+
+.wb-side {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* ===== 三路诊断 tab ===== */
+.wb-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.wb-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: -1px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.wb-tab:hover {
+  color: var(--ink);
+}
+
+.wb-tab.is-on {
+  background: var(--paper);
+  color: var(--red);
+  font-weight: 600;
+}
+
+/* ===== 分析面板 ===== */
+.wb-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wb-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wb-panel-title {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.wb-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wb-sec-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+.wb-line {
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wb-ordered {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.wb-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--red);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--paper-2);
+}
+
+.wb-primary-text {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.7;
+}
+
+.wb-focus {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--red-soft);
+}
+
+.wb-defer {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+
+.wb-panel-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.wb-refs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wb-missing-note {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ===== 三条路线 ===== */
+.wb-route {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wb-route-name {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.wb-route-desc {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.wb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wb-field-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.wb-field-value {
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wb-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* ===== 主客分析 ===== */
+.wb-total {
+  font-size: 13px;
+}
+
+.wb-total b {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: var(--red);
+}
+
+.wb-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.wb-score-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.wb-score-name {
+  flex: 0 0 150px;
+  min-width: 0;
+}
+
+.wb-score-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wb-score-desc {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.wb-dots {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
+
+.wb-dot-score {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.wb-dot-score:hover:not(:disabled) {
+  border-color: var(--red);
+}
+
+.wb-dot-score.is-on {
+  border-color: var(--red);
+  background: var(--red);
+}
+
+.wb-score-reason {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.wb-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.wb-box.is-gap {
+  border-color: var(--red);
+}
+
+.wb-box.is-fix {
+  border-color: var(--red-soft);
+  background: var(--red-soft);
+}
+
+/* ===== 编辑模式 ===== */
+.wb-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wb-edit-field {
+  margin-bottom: 0;
+}
+
+.wb-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wb-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wb-score-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.wb-score-line .textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+}
+
+.wb-score-input {
+  flex: 0 0 72px;
+  width: 72px;
+}

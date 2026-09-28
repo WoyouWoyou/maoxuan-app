@@ -13,12 +13,22 @@ import type {
   Review,
   SearchHit,
   Session,
+  SessionMode,
   SessionPatch,
   SessionSummary,
   Settings,
   ThreeNotes,
   Version,
-  VersionSummary
+  VersionSummary,
+  WbAction,
+  WbCheck,
+  WbContradiction,
+  WbDecision,
+  WbIntake,
+  WbObjSubj,
+  WbRecapInput,
+  WbRecapResult,
+  WbRoutes
 } from './types'
 
 /** Exposed by preload as `window.api`. Every method maps 1:1 to an ipcMain.handle channel named `${group}:${method}`. */
@@ -36,7 +46,8 @@ export interface MaoxuanApi {
     /** 回收站中的会话，按 deletedAt 倒序。 */
     listTrash(): Promise<SessionSummary[]>
     get(id: string): Promise<Session | null>
-    create(problemText: string): Promise<Session>
+    /** mode 缺省为 reading。workbench 会话：problemText 写入 form.objective，currentStep = 'wb_intake'。 */
+    create(problemText: string, mode?: SessionMode): Promise<Session>
     /** When `versionLabel` is given, a full snapshot is appended to the version history. */
     update(id: string, patch: SessionPatch, versionLabel?: string): Promise<Session>
     /** 彻底删除（级联删除版本与对话），不可恢复。 */
@@ -73,6 +84,24 @@ export interface MaoxuanApi {
     reviewNotes(sessionId: string, articleId: string, notes: ThreeNotes): Promise<NoteFeedback>
     reviewSituation(sessionId: string, newSituation: string): Promise<Review>
     mindset(sessionId: string): Promise<Mindset>
+  }
+  /**
+   * 毛选工作台。全部只读会话、不写库：渲染进程先保存最新数据，再调用，拿到结果后自己用 sessions.update 写回。
+   * 会话不是 workbench 模式时抛错。
+   */
+  wb: {
+    /** 整理 form + 已回答的追问 + 现有事实台账，输出新的 WbIntake（事实 id 延续旧台账）。 */
+    intake(sessionId: string): Promise<WbIntake>
+    contradiction(sessionId: string): Promise<WbContradiction>
+    routes(sessionId: string): Promise<WbRoutes>
+    objSubj(sessionId: string): Promise<WbObjSubj>
+    /** 综合三模块 → 决策快照，并附带硬规则 + 红队检查。若已有决策且有未通过检查，则按检查意见修复。 */
+    decide(sessionId: string): Promise<WbDecision>
+    /** 对当前（可能被用户改过的）决策重新跑硬规则 + 红队检查。 */
+    recheck(sessionId: string): Promise<WbCheck[]>
+    /** 基于已确认的决策生成 7/30/90 天行动，并附带检查。 */
+    actions(sessionId: string): Promise<{ actions: WbAction[]; checks: WbCheck[] }>
+    recap(sessionId: string, input: WbRecapInput): Promise<WbRecapResult>
   }
   settings: {
     get(): Promise<Settings>

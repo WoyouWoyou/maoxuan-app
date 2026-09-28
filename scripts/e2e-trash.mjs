@@ -2,7 +2,7 @@ import fs from 'node:fs'
 
 const shots = '.codegen/shots'
 fs.mkdirSync(shots, { recursive: true })
-const t = await (await fetch('http://127.0.0.1:9333/json')).json()
+const t = await (await fetch(`http://127.0.0.1:${process.env.PORT ?? 9333}/json`)).json()
 const ws = new WebSocket(t.find((x) => x.type === 'page').webSocketDebuggerUrl)
 await new Promise((r) => ws.addEventListener('open', r, { once: true }))
 let id = 0

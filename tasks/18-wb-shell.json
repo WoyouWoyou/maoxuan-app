@@ -1,0 +1,28 @@
+{
+  "name": "工作台：页面框架 + 原文抽屉 + 新建时选模式",
+  "files": [
+    "src/renderer/src/pages/WorkbenchPage.tsx",
+    "src/renderer/src/pages/WorkbenchPage.css",
+    "src/renderer/src/components/workbench/SourceDrawer.tsx",
+    "src/renderer/src/components/workbench/SourceDrawer.css",
+    "src/renderer/src/pages/SessionPage.tsx",
+    "src/renderer/src/components/Sidebar.tsx",
+    "src/renderer/src/components/Sidebar.css",
+    "src/renderer/src/components/VersionPanel.tsx",
+    "src/renderer/src/pages/LibraryArticlePage.tsx"
+  ],
+  "context": [
+    "tasks/_renderer-contract.md",
+    "src/renderer/src/components/workbench/types.ts",
+    "src/renderer/src/pages/SessionPage.tsx",
+    "src/renderer/src/pages/SessionPage.css",
+    "src/renderer/src/components/Stepper.tsx",
+    "src/renderer/src/components/ArticleReader.tsx",
+    "src/renderer/src/components/Sidebar.tsx",
+    "src/renderer/src/components/Sidebar.css",
+    "src/renderer/src/components/VersionPanel.tsx",
+    "src/renderer/src/pages/LibraryArticlePage.tsx",
+    "src/renderer/src/styles.css"
+  ],
+  "instructions": "新增「毛选工作台」模式（契约：src/shared/types.ts 的 SessionMode / MODE_META / WB_STEPS / stepMeta / WorkbenchData；src/shared/api.ts 的 sessions.create(text, mode) 与 wb.*；src/shared/workbench.ts 的 wbStepUnlocked / wbStepDone / isAssumptionDraft / WB_SOURCES；src/renderer/src/components/workbench/types.ts 的 WbStepProps）。阅读法的一切行为保持不变。现有文件做最小修改、其余代码一字不动，全部输出完整文件。\n\n四个步骤组件由其他任务编写，你只按下面的路径与签名 import，不要创建它们：\n- `import { WbIntakeStep } from '@renderer/components/workbench/WbIntakeStep'`\n- `import { WbDiagnoseStep } from '@renderer/components/workbench/WbDiagnoseStep'`\n- `import { WbDecideStep } from '@renderer/components/workbench/WbDecideStep'`\n- `import { WbActStep } from '@renderer/components/workbench/WbActStep'`\n每个都是 `(props: WbStepProps) => JSX.Element`。\n\n## 1. WorkbenchPage.tsx（新，具名导出 `WorkbenchPage`，props `{ initial: Session }`）\n- 复用 SessionPage.css 的布局类（`import './SessionPage.css'`，外层 `sp-root` / `sp-main` / `sp-header` / `sp-step` / `sp-panel` 等与 SessionPage 相同），自己的补充样式放 WorkbenchPage.css，类名前缀 `wbp-`。\n- 状态与写入：照抄 SessionPage 的 `sessionRef` + `queueRef` 串行队列与 `commit` 写法（id 取 `initial.id`，初始 session = initial）。实现 `updateWb(fn, opts)`：在队列里取 `sessionRef.current.data`，`wb = data.workbench ?? emptyWorkbench()`，`sessions.update(id, { data: { ...data, workbench: fn(wb) }, currentStep: opts?.step }, opts?.versionLabel)`（step 未给时不传 currentStep），成功后 applySession 并派发 `sessions-changed`；失败写入 saveError 并 **重新抛出**，让调用方知道失败。\n- `viewStep: WbStepKey`：初始为 `initial.currentStep`（若不是以 `wb_` 开头则用 `'wb_intake'`）。`goStep(step)`：设置 viewStep；若 step 在 WB_STEPS 中的顺序大于当前 currentStep，则 `commit({ currentStep: step })`。\n- 头部：标题可点击重命名（照抄 SessionPage 的 renaming 逻辑）；副标题 `毛选工作台 · 第 N 步 · 名称 · 共 N 个版本快照`；当 `wb.intake && isAssumptionDraft(wb)` 时在副标题后加 `<span className=\"badge badge-red\">假设版</span>`，title 提示“追问未答完或没有已确认事实，结论依赖假设”。\n- 步骤条：与 Stepper.tsx 完全相同的 DOM 结构与类名（`stepper` / `stepper-item` / `is-active` / `is-done` / `is-locked` / `is-current` / `stepper-no` / `stepper-body` / `stepper-name` / `stepper-hint`），数据源换成 WB_STEPS + wbStepUnlocked + wbStepDone；写成本文件内的小组件。\n- 主体：按 viewStep 渲染四个步骤组件，统一传 `{ session, wb, updateWb, goStep, openSource }`。\n- 右侧面板：与 SessionPage 相同（教练对话 / 版本历史两个 tab、可折叠），ChatPanel 传 `articleId={null}`，不传 onApplyToProblem；tab 名“参谋对话”代替“教练对话”。VersionPanel 的 onRestored：applySession、把 viewStep 设为恢复后的 currentStep（非 wb_ 开头时用 wb_intake）、派发 sessions-changed。\n- 不渲染 DontsTicker（那是阅读法的）。\n- `openSource(area)`：设置 `sourceArea` 状态，渲染 `<SourceDrawer area={sourceArea} onClose={() => setSourceArea(null)} />`。\n\n## 2. SourceDrawer.tsx（新，具名导出，props `{ area: WbSourceArea; onClose(): void }`，类名前缀 `wsd-`）\n- 从右侧滑出的抽屉：固定定位遮罩（点击遮罩关闭、Esc 关闭），抽屉宽 `min(720px, 60vw)`，高 100%，背景 var(--paper)，左边框 1px var(--line)，阴影。\n- 顶部：标题“原文依据”；下面是该 area 的 WB_SOURCES 条目切换按钮（每个显示《title》+ use），默认第一个。\n- 选中条目后 `window.api.articles.get(articleId)`，用 `article.paragraphs.findIndex(p => p.includes(quote))` 找段落；在抽屉内渲染一块引文卡（serif、左侧 3px var(--red) 竖线、显示 quote 与 use），下面渲染 `<ArticleReader article={article} compact scrollToParagraph={index >= 0 ? index : null} activeParagraph={index >= 0 ? index : null} />`，占满剩余高度可滚动。\n- 右上角两个按钮：`在书库打开`（btn btn-ghost btn-sm，`navigate('/library/' + articleId)` 并关闭）、`关闭`。\n- 加载中显示 spinner，失败显示 `.error-text`。\n\n## 3. SessionPage.tsx（最小修改）\n- import WorkbenchPage；在 `if (!session) { ... }` 那段 return 之后、`const currentStepName` 之前，加 `if (session.mode === 'workbench') return <WorkbenchPage key={session.id} initial={session} />`。其他代码不动。\n\n## 4. Sidebar.tsx / Sidebar.css\n- 新建框（`creating` 为真时）在 textarea 上方加模式选择：两个并排按钮 `.sb-mode-opt`（选中加 `is-on`：边框 var(--red)、背景 var(--red-soft)），第一行 `MODE_META[m].name`（14px 600），第二行 `MODE_META[m].desc`（11px muted，最多 2 行）。状态 `mode: SessionMode` 默认 'reading'，取消 / 创建成功后重置为 'reading'。\n- textarea placeholder：reading 保持原文案；workbench 为 `写出这个项目的主目标（至少 10 字），例如：三个月内把 AI 客服从试点推到全公司`。创建按钮文字：reading `开始`，workbench `建立项目`。\n- 调用改为 `window.api.sessions.create(text, mode)`。\n- `stepLabel` 改用 `stepMeta(step)`（从 '@shared/types' 导入）：`${no} ${name}`，与原格式一致。\n- 列表项：workbench 会话在步骤徽标前加 `<span className=\"badge sb-mode-badge\">工作台</span>`（背景 #2f5d8a 白字，11px）。\n\n## 5. VersionPanel.tsx\n只把按步骤 key 查名称的地方改为 `stepMeta(key)`，其余不动。\n\n## 6. LibraryArticlePage.tsx\n- `stepName` 改用 `stepMeta`。\n- “加入到某个会话”的会话列表只显示 `mode === 'reading'` 的会话（工作台会话不接收阅读篇目）。"
+}

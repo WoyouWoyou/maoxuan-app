@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { STEPS, type Session, type SessionData, type Version, type VersionSummary } from '@shared/types'
+import { stepMeta, type Session, type SessionData, type StepKey, type Version, type VersionSummary } from '@shared/types'
 import { diffData, labelOfPath } from '../lib/diff'
 import './VersionPanel.css'
 
@@ -15,8 +15,8 @@ function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
-function stepName(key: string): string {
-  const found = STEPS.find((s) => s.key === key)
+function stepName(key: StepKey): string {
+  const found = stepMeta(key)
   return found ? `${found.no} ${found.name}` : key
 }
 

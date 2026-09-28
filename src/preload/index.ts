@@ -21,7 +21,7 @@ const api: MaoxuanApi = {
     listArchived: () => ipcRenderer.invoke('sessions:listArchived'),
     listTrash: () => ipcRenderer.invoke('sessions:listTrash'),
     get: (id) => ipcRenderer.invoke('sessions:get', id),
-    create: (problemText) => ipcRenderer.invoke('sessions:create', problemText),
+    create: (problemText, mode) => ipcRenderer.invoke('sessions:create', problemText, mode),
     update: (id, patch, versionLabel) => ipcRenderer.invoke('sessions:update', id, patch, versionLabel),
     remove: (id) => ipcRenderer.invoke('sessions:remove', id),
     archive: (id) => ipcRenderer.invoke('sessions:archive', id),
@@ -52,6 +52,16 @@ const api: MaoxuanApi = {
     reviewSituation: (sessionId, newSituation) =>
       ipcRenderer.invoke('ai:reviewSituation', sessionId, newSituation),
     mindset: (sessionId) => ipcRenderer.invoke('ai:mindset', sessionId)
+  },
+  wb: {
+    intake: (sessionId) => ipcRenderer.invoke('wb:intake', sessionId),
+    contradiction: (sessionId) => ipcRenderer.invoke('wb:contradiction', sessionId),
+    routes: (sessionId) => ipcRenderer.invoke('wb:routes', sessionId),
+    objSubj: (sessionId) => ipcRenderer.invoke('wb:objSubj', sessionId),
+    decide: (sessionId) => ipcRenderer.invoke('wb:decide', sessionId),
+    recheck: (sessionId) => ipcRenderer.invoke('wb:recheck', sessionId),
+    actions: (sessionId) => ipcRenderer.invoke('wb:actions', sessionId),
+    recap: (sessionId, input) => ipcRenderer.invoke('wb:recap', sessionId, input)
   },
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),

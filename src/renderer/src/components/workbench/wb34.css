@@ -1,0 +1,702 @@
+/* 工作台 第三步（综合决策） / 第四步（行动复盘） */
+.wbx-step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.wbx-step > * {
+  flex-shrink: 0;
+}
+
+/* ===== 顶部原文依据 ===== */
+.wbx-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--red);
+  background: var(--red-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 13px;
+}
+
+.wbx-source .serif {
+  font-size: 14px;
+}
+
+.wbx-err {
+  padding: 0 2px;
+}
+
+/* ===== 说明卡 ===== */
+.wbx-intro-text {
+  font-size: 13px;
+  line-height: 1.9;
+  margin-bottom: 10px;
+}
+
+.wbx-note {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+/* ===== 检查面板 ===== */
+.wbx-checks {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbf7ef;
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+
+.wbx-checks-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.wbx-checks-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wbx-checks-sum {
+  font-size: 12px;
+}
+
+.wbx-checks-ok {
+  font-size: 12px;
+}
+
+.wbx-check-fail {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border-left: 3px solid var(--red);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--red-soft);
+}
+
+.wbx-check-msg {
+  flex: 1;
+}
+
+.wbx-check-waived {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.wbx-check-waived li {
+  display: flex;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.wbx-waived-tag {
+  flex-shrink: 0;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.wbx-check-passed {
+  margin-top: 8px;
+  font-size: 12.5px;
+}
+
+.wbx-check-passed summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.wbx-check-passed ul {
+  list-style: none;
+  padding-left: 2px;
+  margin: 6px 0 0;
+  color: var(--ok);
+}
+
+/* ===== 决策卡 ===== */
+.wbx-dec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.wbx-dec-kicker {
+  font-size: 15px;
+  letter-spacing: 0.06em;
+}
+
+.wbx-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.wbx-contra {
+  margin-bottom: 12px;
+}
+
+.wbx-contra-text {
+  font-size: 18px;
+  line-height: 1.7;
+  padding-left: 10px;
+  border-left: 4px solid var(--red);
+}
+
+.wbx-route {
+  margin-bottom: 12px;
+}
+
+.wbx-route-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.wbx-route-badge {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border-radius: var(--radius);
+  background: var(--red);
+  color: #fff;
+  font-size: 12.5px;
+}
+
+.wbx-route-reason {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.wbx-route-alt {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.wbx-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.wbx-block {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbf7ef;
+}
+
+.wbx-block.wbx-gap {
+  border: 1px solid var(--red);
+}
+
+.wbx-block.wbx-first {
+  background: var(--red-soft);
+}
+
+.wbx-block-text {
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.wbx-block-text.wbx-strong {
+  font-weight: 600;
+}
+
+.wbx-none {
+  font-size: 12.5px;
+}
+
+.wbx-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.wbx-list li {
+  display: flex;
+  gap: 6px;
+}
+
+.wbx-mark {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.wbx-section {
+  margin-bottom: 12px;
+}
+
+.wbx-section-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.wbx-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wbx-chip {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbf7ef;
+  font-size: 12.5px;
+}
+
+.wbx-chip-name {
+  flex-shrink: 0;
+  color: var(--red);
+  font-weight: 600;
+}
+
+.wbx-chip-point {
+  color: var(--ink);
+}
+
+.wbx-stale {
+  margin-top: 12px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--red);
+  border: 1px dashed var(--red);
+  border-radius: var(--radius);
+  background: var(--red-soft);
+}
+
+.wbx-check-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.wbx-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.wbx-foot .muted {
+  font-size: 12px;
+}
+
+/* ===== 决策编辑 ===== */
+.wbx-edit {
+  display: flex;
+  flex-direction: column;
+}
+
+.wbx-edit-field {
+  margin-bottom: 10px;
+}
+
+.wbx-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+.wbx-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.wbx-route-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wbx-route-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffdf8;
+  color: var(--ink);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.wbx-route-chip:hover {
+  border-color: var(--muted);
+}
+
+.wbx-route-chip.active {
+  border-color: var(--red);
+  background: var(--red);
+  color: #fff;
+}
+
+/* ===== 决策快照条 ===== */
+.wbx-snap {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.wbx-snap-cell {
+  min-width: 0;
+}
+
+.wbx-snap-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.wbx-snap-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* ===== 行动泳道 ===== */
+.wbx-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.wbx-actions-bar .muted {
+  font-size: 12px;
+}
+
+.wbx-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wbx-lane {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbf7ef;
+}
+
+.wbx-lane-head {
+  margin-bottom: 8px;
+}
+
+.wbx-lane-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wbx-lane-hint {
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.wbx-lane-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.wbx-lane-empty {
+  font-size: 12px;
+}
+
+.wbx-lane-add {
+  width: 100%;
+}
+
+/* ===== 行动卡 ===== */
+.wbx-action {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffdf8;
+}
+
+.wbx-action.is-done {
+  background: #eef4ee;
+}
+
+.wbx-action.is-dropped {
+  opacity: 0.55;
+  background: var(--paper-2);
+}
+
+.wbx-action-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.wbx-action-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.wbx-action-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.wbx-field-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.wbx-field-text {
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.wbx-std-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.wbx-std {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.wbx-std-chip {
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffdf8;
+  color: var(--muted);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.wbx-std-chip:hover {
+  border-color: var(--red);
+}
+
+.wbx-std-chip.active {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.wbx-action-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+/* ===== 行动编辑表单 ===== */
+.wbx-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.wbx-form-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.wbx-form .field {
+  margin-bottom: 8px;
+}
+
+.wbx-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.wbx-checks-block .wbx-checks {
+  margin-top: 14px;
+}
+
+/* ===== 复盘 ===== */
+.wbx-recap-sub {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.wbx-recap .field {
+  margin-bottom: 8px;
+}
+
+.wbx-recap-result {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbf7ef;
+}
+
+.wbx-recap-summary {
+  font-size: 16px;
+  line-height: 1.8;
+  margin-bottom: 8px;
+}
+
+.wbx-deltas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wbx-delta-title {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.wbx-delta ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+
+.wbx-facts {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.wbx-fact {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  cursor: pointer;
+}
+
+.wbx-facts .btn {
+  margin-top: 6px;
+}
+
+.wbx-warn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--red);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: var(--red-soft);
+  font-size: 12.5px;
+}
+
+/* ===== 台账 ===== */
+.wbx-ledger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wbx-ledger-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbf7ef;
+  padding: 6px 10px;
+}
+
+.wbx-ledger-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.wbx-ledger-head::-webkit-details-marker {
+  display: none;
+}
+
+.wbx-ledger-time {
+  font-size: 11.5px;
+  flex-shrink: 0;
+}
+
+.wbx-ledger-summary {
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.wbx-ledger-body {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wbx-raw {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--paper-2);
+  border-radius: var(--radius);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+
+/* ===== 窄屏 ===== */
+@media (max-width: 1240px) {
+  .wbx-snap {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wbx-lanes {
+    grid-template-columns: 1fr;
+  }
+
+  .wbx-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}

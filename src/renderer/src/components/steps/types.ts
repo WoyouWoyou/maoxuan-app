@@ -39,6 +39,8 @@ export function stepUnlocked(data: SessionData, step: StepKey): { ok: boolean; r
         return { ok: false, reason: '先写完 3 条笔记并保存，才会生成行动' }
       }
       return { ok: true, reason: '' }
+    default:
+      return { ok: false, reason: '' }
   }
 }
 
@@ -52,5 +54,7 @@ export function stepDone(data: SessionData, step: StepKey): boolean {
       return data.readings.some(r => r.notesDone)
     case 'apply':
       return data.mindset !== null || data.actions.some(a => a.status === 'done')
+    default:
+      return false
   }
 }

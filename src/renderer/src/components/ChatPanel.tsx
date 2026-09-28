@@ -10,6 +10,9 @@ export interface ChatPanelProps {
   articleId: string | null
   /** 存在时，讨论过一轮后可在面板底部一键把结论套用到第一步 */
   onApplyToProblem?: () => void
+  title?: string
+  intro?: { title: string; desc: string }
+  quickQuestions?: string[]
 }
 
 interface DisplayMessage {
@@ -32,7 +35,19 @@ function toDisplay(m: ChatMessage): DisplayMessage {
   return { id: m.id, role: m.role, content: m.content }
 }
 
-export function ChatPanel({ sessionId, articleId, onApplyToProblem }: ChatPanelProps) {
+const READING_INTRO = {
+  title: '我是你的《毛选》实用阅读教练。',
+  desc: '我只指原文、提问、批改，不替你总结，也不代写笔记。'
+}
+
+export function ChatPanel({
+  sessionId,
+  articleId,
+  onApplyToProblem,
+  title = '教练对话',
+  intro = READING_INTRO,
+  quickQuestions = QUICK_QUESTIONS
+}: ChatPanelProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -246,7 +261,7 @@ export function ChatPanel({ sessionId, articleId, onApplyToProblem }: ChatPanelP
   return (
     <div className="chat-panel">
       <div className="chat-head">
-        <span className="chat-title">教练对话</span>
+        <span className="chat-title">{title}</span>
         <span className="spacer" />
         {messages.length > 0 &&
           (confirmClear ? (
@@ -275,10 +290,10 @@ export function ChatPanel({ sessionId, articleId, onApplyToProblem }: ChatPanelP
 
         {!loading && messages.length === 0 && (
           <div className="chat-empty">
-            <p className="chat-empty-title">我是你的《毛选》实用阅读教练。</p>
-            <p className="muted">我只指原文、提问、批改，不替你总结，也不代写笔记。</p>
+            <p className="chat-empty-title">{intro.title}</p>
+            <p className="muted">{intro.desc}</p>
             <div className="chat-quick">
-              {QUICK_QUESTIONS.map((q) => (
+              {quickQuestions.map((q) => (
                 <button
                   key={q}
                   type="button"

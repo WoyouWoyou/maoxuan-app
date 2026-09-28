@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { STEPS, type SessionSummary, type StepKey } from '@shared/types'
+import { MODE_META, stepMeta, type SessionMode, type SessionSummary, type StepKey } from '@shared/types'
 import { CloseSessionDialog } from './CloseSessionDialog'
 import './Sidebar.css'
 
 const MIN_PROBLEM_LEN = 10
 const COLLAPSE_KEY = 'maoxuan.sidebarCollapsed'
+const MODES: SessionMode[] = ['reading', 'workbench']
 
 function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
 function stepLabel(step: StepKey): string {
-  const found = STEPS.find((s) => s.key === step)
+  const found = stepMeta(step)
   return found ? `${found.no} ${found.name}` : step
 }
 
@@ -41,6 +42,7 @@ export function Sidebar() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [mode, setMode] = useState<SessionMode>('reading')
   const [problemText, setProblemText] = useState('')
   const [busy, setBusy] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -111,6 +113,7 @@ export function Sidebar() {
     setCreating(false)
     setProblemText('')
     setCreateError(null)
+    setMode('reading')
   }
 
   async function submitCreate() {
@@ -119,9 +122,10 @@ export function Sidebar() {
     setBusy(true)
     setCreateError(null)
     try {
-      const session = await window.api.sessions.create(text)
+      const session = await window.api.sessions.create(text, mode)
       setProblemText('')
       setCreating(false)
+      setMode('reading')
       window.dispatchEvent(new Event('sessions-changed'))
       navigate(`/session/${session.id}`)
     } catch (e) {
@@ -196,10 +200,29 @@ export function Sidebar() {
 
         {creating ? (
           <div className="sb-new-box">
+            <div className="sb-mode-row">
+              {MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={m === mode ? 'sb-mode-opt is-on' : 'sb-mode-opt'}
+                  disabled={busy}
+                  onClick={() => setMode(m)}
+                >
+                  <span className="sb-mode-name">{MODE_META[m].name}</span>
+                  <span className="sb-mode-desc">{MODE_META[m].desc}</span>
+                </button>
+              ))}
+            </div>
+
             <textarea
               ref={textareaRef}
               className="textarea sb-new-input"
-              placeholder="写出你最近最头疼的那一件事（至少 10 字）"
+              placeholder={
+                mode === 'workbench'
+                  ? '写出这个项目的主目标（至少 10 字），例如：三个月内把 AI 客服从试点推到全公司'
+                  : '写出你最近最头疼的那一件事（至少 10 字）'
+              }
               value={problemText}
               onChange={(e) => setProblemText(e.target.value)}
               onKeyDown={(e) => {
@@ -215,7 +238,7 @@ export function Sidebar() {
               </button>
               <button className="btn btn-sm btn-primary" onClick={() => void submitCreate()} disabled={!canSubmit}>
                 {busy ? <span className="spinner" /> : null}
-                开始
+                {mode === 'workbench' ? '建立项目' : '开始'}
               </button>
             </div>
             {createError ? <div className="error-text">{createError}</div> : null}
@@ -264,6 +287,7 @@ export function Sidebar() {
 
             <div className="sb-item-title">{s.title}</div>
             <div className="sb-item-meta">
+              {s.mode === 'workbench' ? <span className="badge sb-mode-badge">工作台</span> : null}
               <span className="badge sb-badge">{stepLabel(s.currentStep)}</span>
               <span className="spacer" />
               <span className="sb-item-time">{formatTime(s.updatedAt)}</span>

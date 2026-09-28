@@ -4,15 +4,20 @@ import { app } from 'electron'
 import Database from 'better-sqlite3'
 import {
   emptySessionData,
+  emptyWorkbench,
   type ChatMessage,
   type Session,
   type SessionData,
+  type SessionMode,
   type SessionPatch,
   type SessionSummary,
   type Settings,
   type StepKey,
   type Version,
-  type VersionSummary
+  type VersionSummary,
+  type WbDiagnosis,
+  type WbForm,
+  type WorkbenchData
 } from '@shared/types'
 
 type SqliteDb = InstanceType<typeof Database>
@@ -21,8 +26,8 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY, title TEXT NOT NULL, current_step TEXT NOT NULL DEFAULT 'problem',
-  status TEXT NOT NULL DEFAULT 'active', data TEXT NOT NULL, version_no INTEGER NOT NULL DEFAULT 0,
-  deleted_at TEXT,
+  status TEXT NOT NULL DEFAULT 'active', mode TEXT NOT NULL DEFAULT 'reading', data TEXT NOT NULL,
+  version_no INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS versions (
   id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -43,6 +48,7 @@ interface SessionRow {
   title: string
   current_step: string
   status: string
+  mode: string
   data: string
   version_no: number
   deleted_at: string | null
@@ -82,6 +88,9 @@ export function initDb(): SqliteDb {
   if (!columns.some((column) => column.name === 'deleted_at')) {
     handle.exec('ALTER TABLE sessions ADD COLUMN deleted_at TEXT')
   }
+  if (!columns.some((column) => column.name === 'mode')) {
+    handle.exec("ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'reading'")
+  }
 
   db = handle
   return handle
@@ -96,10 +105,50 @@ function nowIso(): string {
   return new Date().toISOString()
 }
 
+/** 工作台数据结构的历史版本可能缺字段，这里统一补齐默认值。 */
+function normalizeWorkbench(raw: WorkbenchData): WorkbenchData {
+  const base = emptyWorkbench()
+  const form = (raw.form ?? {}) as Partial<WbForm>
+  const blockers = Array.isArray(form.blockers)
+    ? form.blockers.map((item) => (typeof item === 'string' ? item : ''))
+    : []
+  while (blockers.length < 3) blockers.push('')
+
+  const diagnosis = (raw.diagnosis ?? {}) as Partial<WbDiagnosis>
+  const decision = raw.decision ? { ...raw.decision, checks: raw.decision.checks ?? [] } : null
+  const actions = Array.isArray(raw.actions) ? raw.actions : []
+
+  return {
+    form: {
+      projectName: form.projectName ?? base.form.projectName,
+      objective: form.objective ?? base.form.objective,
+      timeScale: form.timeScale ?? base.form.timeScale,
+      stage: form.stage ?? base.form.stage,
+      blockers,
+      background: form.background ?? base.form.background,
+      knownFacts: form.knownFacts ?? base.form.knownFacts,
+      opponents: form.opponents ?? base.form.opponents,
+      allies: form.allies ?? base.form.allies,
+      swing: form.swing ?? base.form.swing
+    },
+    intake: raw.intake ?? null,
+    diagnosis: {
+      contradiction: diagnosis.contradiction ?? null,
+      routes: diagnosis.routes ?? null,
+      objSubj: diagnosis.objSubj ?? null
+    },
+    decision,
+    actions: actions.map((action) => ({ ...action, progress: action.progress ?? [] })),
+    actionChecks: raw.actionChecks ?? [],
+    ledger: raw.ledger ?? []
+  }
+}
+
 function parseData(value: string): SessionData {
   const data = JSON.parse(value) as SessionData
   data.readings = (data.readings ?? []).map((r) => ({ ...r, reflections: r.reflections ?? [] }))
   data.actions = (data.actions ?? []).map((a) => ({ ...a, progress: a.progress ?? [] }))
+  if (data.workbench) data.workbench = normalizeWorkbench(data.workbench)
   return data
 }
 
@@ -107,6 +156,7 @@ function rowToSummary(row: SessionRow): SessionSummary {
   return {
     id: row.id,
     title: row.title,
+    mode: row.mode === 'workbench' ? 'workbench' : 'reading',
     currentStep: row.current_step as StepKey,
     status: row.status === 'archived' ? 'archived' : 'active',
     deletedAt: row.deleted_at ?? null,
@@ -207,27 +257,36 @@ export function getSession(id: string): Session | null {
   return row ? rowToSession(row) : null
 }
 
-export function createSession(problemText: string): Session {
+export function createSession(problemText: string, mode: SessionMode = 'reading'): Session {
   const handle = getDb()
   const id = randomUUID()
   const timestamp = nowIso()
   const text = problemText.trim()
   const title = text.slice(0, 24) || '未命名问题'
   const data = emptySessionData()
-  data.problem.text = text
+
+  let currentStep: StepKey = 'problem'
+  let label = '创建问题'
+  if (mode === 'workbench') {
+    data.workbench = emptyWorkbench(text)
+    currentStep = 'wb_intake'
+    label = '创建项目'
+  } else {
+    data.problem.text = text
+  }
   const payload = JSON.stringify(data)
 
   const run = handle.transaction(() => {
     handle
       .prepare(
-        'INSERT INTO sessions (id, title, current_step, status, data, version_no, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO sessions (id, title, current_step, status, mode, data, version_no, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
       )
-      .run(id, title, 'problem', 'active', payload, 1, timestamp, timestamp)
+      .run(id, title, currentStep, 'active', mode, payload, 1, timestamp, timestamp)
     handle
       .prepare(
         'INSERT INTO versions (id, session_id, version_no, step, label, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
       )
-      .run(randomUUID(), id, 1, 'problem', '创建问题', payload, timestamp)
+      .run(randomUUID(), id, 1, currentStep, label, payload, timestamp)
   })
   run()
 

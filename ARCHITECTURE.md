@@ -146,6 +146,22 @@ sequenceDiagram
 
 所有提示词共享 `BASE_RULES`（“四不要”）：不替用户总结、不代写笔记、引用原文一字不差。
 
+### 4.3 工作台模式
+
+新建问题时二选一：**阅读法**（原有四步，`mode='reading'`）或**工作台**（`mode='workbench'`，数据在 `SessionData.workbench`）。`SessionPage` 遇到工作台会话直接交给 `WorkbenchPage`，两套页面互不影响。
+
+| 步骤 | 调用 | 要点 |
+|---|---|---|
+| 1 摸清事实 | `wb.intake` | 表单转成事实台账，分事实 / 判断 / 愿望，编号 F1、F2… 只增不改；缺什么就追问 |
+| 2 三路诊断 | `wb.contradiction` / `wb.routes` / `wb.objSubj` | 三个分析各自只看事实台账，互不参考；引用的 F 编号由程序校验 |
+| 3 综合决策 | `wb.decide` / `wb.recheck` | 硬规则（`ruleChecksDecision`，F/C/R/O/D 系列）+ AI 红队；未通过项可修复或由用户豁免 |
+| 4 行动复盘 | `wb.actions` / `wb.recap` | 7/30/90 天行动须有验证、执行标准、KPI 关系（`ruleChecksActions`）；复盘结论只追加到项目台账 |
+
+- 规则常量、原文依据（`WB_SOURCES`，均已核对原文）和门禁函数在 `src/shared/workbench.ts`，提示词在 `src/main/wbPrompts.ts`（`WB_RULES`：不用毛泽东第一人称、结论写成条件式、给人看的文字不出现英文键名）。
+- `src/main/workbench.ts` 遇到网络闪断会自动重试一次，超时不重试。
+- 对话复用 `ChatPanel`，工作台传入「参谋对话」的标题、开场白和快捷问题，系统提示由 `buildWbChatSystem` 生成。
+- 端到端测试：`PORT=9336 node scripts/e2e-wb.mjs`（`RESUME=1` 接着测已有示例）。
+
 ## 5. 开发方式：Opus 指挥 + DeepSeek 写代码
 
 ```mermaid

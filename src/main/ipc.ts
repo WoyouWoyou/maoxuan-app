@@ -7,9 +7,20 @@ import type {
   ChatErrorEvent,
   ChatMessage,
   Session,
+  SessionMode,
   SessionPatch,
   Settings,
-  ThreeNotes
+  ThreeNotes,
+  WbAction,
+  WbCheck,
+  WbContradiction,
+  WbDecision,
+  WbIntake,
+  WbObjSubj,
+  WbRecapInput,
+  WbRecapResult,
+  WbRoutes,
+  WorkbenchData
 } from '@shared/types'
 import {
   addMessage,
@@ -43,6 +54,17 @@ import {
   reviewSituation,
   reviseProblem
 } from './coach'
+import {
+  buildWbChatMessages,
+  wbActions,
+  wbContradiction,
+  wbDecide,
+  wbIntake,
+  wbObjSubj,
+  wbRecap,
+  wbRecheck,
+  wbRoutes
+} from './workbench'
 import { streamChat, testConnection } from './ai'
 
 function toError(error: unknown): Error {
@@ -75,6 +97,12 @@ function requireArticle(id: string): Article {
   return article
 }
 
+function requireWorkbench(sessionId: string): WorkbenchData {
+  const session = requireSession(sessionId)
+  if (session.mode !== 'workbench' || !session.data.workbench) throw new Error('这个会话不是工作台模式')
+  return session.data.workbench
+}
+
 async function runChat(
   sender: WebContents,
   requestId: string,
@@ -93,7 +121,10 @@ async function runChat(
       .filter((message) => message.id !== userMessageId)
       .slice(-20)
     const article = articleId ? getArticle(articleId) : null
-    const messages = buildChatMessages(session.data, history, userContent, article)
+    const messages =
+      session.mode === 'workbench' && session.data.workbench
+        ? buildWbChatMessages(session.data.workbench, history, userContent)
+        : buildChatMessages(session.data, history, userContent, article)
     const full = await streamChat(getSettings(), messages, (delta) => {
       send<ChatChunkEvent>('chat:chunk', { requestId, delta })
     })
@@ -119,7 +150,9 @@ export function registerIpc(): void {
   register<[], ReturnType<typeof listArchivedSessions>>('sessions:listArchived', () => listArchivedSessions())
   register<[], ReturnType<typeof listTrashSessions>>('sessions:listTrash', () => listTrashSessions())
   register<[string], Session | null>('sessions:get', (id) => getSession(id))
-  register<[string], Session>('sessions:create', (problemText) => createSession(problemText))
+  register<[string, SessionMode | undefined], Session>('sessions:create', (problemText, mode) =>
+    createSession(problemText, mode === 'workbench' ? 'workbench' : 'reading')
+  )
   register<[string, SessionPatch, string | undefined], Session>(
     'sessions:update',
     (id, patch, versionLabel) => updateSession(id, patch, versionLabel)
@@ -209,6 +242,21 @@ export function registerIpc(): void {
     const session = requireSession(sessionId)
     return mindset(getSettings(), session.data)
   })
+
+  register<[string], WbIntake>('wb:intake', (sessionId) => wbIntake(getSettings(), requireWorkbench(sessionId)))
+  register<[string], WbContradiction>('wb:contradiction', (sessionId) =>
+    wbContradiction(getSettings(), requireWorkbench(sessionId))
+  )
+  register<[string], WbRoutes>('wb:routes', (sessionId) => wbRoutes(getSettings(), requireWorkbench(sessionId)))
+  register<[string], WbObjSubj>('wb:objSubj', (sessionId) => wbObjSubj(getSettings(), requireWorkbench(sessionId)))
+  register<[string], WbDecision>('wb:decide', (sessionId) => wbDecide(getSettings(), requireWorkbench(sessionId)))
+  register<[string], WbCheck[]>('wb:recheck', (sessionId) => wbRecheck(getSettings(), requireWorkbench(sessionId)))
+  register<[string], { actions: WbAction[]; checks: WbCheck[] }>('wb:actions', (sessionId) =>
+    wbActions(getSettings(), requireWorkbench(sessionId))
+  )
+  register<[string, WbRecapInput], WbRecapResult>('wb:recap', (sessionId, input) =>
+    wbRecap(getSettings(), requireWorkbench(sessionId), input)
+  )
 
   register<[], Settings>('settings:get', () => getSettings())
   register<[Settings], Settings>('settings:set', (settings) => setSettings(settings))

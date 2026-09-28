@@ -12,6 +12,7 @@ import { StepFocus } from '@renderer/components/steps/StepFocus'
 import { StepProblem } from '@renderer/components/steps/StepProblem'
 import { StepRelate } from '@renderer/components/steps/StepRelate'
 import { stepUnlocked } from '@renderer/components/steps/types'
+import { WorkbenchPage } from './WorkbenchPage'
 import './SessionPage.css'
 
 const ORDER: StepKey[] = ['problem', 'focus', 'relate', 'apply']
@@ -289,6 +290,8 @@ export function SessionPage() {
       </div>
     )
   }
+
+  if (session.mode === 'workbench') return <WorkbenchPage key={session.id} initial={session} />
 
   const currentStepName = STEPS.find(s => s.key === session.currentStep)?.name ?? ''
   const chatArticleId = viewStep === 'focus' || viewStep === 'relate' ? focusArticleId : null
