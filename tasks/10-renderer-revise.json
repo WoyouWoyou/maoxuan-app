@@ -1,0 +1,23 @@
+{
+  "name": "v0.2 渲染：第一步套用讨论结果 + 手动修订诊断",
+  "files": [
+    "src/renderer/src/components/ReviseDialog.tsx",
+    "src/renderer/src/components/ReviseDialog.css",
+    "src/renderer/src/components/steps/types.ts",
+    "src/renderer/src/pages/SessionPage.tsx",
+    "src/renderer/src/components/ChatPanel.tsx",
+    "src/renderer/src/components/ChatPanel.css",
+    "src/renderer/src/components/steps/StepProblem.tsx",
+    "src/renderer/src/components/steps/StepProblem.css"
+  ],
+  "context": [
+    "tasks/_renderer-contract.md",
+    "src/preload/index.d.ts",
+    "src/renderer/src/components/steps/types.ts",
+    "src/renderer/src/pages/SessionPage.tsx",
+    "src/renderer/src/components/ChatPanel.tsx",
+    "src/renderer/src/components/ChatPanel.css",
+    "src/renderer/src/components/steps/StepProblem.tsx"
+  ],
+  "instructions": "按 SPEC.md 5.1“第一步套用讨论结果”，在现有代码上做修改，输出完整文件（ReviseDialog.*、StepProblem.css 为新文件）。其余行为、文案保持不变。新建 Reading 的地方（SessionPage、StepProblem 的 makeReading）要加 `reflections: []`。\n\n1. `steps/types.ts`：`StepProps` 新增 `openRevise: () => void`。\n2. 新组件 `ReviseDialog`（具名导出）：`{ session: Session; onClose: () => void; onApply: (next: { problem: ProblemInput; diagnosis: Diagnosis }) => Promise<void> }`。打开即调用 `window.api.ai.reviseProblem(session.id)`，加载中显示“教练正在整理你们的讨论…”+ spinner，失败显示错误与“重试”。成功后：顶部列出 `changes`（为空则提示“讨论里没有需要改动的地方”）；下方逐字段对比表，字段：问题、背景、已经试过、复述、症状（数组按“；”连接比较）、主要矛盾、所处阶段、推荐篇目（按“《标题》：理由”列表比较）。每行：复选框、字段名、左“原来”（muted）、右“修订后”（朱红左边框）；有变化的默认勾选，无变化的行默认折叠到底部“未改动的字段（N）”中且不可勾选。底部按钮“套用选中项”（未勾选任何项时禁用）与“取消”。套用：以当前 session.data.problem / diagnosis 为基础，只替换勾选字段（diagnosis 为 null 时以修订版为基础），调用 onApply。全屏半透明遮罩 + 居中 760px 卡片，Esc 关闭，最大高度 85vh 内部滚动。样式前缀 `.rev-`。\n3. `SessionPage`：state `reviseOpen`；`openRevise` 放进 stepProps；渲染 `ReviseDialog`，`onApply` 用 `update(latest => ({ ...latest, problem: next.problem, diagnosis: next.diagnosis }), { versionLabel: '第一步：根据讨论修订' })`，成功后关闭弹窗并 `setViewStep('problem')`。给 ChatPanel 传 `onApplyToProblem={openRevise}`。\n4. `ChatPanel`：新增可选 prop `onApplyToProblem?: () => void`；当它存在且对话中至少有一条用户消息、且当前不在流式回复中时，在输入框上方显示一条浅红提示条：“对诊断有不同看法？讨论完可以把结论套用到第一步” + 按钮“套用到第一步 →”。\n5. `StepProblem`：\n   - 本地表单 state 需要在外部数据变化时同步：用 `useEffect` 监听 `session.data.problem` 三个字段，若与本地不同且用户当前没有正在编辑的未保存改动（用一个 dirty ref 判断：输入时置 true，blur 保存或诊断成功后置 false），则用外部值覆盖本地。\n   - 诊断卡片标题行右侧增加两个按钮：“和教练讨论分歧”（聚焦右侧对话输入框：`document.querySelector<HTMLTextAreaElement>('.chat-input')?.focus()`，并在输入框为空时预填“我对诊断有不同看法：”——通过派发 `window.dispatchEvent(new CustomEvent('chat-prefill', { detail: '我对诊断有不同看法：' }))`，ChatPanel 监听该事件，仅在输入框为空时填入并聚焦）与“套用讨论结果”（调用 `openRevise`）。ChatPanel 的该监听一并在第 4 点中实现。\n   - 复述、主要矛盾、所处阶段三处支持手动编辑：hover 显示“编辑”小按钮，点击变 textarea + “保存 / 取消”；保存用 `update(latest => latest.diagnosis ? { ...latest, diagnosis: { ...latest.diagnosis, [field]: value } } : latest, { versionLabel: '第一步：手动修订诊断' })`。\n   - 新样式写在 `StepProblem.css`（前缀 `.sp1-`），在组件中 import。"
+}

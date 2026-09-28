@@ -1,0 +1,8 @@
+node_modules
+dist
+out
+release
+.env
+_epub
+*.db
+.codegen

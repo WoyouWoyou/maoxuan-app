@@ -1,0 +1,85 @@
+.csd-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(43, 43, 43, 0.34);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.csd-card {
+  width: 520px;
+  max-width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 44px rgba(43, 43, 43, 0.22);
+  padding: 18px 20px 16px;
+  font-family: var(--sans);
+  color: var(--ink);
+}
+
+.csd-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.csd-problem {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  background: #fbf7ef;
+  font-size: 15px;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.csd-note {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+
+.csd-error {
+  margin-top: 10px;
+}
+
+.csd-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.csd-actions .csd-btn-archive,
+.csd-actions .csd-btn-trash {
+  border-width: 1px;
+  border-style: solid;
+  color: #fff;
+}
+
+.csd-actions .csd-btn-archive {
+  background: #2f5d8a;
+  border-color: #2f5d8a;
+}
+
+.csd-actions .csd-btn-archive:hover:not(:disabled) {
+  background: #264c72;
+  border-color: #264c72;
+}
+
+.csd-actions .csd-btn-trash {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.csd-actions .csd-btn-trash:hover:not(:disabled) {
+  background: #9c2a23;
+  border-color: #9c2a23;
+}

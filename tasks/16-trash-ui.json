@@ -1,0 +1,21 @@
+{
+  "name": "回收站与归档：侧栏关闭弹窗 + 设置页回收站",
+  "files": [
+    "src/renderer/src/components/Sidebar.tsx",
+    "src/renderer/src/components/Sidebar.css",
+    "src/renderer/src/components/CloseSessionDialog.tsx",
+    "src/renderer/src/components/CloseSessionDialog.css",
+    "src/renderer/src/components/TrashPanel.tsx",
+    "src/renderer/src/components/TrashPanel.css",
+    "src/renderer/src/pages/SettingsPage.tsx"
+  ],
+  "context": [
+    "tasks/_renderer-contract.md",
+    "src/renderer/src/components/Sidebar.tsx",
+    "src/renderer/src/components/Sidebar.css",
+    "src/renderer/src/pages/SettingsPage.tsx",
+    "src/renderer/src/components/ReviseDialog.tsx",
+    "src/renderer/src/components/ReviseDialog.css"
+  ],
+  "instructions": "契约已更新：`SessionSummary.deletedAt: string | null`；`window.api.sessions` 新增 listArchived / listTrash / archive / unarchive / trash / restore / emptyTrash（见 src/shared/api.ts）；`sessions.list()` 现在只返回进行中的会话；`TRASH_RETENTION_DAYS`（=30）从 '@shared/core' 导入。现有文件做最小修改、其余代码一字不动，全部输出完整文件。所有会话变更成功后都 `window.dispatchEvent(new Event('sessions-changed'))`。\n\n## 1. 新组件 CloseSessionDialog（具名导出）\nprops：`{ session: SessionSummary; onClose(): void; onDone(action: 'trash' | 'archive'): void }`。模态遮罩与 Esc 关闭参照 ReviseDialog 的写法，类名前缀 `csd-`。\n- 标题：`关闭这个问题？`；正文用 serif 显示问题标题 `session.title`；下面一行 muted 13px 说明：`归档：从列表中收起，随时可在「设置 → 已归档」找回。回收站：${TRASH_RETENTION_DAYS} 天后彻底删除，期间可在「设置 → 回收站」恢复。`\n- 按钮行（右对齐，间距 8px）：`取消`（btn btn-ghost）、`归档`（蓝底白字 `.csd-btn-archive`：背景 #2f5d8a，hover #264c72）、`移入回收站（${TRASH_RETENTION_DAYS} 天后彻底删除）`（红底白字 `.csd-btn-trash`：背景 var(--red)，hover #9c2a23）。两个彩色按钮带 `btn` 基类，border 同色，color #fff。\n- 点击后调用 `window.api.sessions.archive` / `trash`，期间两个按钮 disabled 并在被点按钮内显示 `<span className=\"spinner\" />`；成功调 `onDone(action)`；失败在按钮行上方显示 `.error-text`。\n\n## 2. Sidebar.tsx / Sidebar.css\n- 删除原来右键出现的内联「确认删除？」(`confirmId`/`deletingId`/`removeSession`/`.sb-confirm` 相关状态、JSX 与 CSS）。\n- 每个 `.sb-item` 右上角加关闭按钮 `<button className=\"sb-item-close\" title=\"关闭问题\">×</button>`：绝对定位（`.sb-item` 设 position: relative），top 6px right 6px，22×22，圆形，透明底，muted 色 16px；默认 opacity 0，`.sb-item:hover .sb-item-close, .sb-item.active .sb-item-close` 时 opacity 1；hover 背景 var(--red-soft)、颜色 var(--red)。点击 `e.stopPropagation()` 后 `setClosing(s)`。右键 `onContextMenu` 也改为 `setClosing(s)`。`.sb-item-title` 加 padding-right 20px 避免与按钮重叠。\n- 渲染 `{closing && <CloseSessionDialog session={closing} onClose={() => setClosing(null)} onDone={...} />}`：onDone 中 `setClosing(null)`，若 `closing.id === activeId` 则 `navigate('/')`，再派发 sessions-changed。\n\n## 3. 新组件 TrashPanel（具名导出，无 props），类名前缀 `tp-`\n渲染两个 `.card` 区块，垂直间距 16px，挂载时及收到 `sessions-changed` 时分别调用 listTrash / listArchived 刷新。\n### 回收站\n- 标题行：`回收站`（16px 600）+ muted `共 N 个 · ${TRASH_RETENTION_DAYS} 天后自动彻底删除`；右侧 `清空回收站` 按钮（btn btn-sm btn-danger，列表为空时 disabled）。点击后在标题行下方出现内联确认条：`确定彻底删除回收站里的 N 个问题？此操作不可恢复。` + `取消` + `彻底删除`（btn-danger），确认后调 emptyTrash。\n- 空态：muted `回收站是空的。`\n- 每行 `.tp-row`：左侧标题（serif 15px，单行省略）+ 下方 muted 12px `删除于 YYYY-MM-DD · 剩余 D 天`，D = max(0, ceil((deletedAt + 30 天 - now) / 86400000))，D ≤ 3 时用 var(--red)。右侧 `恢复`（btn btn-sm btn-ghost，调 restore）与 `彻底删除`（btn btn-sm btn-danger；点击后该行按钮变成 `确认删除？` + `取消`/`删除` 两个小按钮，确认后调 remove）。\n### 已归档\n- 标题行：`已归档` + muted `共 N 个`。空态：muted `没有归档的问题。`\n- 每行：标题 + muted `归档于 YYYY-MM-DD`（取 updatedAt）；右侧 `打开`（btn-ghost，`navigate('/session/'+id)`）、`取消归档`（btn-ghost，调 unarchive）、`移入回收站`（btn-danger，调 trash）。\n- 所有操作期间该行按钮 disabled；失败在区块底部显示 `.error-text`。\n\n## 4. SettingsPage.tsx\n在页面最底部（现有 `.set-hint` 之后、`.set` 容器内）加一个 `<h2 className=\"set-title\" style={{ fontSize: 20, marginTop: 32 }}>回收站与归档</h2>` 与 `<TrashPanel />`。页面副标题 `set-desc` 不变。"
+}

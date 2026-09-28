@@ -1,0 +1,44 @@
+[主进程核心：窗口、SQLite、原文检索、IPC、preload] start, prompt=22960 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] start, prompt=22118 chars
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] start, prompt=24863 chars
+[渲染进程会话页：四步工作流] start, prompt=26310 chars
+[渲染进程右侧面板：教练对话 + 版本历史与对比] start, prompt=24390 chars
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] reasoning=14334 chars, content=0 chars
+[主进程核心：窗口、SQLite、原文检索、IPC、preload] reasoning=14242 chars, content=0 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] reasoning=11983 chars, content=0 chars
+[渲染进程右侧面板：教练对话 + 版本历史与对比] reasoning=12456 chars, content=0 chars
+[渲染进程会话页：四步工作流] reasoning=14146 chars, content=0 chars
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] reasoning=30195 chars, content=0 chars
+[主进程核心：窗口、SQLite、原文检索、IPC、preload] reasoning=29694 chars, content=0 chars
+[渲染进程右侧面板：教练对话 + 版本历史与对比] reasoning=26933 chars, content=0 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] reasoning=23985 chars, content=0 chars
+[渲染进程会话页：四步工作流] reasoning=28433 chars, content=0 chars
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] reasoning=46712 chars, content=0 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] reasoning=35019 chars, content=0 chars
+[渲染进程右侧面板：教练对话 + 版本历史与对比] reasoning=39257 chars, content=0 chars
+[主进程核心：窗口、SQLite、原文检索、IPC、preload] reasoning=44832 chars, content=0 chars
+[渲染进程会话页：四步工作流] reasoning=45440 chars, content=0 chars
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] reasoning=62767 chars, content=0 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] reasoning=51099 chars, content=0 chars
+[渲染进程右侧面板：教练对话 + 版本历史与对比] reasoning=58307 chars, content=0 chars
+[主进程核心：窗口、SQLite、原文检索、IPC、preload] reasoning=47659 chars, content=18284 chars
+[渲染进程会话页：四步工作流] reasoning=60612 chars, content=0 chars
+[主进程核心：窗口、SQLite、原文检索、IPC、preload] done in 67s, wrote 5/5
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] reasoning=76967 chars, content=0 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] reasoning=64227 chars, content=0 chars
+[渲染进程右侧面板：教练对话 + 版本历史与对比] reasoning=72138 chars, content=2542 chars
+[渲染进程会话页：四步工作流] reasoning=75744 chars, content=0 chars
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] reasoning=77659 chars, content=19389 chars
+[渲染进程右侧面板：教练对话 + 版本历史与对比] reasoning=72138 chars, content=22638 chars
+[渲染进程会话页：四步工作流] reasoning=91885 chars, content=0 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] reasoning=66897 chars, content=11032 chars
+[渲染进程右侧面板：教练对话 + 版本历史与对比] done in 99s, wrote 5/5
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] reasoning=77659 chars, content=40281 chars
+[渲染进程会话页：四步工作流] reasoning=108736 chars, content=0 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] reasoning=66897 chars, content=28209 chars
+[主进程 AI 大脑：DeepSeek 客户端、提示词、教练逻辑] done in 107s, wrote 3/3
+[渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置] done in 114s, wrote 13/13
+[渲染进程会话页：四步工作流] reasoning=114178 chars, content=13689 chars
+[渲染进程会话页：四步工作流] reasoning=114178 chars, content=35630 chars
+[渲染进程会话页：四步工作流] reasoning=114178 chars, content=57627 chars
+[渲染进程会话页：四步工作流] done in 156s, wrote 10/10

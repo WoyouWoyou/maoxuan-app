@@ -1,0 +1,302 @@
+/* 根元素即容器查询上下文：宽度不足时自动放弃右侧目录 */
+.reader {
+  container-type: inline-size;
+  container-name: reader;
+  width: 100%;
+  min-width: 0;
+}
+
+.reader-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 只有容器够宽（≥720px）时才给目录 220px，正文列因此不会低于 260px */
+.reader-grid.has-side {
+  grid-template-columns: minmax(0, 1fr) 220px;
+}
+
+.reader-main {
+  min-width: 0;
+  width: 100%;
+  max-width: 760px;
+}
+
+/* 没有右侧目录时给正文一个下限，防止被相邻面板压成竖条 */
+.reader-compact .reader-main,
+.reader:not(.reader-compact) .reader-grid:not(.has-side) .reader-main {
+  min-width: 260px;
+}
+
+/* ===== 顶部标注标签条（compact 或窄容器） ===== */
+.reader-toc-strip {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  margin-bottom: 12px;
+  padding: 6px 0;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
+.reader-toc-strip-label {
+  flex: 0 0 auto;
+  padding-right: 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  user-select: none;
+}
+
+.reader-toc-item {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffdf8;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reader-toc-item:hover {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.reader-compact .reader-toc-strip {
+  display: flex;
+}
+
+/* ===== 正文 ===== */
+.reader-focus {
+  padding: 10px 14px;
+  margin-bottom: 22px;
+  border-left: 3px solid var(--red);
+  background: var(--red-soft);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.reader-focus-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--red);
+}
+
+.reader-focus-text {
+  margin-top: 2px;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.reader-head {
+  padding-bottom: 12px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reader-title {
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1.4;
+}
+
+.reader-volume {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.reader-body {
+  min-width: 0;
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.9;
+}
+
+.reader-p {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 4px;
+  padding: 2px 8px 2px 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.reader-p.reader-mark {
+  padding: 4px 10px 4px 7px;
+  border-left: 3px solid var(--red);
+  background: var(--red-soft);
+}
+
+/* 当前“关联到感悟”的段落：朱红虚线外框，可与标注高亮叠加 */
+.reader-p.reader-active {
+  outline: 1px dashed var(--red);
+  outline-offset: 2px;
+  background: var(--red-soft);
+}
+
+.reader-p.reader-mark.reader-active {
+  background: #f6d9d3;
+}
+
+.reader-no {
+  flex: 0 0 26px;
+  padding-top: 9px;
+  text-align: right;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: #b6aa95;
+  user-select: none;
+}
+
+/* 可点击的段落编号：关联 / 取消关联到感悟 */
+.reader-no-btn {
+  border: none;
+  background: transparent;
+  padding: 9px 0 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.reader-no-btn:hover {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.reader-no-btn:focus-visible {
+  outline: 1px solid var(--red);
+}
+
+.reader-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.reader-num {
+  font-size: 11px;
+  color: var(--muted);
+  vertical-align: super;
+}
+
+.reader-why {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.reader-why-line {
+  display: block;
+}
+
+.reader-unverified {
+  color: #b0812f;
+}
+
+.reader-flash {
+  animation: reader-flash 1.6s ease-out;
+}
+
+@keyframes reader-flash {
+  0%,
+  25% {
+    box-shadow: inset 0 0 0 2px var(--red);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+}
+
+/* ===== 右侧标注目录（仅宽容器） ===== */
+.reader-side {
+  position: sticky;
+  top: 8px;
+  min-width: 0;
+  max-height: 70vh;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbf7ef;
+}
+
+.reader-side-title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.reader-side-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reader-side-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 8px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffdf8;
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.reader-side-item:hover {
+  border-color: var(--red);
+}
+
+.reader-side-no {
+  font-size: 11px;
+  color: var(--red);
+}
+
+.reader-side-quote {
+  font-family: var(--serif);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* ===== compact：嵌入会话页时字号与内边距收敛 ===== */
+.reader-compact .reader-body {
+  font-size: 16px;
+  padding: 0 20px;
+}
+
+/* ===== 窄容器：退化成顶部标签条 + 单列正文 ===== */
+@container reader (max-width: 720px) {
+  .reader-grid.has-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reader-side {
+    display: none;
+  }
+
+  .reader-toc-strip {
+    display: flex;
+  }
+}

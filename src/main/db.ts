@@ -1,0 +1,396 @@
+import path from 'path'
+import { randomUUID } from 'crypto'
+import { app } from 'electron'
+import Database from 'better-sqlite3'
+import {
+  emptySessionData,
+  type ChatMessage,
+  type Session,
+  type SessionData,
+  type SessionPatch,
+  type SessionSummary,
+  type Settings,
+  type StepKey,
+  type Version,
+  type VersionSummary
+} from '@shared/types'
+
+type SqliteDb = InstanceType<typeof Database>
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, current_step TEXT NOT NULL DEFAULT 'problem',
+  status TEXT NOT NULL DEFAULT 'active', data TEXT NOT NULL, version_no INTEGER NOT NULL DEFAULT 0,
+  deleted_at TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS versions (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  version_no INTEGER NOT NULL, step TEXT NOT NULL, label TEXT NOT NULL, data TEXT NOT NULL,
+  created_at TEXT NOT NULL, UNIQUE(session_id, version_no));
+CREATE TABLE IF NOT EXISTS messages (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  role TEXT NOT NULL, content TEXT NOT NULL, article_id TEXT, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, created_at);
+CREATE TABLE IF NOT EXISTS articles (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, volume TEXT NOT NULL, is_core INTEGER NOT NULL,
+  core_order INTEGER, content TEXT NOT NULL, ord INTEGER NOT NULL);
+CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(title, content, content='articles', content_rowid='rowid', tokenize='trigram');
+`
+
+interface SessionRow {
+  id: string
+  title: string
+  current_step: string
+  status: string
+  data: string
+  version_no: number
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+interface VersionRow {
+  id: string
+  session_id: string
+  version_no: number
+  step: string
+  label: string
+  data: string
+  created_at: string
+}
+
+interface MessageRow {
+  id: string
+  session_id: string
+  role: string
+  content: string
+  article_id: string | null
+  created_at: string
+}
+
+let db: SqliteDb | null = null
+
+export function initDb(): SqliteDb {
+  if (db) return db
+  const handle = new Database(path.join(app.getPath('userData'), 'maoxuan.db'))
+  handle.pragma('journal_mode = WAL')
+  handle.pragma('foreign_keys = ON')
+  handle.exec(SCHEMA)
+
+  const columns = handle.pragma('table_info(sessions)') as { name: string }[]
+  if (!columns.some((column) => column.name === 'deleted_at')) {
+    handle.exec('ALTER TABLE sessions ADD COLUMN deleted_at TEXT')
+  }
+
+  db = handle
+  return handle
+}
+
+export function getDb(): SqliteDb {
+  if (!db) throw new Error('数据库尚未初始化')
+  return db
+}
+
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+function parseData(value: string): SessionData {
+  const data = JSON.parse(value) as SessionData
+  data.readings = (data.readings ?? []).map((r) => ({ ...r, reflections: r.reflections ?? [] }))
+  data.actions = (data.actions ?? []).map((a) => ({ ...a, progress: a.progress ?? [] }))
+  return data
+}
+
+function rowToSummary(row: SessionRow): SessionSummary {
+  return {
+    id: row.id,
+    title: row.title,
+    currentStep: row.current_step as StepKey,
+    status: row.status === 'archived' ? 'archived' : 'active',
+    deletedAt: row.deleted_at ?? null,
+    versionNo: row.version_no,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }
+}
+
+function rowToSession(row: SessionRow): Session {
+  return { ...rowToSummary(row), data: parseData(row.data) }
+}
+
+function rowToVersionSummary(row: VersionRow): VersionSummary {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    versionNo: row.version_no,
+    step: row.step as StepKey,
+    label: row.label,
+    createdAt: row.created_at
+  }
+}
+
+function rowToVersion(row: VersionRow): Version {
+  return { ...rowToVersionSummary(row), data: parseData(row.data) }
+}
+
+function rowToMessage(row: MessageRow): ChatMessage {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    role: row.role === 'assistant' ? 'assistant' : 'user',
+    content: row.content,
+    articleId: row.article_id,
+    createdAt: row.created_at
+  }
+}
+
+function readSetting(key: string): string | null {
+  const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
+  return row ? row.value : null
+}
+
+function readSettingWithFallback(key: string, envName: string, fallback: string): string {
+  const stored = readSetting(key)
+  if (stored !== null && stored !== '') return stored
+  const fromEnv = process.env[envName]
+  if (typeof fromEnv === 'string' && fromEnv.trim() !== '') return fromEnv.trim()
+  return fallback
+}
+
+export function getSettings(): Settings {
+  return {
+    apiKey: readSettingWithFallback('apiKey', 'DEEPSEEK_API_KEY', ''),
+    baseUrl: readSettingWithFallback('baseUrl', 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1'),
+    model: readSettingWithFallback('model', 'DEEPSEEK_MODEL', 'deepseek-v4-flash')
+  }
+}
+
+export function setSettings(settings: Settings): Settings {
+  const handle = getDb()
+  const upsert = handle.prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  )
+  const run = handle.transaction((value: Settings) => {
+    upsert.run('apiKey', value.apiKey.trim())
+    upsert.run('baseUrl', value.baseUrl.trim().replace(/\/+$/, '') || 'https://api.deepseek.com/v1')
+    upsert.run('model', value.model.trim() || 'deepseek-v4-flash')
+  })
+  run(settings)
+  return getSettings()
+}
+
+export function listSessions(): SessionSummary[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM sessions WHERE deleted_at IS NULL AND status = 'active' ORDER BY updated_at DESC")
+    .all() as SessionRow[]
+  return rows.map(rowToSummary)
+}
+
+export function listArchivedSessions(): SessionSummary[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM sessions WHERE deleted_at IS NULL AND status = 'archived' ORDER BY updated_at DESC")
+    .all() as SessionRow[]
+  return rows.map(rowToSummary)
+}
+
+export function listTrashSessions(): SessionSummary[] {
+  const rows = getDb()
+    .prepare('SELECT * FROM sessions WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC')
+    .all() as SessionRow[]
+  return rows.map(rowToSummary)
+}
+
+export function getSession(id: string): Session | null {
+  const row = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | undefined
+  return row ? rowToSession(row) : null
+}
+
+export function createSession(problemText: string): Session {
+  const handle = getDb()
+  const id = randomUUID()
+  const timestamp = nowIso()
+  const text = problemText.trim()
+  const title = text.slice(0, 24) || '未命名问题'
+  const data = emptySessionData()
+  data.problem.text = text
+  const payload = JSON.stringify(data)
+
+  const run = handle.transaction(() => {
+    handle
+      .prepare(
+        'INSERT INTO sessions (id, title, current_step, status, data, version_no, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(id, title, 'problem', 'active', payload, 1, timestamp, timestamp)
+    handle
+      .prepare(
+        'INSERT INTO versions (id, session_id, version_no, step, label, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(randomUUID(), id, 1, 'problem', '创建问题', payload, timestamp)
+  })
+  run()
+
+  const session = getSession(id)
+  if (!session) throw new Error('会话不存在')
+  return session
+}
+
+export function updateSession(id: string, patch: SessionPatch, versionLabel?: string): Session {
+  const handle = getDb()
+  const run = handle.transaction(() => {
+    const row = handle.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | undefined
+    if (!row) throw new Error('会话不存在')
+
+    const nextData: SessionData = patch.data ?? parseData(row.data)
+    const nextStep: StepKey = patch.currentStep ?? (row.current_step as StepKey)
+    const nextTitle = patch.title ?? row.title
+    const nextStatus = patch.status ?? row.status
+    const timestamp = nowIso()
+    const bump = Boolean(versionLabel)
+    const versionNo = bump ? row.version_no + 1 : row.version_no
+    const payload = JSON.stringify(nextData)
+
+    handle
+      .prepare(
+        'UPDATE sessions SET title = ?, current_step = ?, status = ?, data = ?, version_no = ?, updated_at = ? WHERE id = ?'
+      )
+      .run(nextTitle, nextStep, nextStatus, payload, versionNo, timestamp, id)
+
+    if (bump) {
+      handle
+        .prepare(
+          'INSERT INTO versions (id, session_id, version_no, step, label, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )
+        .run(randomUUID(), id, versionNo, nextStep, versionLabel as string, payload, timestamp)
+    }
+  })
+  run()
+
+  const session = getSession(id)
+  if (!session) throw new Error('会话不存在')
+  return session
+}
+
+export function removeSession(id: string): void {
+  getDb().prepare('DELETE FROM sessions WHERE id = ?').run(id)
+}
+
+export function archiveSession(id: string): void {
+  const changes = getDb()
+    .prepare("UPDATE sessions SET status = 'archived', updated_at = ? WHERE id = ?")
+    .run(nowIso(), id).changes
+  if (changes === 0) throw new Error('会话不存在')
+}
+
+export function unarchiveSession(id: string): void {
+  const changes = getDb()
+    .prepare("UPDATE sessions SET status = 'active', updated_at = ? WHERE id = ?")
+    .run(nowIso(), id).changes
+  if (changes === 0) throw new Error('会话不存在')
+}
+
+export function trashSession(id: string): void {
+  const changes = getDb()
+    .prepare('UPDATE sessions SET deleted_at = ? WHERE id = ?')
+    .run(nowIso(), id).changes
+  if (changes === 0) throw new Error('会话不存在')
+}
+
+export function restoreSession(id: string): void {
+  const changes = getDb()
+    .prepare('UPDATE sessions SET deleted_at = NULL, updated_at = ? WHERE id = ?')
+    .run(nowIso(), id).changes
+  if (changes === 0) throw new Error('会话不存在')
+}
+
+export function emptyTrash(): number {
+  return getDb().prepare('DELETE FROM sessions WHERE deleted_at IS NOT NULL').run().changes
+}
+
+export function purgeExpiredTrash(days: number): number {
+  const deadline = new Date(Date.now() - days * 86400000).toISOString()
+  return getDb()
+    .prepare('DELETE FROM sessions WHERE deleted_at IS NOT NULL AND deleted_at < ?')
+    .run(deadline).changes
+}
+
+export function listVersions(sessionId: string): VersionSummary[] {
+  const rows = getDb()
+    .prepare('SELECT * FROM versions WHERE session_id = ? ORDER BY version_no DESC')
+    .all(sessionId) as VersionRow[]
+  return rows.map(rowToVersionSummary)
+}
+
+export function getVersion(id: string): Version | null {
+  const row = getDb().prepare('SELECT * FROM versions WHERE id = ?').get(id) as VersionRow | undefined
+  return row ? rowToVersion(row) : null
+}
+
+export function restoreVersion(versionId: string): Session {
+  const handle = getDb()
+  let sessionId = ''
+
+  const run = handle.transaction(() => {
+    const version = handle.prepare('SELECT * FROM versions WHERE id = ?').get(versionId) as VersionRow | undefined
+    if (!version) throw new Error('版本不存在')
+
+    const row = handle.prepare('SELECT * FROM sessions WHERE id = ?').get(version.session_id) as
+      | SessionRow
+      | undefined
+    if (!row) throw new Error('会话不存在')
+
+    sessionId = row.id
+    const timestamp = nowIso()
+    const versionNo = row.version_no + 1
+    const label = `恢复自 v${version.version_no}`
+
+    handle
+      .prepare('UPDATE sessions SET data = ?, current_step = ?, version_no = ?, updated_at = ? WHERE id = ?')
+      .run(version.data, version.step, versionNo, timestamp, row.id)
+
+    handle
+      .prepare(
+        'INSERT INTO versions (id, session_id, version_no, step, label, data, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(randomUUID(), row.id, versionNo, version.step, label, version.data, timestamp)
+  })
+  run()
+
+  const session = getSession(sessionId)
+  if (!session) throw new Error('会话不存在')
+  return session
+}
+
+export function listMessages(sessionId: string): ChatMessage[] {
+  const rows = getDb()
+    .prepare('SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC, rowid ASC')
+    .all(sessionId) as MessageRow[]
+  return rows.map(rowToMessage)
+}
+
+export function addMessage(
+  sessionId: string,
+  role: 'user' | 'assistant',
+  content: string,
+  articleId: string | null = null
+): ChatMessage {
+  const message: ChatMessage = {
+    id: randomUUID(),
+    sessionId,
+    role,
+    content,
+    articleId,
+    createdAt: nowIso()
+  }
+  getDb()
+    .prepare(
+      'INSERT INTO messages (id, session_id, role, content, article_id, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+    .run(message.id, message.sessionId, message.role, message.content, message.articleId, message.createdAt)
+  return message
+}
+
+export function clearMessages(sessionId: string): void {
+  getDb().prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId)
+}

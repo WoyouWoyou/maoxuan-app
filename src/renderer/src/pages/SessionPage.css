@@ -1,0 +1,277 @@
+.sp-root {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* 中间列 */
+.sp-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 20px 0;
+  overflow: hidden;
+}
+
+.sp-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sp-title {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  padding: 0;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: left;
+  cursor: text;
+}
+
+.sp-title:hover {
+  border-bottom-color: var(--line);
+}
+
+.sp-title-input {
+  max-width: 560px;
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.sp-sub {
+  font-size: 12px;
+}
+
+.sp-errorbar {
+  padding: 6px 10px;
+  border: 1px solid var(--red);
+  border-radius: var(--radius);
+  background: var(--red-soft);
+}
+
+.sp-step {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* 右侧面板 */
+.sp-panel {
+  flex: 0 0 360px;
+  width: 360px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.sp-panel.is-collapsed {
+  flex: 0 0 40px;
+  width: 40px;
+  align-items: center;
+}
+
+.sp-panel-toggle {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sp-panel-toggle-text {
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  font-size: 12px;
+}
+
+.sp-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sp-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.sp-tabs button {
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.sp-tabs button.is-on {
+  color: var(--red);
+  border-color: var(--line);
+  background: var(--paper);
+  font-weight: 600;
+}
+
+.sp-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Stepper */
+.stepper {
+  display: flex;
+  gap: 8px;
+}
+
+.stepper-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.stepper-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.stepper-item.is-active {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.stepper-no {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  font-size: 12px;
+}
+
+.stepper-item.is-active .stepper-no {
+  border-color: var(--red);
+  background: var(--red);
+  color: #fff;
+}
+
+.stepper-item.is-done .stepper-no {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: #fff;
+}
+
+.stepper-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stepper-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stepper-hint {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 四不要 */
+.donts {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.donts-label {
+  flex: 0 0 auto;
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 10px;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.donts-arrow {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.donts-arrow:hover {
+  color: var(--red);
+}
+
+.donts-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.donts-text b {
+  color: var(--ink);
+  margin-right: 6px;
+}
+
+.donts-dots {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.donts-dots i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.donts-dots i.on {
+  background: var(--red);
+}

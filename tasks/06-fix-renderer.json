@@ -1,0 +1,25 @@
+{
+  "name": "修复：渲染进程审查意见",
+  "files": [
+    "src/renderer/src/components/steps/types.ts",
+    "src/renderer/src/pages/SessionPage.tsx",
+    "src/renderer/src/components/steps/StepProblem.tsx",
+    "src/renderer/src/components/steps/StepFocus.tsx",
+    "src/renderer/src/components/steps/StepRelate.tsx",
+    "src/renderer/src/components/steps/StepApply.tsx",
+    "src/renderer/src/components/VersionPanel.tsx"
+  ],
+  "context": [
+    "tasks/_renderer-contract.md",
+    "src/preload/index.d.ts",
+    "src/renderer/src/components/ArticleReader.tsx",
+    "src/renderer/src/components/steps/types.ts",
+    "src/renderer/src/pages/SessionPage.tsx",
+    "src/renderer/src/components/steps/StepProblem.tsx",
+    "src/renderer/src/components/steps/StepFocus.tsx",
+    "src/renderer/src/components/steps/StepRelate.tsx",
+    "src/renderer/src/components/steps/StepApply.tsx",
+    "src/renderer/src/components/VersionPanel.tsx"
+  ],
+  "instructions": "上面 CONTEXT 中的文件是现有实现，整体设计正确。请**在现有代码上做最小修改**，修复以下审查意见，其余逻辑、文案、类名保持不变，输出修改后的完整文件。\n\n1. 【编译错误】`StepRelate.tsx` 中 `selected` 在嵌套函数里 possibly null（TS18047）：在 `review()` / `saveNotes()` 开头用局部常量收窄（如 `const current = selected; if (!current) return`）。`VersionPanel.tsx` 用了 `useRef` 但没有 import。\n2. 【竞态：旧数据覆盖】AI 调用要 30–120 秒，期间用户可能切换文章、新增阅读等并触发保存；AI 返回后用调用前闭包里的 `data` 去 save 会把期间的改动覆盖掉。修复：\n   - `StepProps` 新增 `update: (fn: (latest: SessionData) => SessionData, opts?: { versionLabel?: string; step?: StepKey }) => Promise<void>`。\n   - `SessionPage` 用 `sessionRef`（每次 setSession 时同步更新）保存最新会话，`update` 基于 `sessionRef.current.data` 计算新数据再调用与 `save` 相同的持久化逻辑；为了避免两个并发 update 互相覆盖，用一个 Promise 队列（`queueRef`）把 save/update 串行化，update 在轮到自己执行时才读取最新数据。`save` 也走同一队列。\n   - 所有“先 await（AI 调用或 articles.get）再保存”的地方改用 `update(latest => ...)`，并在函数内按 articleId / id 定位要修改的记录，而不是用闭包里的 reading/data：StepProblem.diagnose（第二次保存，只写入 diagnosis 与 problem）、StepFocus.findPassages、StepFocus.select（articles.get 之后）、StepRelate.review、StepApply.doReview、StepApply.genMindset、StepApply.openReread，以及 SessionPage 中处理 `?focus=` 的逻辑。追加 reading 前要在 latest 中再次检查是否已存在，避免重复。\n3. 【重复滚动失效】点击同一段落的“重读”第二次不会滚动，因为 `scrollToParagraph` 值没变。`SessionPage.openReader` 改为先 `setScrollToParagraph(null)`，再 `window.setTimeout(() => setScrollToParagraph(paragraph), 0)`。\n4. 【看不到结果】`StepApply.doReview` 成功后自动展开刚生成的这条复盘（`setOpenReview(review.id)`）。\n5. 【输入丢失】`StepProblem`：用户改了问题三字段但没点诊断就离开，改动会丢。在输入框 `onBlur` 时若与已保存值不同，调用 `update(latest => ({ ...latest, problem }))`（不记版本）。\n6. `StepApply` 的截止日 `input type=date` 只在值合法（非空）时保存。"
+}

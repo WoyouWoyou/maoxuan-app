@@ -1,0 +1,10 @@
+{
+  "name": "第三步示例：按五篇核心文章切换 + 核心方法罗列",
+  "files": [
+    "src/renderer/src/components/NoteExampleCard.tsx",
+    "src/renderer/src/components/NoteExampleCard.css",
+    "src/renderer/src/components/steps/StepRelate.tsx"
+  ],
+  "context": ["src/renderer/src/components/steps/StepRelate.tsx"],
+  "instructions": "`src/shared/core.ts` 新增了 `CORE_EXAMPLES`（五篇核心文章各自的 methods 核心方法罗列 + wrong/coreMethod/relatedProblem/action 示例）与 `exampleFor(articleId)`。在现有代码上做最小修改，输出完整文件（NoteExampleCard 为新文件）。\n\n1. 新组件 `NoteExampleCard`（具名导出）：`{ articleId: string | null }`。\n   - 仍是可折叠的 `<details className=\"card nex-card\">`，默认折叠；summary：`▸ 示例：读完《{当前示例标题}》`（朱红）。\n   - 展开后顶部一排五个小标签（`CORE_EXAMPLES` 顺序，文字为标题，选中态朱红底白字，其余细边框），默认选中 `exampleFor(articleId)`；`articleId` 变化时重置为对应篇。当前文章不是核心篇时，标签上方加一行 muted 小字“这篇不是核心五篇，先参考最接近的示例”。\n   - 内容区依次：\n     a) **本篇核心方法**：小标题“《标题》的核心方法”（13px 600），下面用编号列表列出 `methods`（每条前加 `◆`，朱红点、墨色文字，14px，行高 1.8）。\n     b) 错误示范一行：`错误示范：{wrong}`，灰色删除线（保留原样式意图）。\n     c) 三条正确示范：`1. 核心方法：`、`2. 关联问题：`、`3. 具体行动：`（标签加粗）。\n     d) 底部 muted 小字：“示例只是示范写法，你的 3 条要写你自己的事。”\n   - 样式前缀 `.nex-`，写在 NoteExampleCard.css，沿用纸色/朱红主题。\n2. `StepRelate`：把原来 `relate-example` 那个 details 示例块整体替换为 `<NoteExampleCard articleId={selected.articleId} />`；三条笔记 textarea 的 placeholder 改用 `exampleFor(selected.articleId)` 对应字段（仍前缀“例：”）。如果 `NOTE_EXAMPLE` 导入因此不再使用就删掉该导入。其余代码一字不动。"
+}

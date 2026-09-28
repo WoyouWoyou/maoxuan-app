@@ -1,0 +1,176 @@
+.prog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+.prog-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.prog-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.prog-hint,
+.prog-count {
+  font-size: 12px;
+}
+
+.prog-empty {
+  font-size: 12px;
+  padding-left: 18px;
+  position: relative;
+}
+
+.prog-empty::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.prog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 2px;
+}
+
+.prog-item {
+  position: relative;
+  padding: 0 0 10px 18px;
+}
+
+.prog-item::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+
+.prog-item:last-child {
+  padding-bottom: 0;
+}
+
+.prog-item:last-child::before {
+  display: none;
+}
+
+.prog-dot {
+  position: absolute;
+  left: 2px;
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.prog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prog-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.prog-stage {
+  color: var(--red);
+  font-size: 12px;
+}
+
+.prog-time {
+  font-size: 12px;
+}
+
+.prog-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.prog-item:hover .prog-tools,
+.prog-tools:focus-within {
+  opacity: 1;
+}
+
+.prog-tool {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.prog-tool:hover {
+  color: var(--red);
+  text-decoration: underline;
+}
+
+.prog-text {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.prog-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prog-edit-input {
+  font-size: 13px;
+}
+
+.prog-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.prog-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--red);
+}
+
+.prog-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.prog-add-input {
+  flex: 1;
+  font-size: 13px;
+  padding: 5px 8px;
+}
+
+.prog-err {
+  font-size: 12px;
+}

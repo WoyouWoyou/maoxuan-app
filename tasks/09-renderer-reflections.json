@@ -1,0 +1,23 @@
+{
+  "name": "v0.2 渲染：第二步阅读感悟框 + 第三步展示感悟",
+  "files": [
+    "src/renderer/src/components/ArticleReader.tsx",
+    "src/renderer/src/components/ArticleReader.css",
+    "src/renderer/src/components/ReflectionPanel.tsx",
+    "src/renderer/src/components/ReflectionPanel.css",
+    "src/renderer/src/components/steps/StepFocus.tsx",
+    "src/renderer/src/components/steps/StepRelate.tsx",
+    "src/renderer/src/components/steps/steps.css"
+  ],
+  "context": [
+    "tasks/_renderer-contract.md",
+    "src/preload/index.d.ts",
+    "src/renderer/src/components/ArticleReader.tsx",
+    "src/renderer/src/components/ArticleReader.css",
+    "src/renderer/src/components/steps/types.ts",
+    "src/renderer/src/components/steps/StepFocus.tsx",
+    "src/renderer/src/components/steps/StepRelate.tsx",
+    "src/renderer/src/components/steps/steps.css"
+  ],
+  "instructions": "按 SPEC.md 5.1“阅读感悟”与“第三步可见感悟”，在现有代码上做修改，输出完整文件（ReflectionPanel 为新文件）。其余行为、文案、类名保持不变。注意 `reading.reflections` 在旧数据中可能缺失，读取一律 `reading.reflections ?? []`。\n\n1. `ArticleReader`：新增可选 props `onParagraphClick?: (index: number) => void` 与 `activeParagraph?: number | null`。提供 onParagraphClick 时，段落编号变成可点击按钮（hover 朱红、title“关联到感悟”）；`activeParagraph` 对应段落加 `.reader-active`（朱红虚线外框 + 淡底，与 `.reader-mark` 可叠加）。不改变已有 props 行为。\n2. 新组件 `ReflectionPanel`（具名导出）：\n```ts\nexport function ReflectionPanel(props: {\n  article: Article\n  reflections: Reflection[]\n  activeParagraph: number | null\n  onClearParagraph: () => void\n  onAdd: (r: Reflection) => Promise<void>\n  onRemove: (id: string) => Promise<void>\n  onJump: (paragraphIndex: number) => void\n})\n```\n   标题“阅读感悟”+副标题“读到哪有想法就记下来，第三步会用到”；关联提示行：有 activeParagraph 时显示“关联：第 N 段 · 前 40 字…”和“取消关联”，否则 muted“点击原文左侧段落编号可关联到这一段”；textarea（3 行，placeholder“这段让我想到……”，⌘/Ctrl+Enter 保存）+“记下”按钮（空时禁用，保存中 spinner）；保存时构造 `{ id: crypto.randomUUID(), paragraphIndex: activeParagraph, quote: activeParagraph!=null ? 段落前80字 : '', text, createdAt }`，成功后清空输入并调用 onClearParagraph。列表按时间倒序：时间（HH:mm）、可点击的“第 N 段”徽标（调用 onJump）、文本（保留换行）、删除（内联二次确认）。空态“还没有感悟”。样式前缀 `.refl-`。\n3. `StepFocus`：右侧区域改为纵向两块：上方阅读器（flex:1，可滚动），下方 `ReflectionPanel`（高度 260px，顶部 4px 可拖拽分隔条调整高度，范围 160–480px，可用按钮折叠为只剩标题栏）。本地 state `activeParagraph`（切换文章时清空）传给 ArticleReader（`onParagraphClick` 切换选中/取消）与 ReflectionPanel；`onJump` 复用现有滚动机制：设置一个本地 `jumpTo` 状态传给 ArticleReader 的 scrollToParagraph（优先于 props.scrollToParagraph，先置 null 再 setTimeout 设值以便重复触发）。`onAdd` / `onRemove` 用 `update(latest => ...)` 按 articleId 修改对应 reading 的 reflections（不记版本）。\n4. `StepRelate`：选择文章后、示例卡片之前，新增“我读时写下的感悟（N 条）”卡片：按时间正序列出本篇感悟（“第 N 段”可点击 → `openReader(articleId, idx)`，文本，时间），没有感悟时显示 muted“第二步没有留下感悟。可以回去边读边记，再来写 3 条。”并附“回去读原文”按钮（`openReader(articleId)`）。卡片下方一句引导：“先看自己的感悟，再写下面 3 条。”\n   - 按钮文案“请教练批改”改为“请教员批改”，提示“写完先请教练批改，再看要不要改。”改为“写完先请教员批改，再看要不要改。”\n5. `steps.css`：补充上述新布局所需样式（`.step-focus-main` 纵向 flex、阅读器与感悟框分隔条 `.step-focus-splitter`、第三步感悟卡片 `.relate-refl-*`）。"
+}

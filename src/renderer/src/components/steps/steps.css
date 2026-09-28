@@ -1,0 +1,695 @@
+.step-lead {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+/* ---------- 第一步：明确问题 ---------- */
+.step-problem {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 4px;
+}
+
+.step-problem-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.problem-diagnosis {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.diag-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diag-label {
+  font-size: 12px;
+  color: var(--red);
+  font-weight: 600;
+}
+
+.diag-text {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.diag-strong {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.diag-symptoms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.rec-card {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  background: var(--paper);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rec-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.rec-reason,
+.rec-focus {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.rec-focus {
+  color: var(--red);
+}
+
+/* ---------- 第二步：聚焦核心 ---------- */
+.step-focus {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.step-focus-list {
+  flex: 0 0 240px;
+  width: 240px;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step-focus-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-focus-group-title {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.step-focus-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.step-focus-item:hover {
+  border-color: var(--line);
+}
+
+.step-focus-item.is-active {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.step-focus-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.step-focus-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-focus-item-sub {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.step-focus-search-tip {
+  font-size: 11px;
+}
+
+.step-focus-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.step-focus-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.step-focus-reader {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  padding: 0 14px 14px;
+}
+
+/* 阅读器与感悟框之间的可拖拽分隔条 */
+.step-focus-splitter {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 14px;
+}
+
+.step-focus-splitter-bar {
+  position: relative;
+  flex: 1;
+  height: 14px;
+  cursor: row-resize;
+}
+
+.step-focus-splitter-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 6px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.step-focus-splitter-bar:hover::after {
+  background: var(--red);
+}
+
+.step-focus-splitter-btn {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.step-focus-splitter-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* 感悟框容器：高度由 StepFocus 控制，折叠时只剩标题栏 */
+.step-focus-refl {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.step-focus-refl > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-focus-refl.is-collapsed .refl-body {
+  display: none;
+}
+
+/* ---------- 第三步：联系自身 ---------- */
+.step-relate {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.relate-form .field {
+  margin-bottom: 8px;
+}
+
+.relate-field-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.relate-field-head .field-label {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.relate-form .textarea {
+  min-height: 52px;
+}
+
+.relate-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.relate-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  color: var(--ink);
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.relate-tab.is-on {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 600;
+}
+
+/* 第二步留下的阅读感悟（只读卡片） */
+.relate-refl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.relate-refl-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.relate-refl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.relate-refl-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.relate-refl-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.relate-refl-no {
+  flex: 0 0 auto;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffdf8;
+  color: var(--red);
+  font-size: 11px;
+  line-height: 1.6;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.relate-refl-no:hover {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.relate-refl-no.is-plain {
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+  cursor: default;
+}
+
+.relate-refl-time {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.relate-refl-text {
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.relate-example {
+  padding: 10px 14px;
+}
+
+.relate-example summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--red);
+}
+
+.relate-example-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.relate-example-body p {
+  margin: 0;
+}
+
+.relate-wrong {
+  color: var(--muted);
+}
+
+.relate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.relate-tip {
+  font-size: 12px;
+}
+
+.relate-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.relate-score {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.relate-score-label {
+  flex: 0 0 96px;
+}
+
+.relate-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.relate-bar i {
+  display: block;
+  height: 100%;
+  background: var(--red);
+}
+
+.relate-comments {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.relate-reread {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+/* ---------- 第四步：反复应用 ---------- */
+.step-apply {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-right: 4px;
+}
+
+.apply-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.apply-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.apply-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.apply-section-title .muted {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.apply-action {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apply-action.is-overdue {
+  border-color: var(--red);
+}
+
+.apply-action-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.apply-action-text {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.apply-action-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.apply-action-meta label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.apply-date {
+  width: 140px;
+}
+
+.apply-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.apply-reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apply-review {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.apply-review-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.apply-review-time {
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+
+.apply-review-situation {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apply-review-body {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apply-advice {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.apply-advice :first-child {
+  margin-top: 0;
+}
+
+.apply-advice :last-child {
+  margin-bottom: 0;
+}
+
+.apply-reread {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.apply-mindset {
+  display: flex;
+  gap: 12px;
+}
+
+.apply-mindset-card {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius);
+  background: var(--paper);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.apply-mindset-q {
+  font-size: 12px;
+  color: var(--red);
+  font-weight: 600;
+}
+
+.apply-mindset-a {
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.apply-motto {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+}

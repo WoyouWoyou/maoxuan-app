@@ -1,0 +1,238 @@
+.ver-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-family: var(--sans);
+}
+
+.ver-head {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ver-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ver-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ver-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ver-error {
+  padding: 2px 0;
+}
+
+.ver-item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.ver-item-open {
+  border-color: var(--red);
+}
+
+.ver-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.ver-item-head:hover {
+  background: var(--paper-2);
+}
+
+.ver-no {
+  flex: 0 0 auto;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+.ver-step {
+  flex: 0 0 auto;
+}
+
+.ver-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ver-time {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.ver-detail {
+  border-top: 1px solid var(--line);
+  padding: 10px;
+  background: var(--paper);
+}
+
+.ver-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ver-tab {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: transparent;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.ver-tab-on {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
+.ver-snapshot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.ver-snap-row {
+  display: flex;
+  gap: 8px;
+}
+
+.ver-snap-label {
+  flex: 0 0 84px;
+  color: var(--muted);
+}
+
+.ver-snap-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.ver-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.ver-diff-row {
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.ver-diff-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ver-diff-label {
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.ver-diff-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.ver-diff-text {
+  word-break: break-word;
+}
+
+.ver-diff-added .ver-diff-after {
+  color: var(--ok);
+}
+
+.ver-diff-removed .ver-diff-before {
+  color: var(--red);
+  text-decoration: line-through;
+}
+
+.ver-diff-changed .ver-diff-before {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.ver-diff-changed .ver-diff-after {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.ver-diff-arrow {
+  color: var(--muted);
+}
+
+.ver-diff-more {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--red);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ver-diff-summary {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.ver-empty-diff {
+  padding: 10px 0;
+  font-size: 12.5px;
+}
+
+.ver-restore {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ver-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12.5px;
+}

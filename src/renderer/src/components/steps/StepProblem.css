@@ -1,0 +1,49 @@
+.sp1-diag-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sp1-diag-title {
+  margin: 0;
+}
+
+.sp1-view {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sp1-view .diag-text {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.sp1-edit-btn {
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.sp1-view:hover .sp1-edit-btn,
+.sp1-edit-btn:focus-visible {
+  opacity: 1;
+}
+
+.sp1-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp1-edit-input {
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.sp1-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

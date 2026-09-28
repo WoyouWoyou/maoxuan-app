@@ -1,0 +1,20 @@
+{
+  "name": "渲染进程外壳：入口、路由、全局样式、侧栏、首页、书库、阅读器、设置",
+  "files": [
+    "src/renderer/index.html",
+    "src/renderer/src/main.tsx",
+    "src/renderer/src/App.tsx",
+    "src/renderer/src/styles.css",
+    "src/renderer/src/components/Sidebar.tsx",
+    "src/renderer/src/components/Sidebar.css",
+    "src/renderer/src/components/ArticleReader.tsx",
+    "src/renderer/src/components/ArticleReader.css",
+    "src/renderer/src/pages/HomePage.tsx",
+    "src/renderer/src/pages/LibraryPage.tsx",
+    "src/renderer/src/pages/LibraryPage.css",
+    "src/renderer/src/pages/LibraryArticlePage.tsx",
+    "src/renderer/src/pages/SettingsPage.tsx"
+  ],
+  "context": ["tasks/_renderer-contract.md", "src/preload/index.d.ts"],
+  "instructions": "实现 SPEC.md 第 5 节中除会话页、ChatPanel、VersionPanel 以外的全部界面，并严格遵守 tasks/_renderer-contract.md。\n\n- `index.html`：`<div id=\"root\">`，`<script type=\"module\" src=\"/src/main.tsx\">`，CSP：`default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:`，标题“毛选实用工具箱”，lang=zh-CN。\n- `main.tsx`：createRoot + StrictMode + HashRouter，import './styles.css'。\n- `App.tsx`：`.app` 三栏中的左两栏（Sidebar + `<main className=\"main\">` 路由出口；右侧面板由 SessionPage 自己渲染）。路由见约定；`/session/:id` 用 `import { SessionPage } from './pages/SessionPage'`（另一任务实现）。\n- `styles.css`：实现约定里的全部变量与基础类；全局 reset；`.app { display:flex; height:100vh }`；`.main { flex:1; min-width:0; overflow:auto }`；顶部 28px 的 `-webkit-app-region: drag` 区域（macOS hiddenInset 标题栏），按钮/输入框设 `no-drag`；美观的滚动条；focus 样式用朱红描边。\n- `Sidebar`：见 SPEC；新建会话用内联展开的 textarea（不要 prompt()），至少 10 字才能提交，提交后 `navigate('/session/'+id)` 并派发 sessions-changed；当前会话高亮；删除需二次确认（内联“确认删除？”按钮）；步骤徽标显示 `STEPS` 中的序号与名称。\n- `HomePage`：有会话时跳到最近一个（`navigate(..., {replace:true})`）；否则展示方法论：标题“带着问题读《毛选》”、核心观点一句、错误方式 vs 正确方式对照、四步（用 `STEPS`）、核心五篇（`CORE_ARTICLES`）、`MOTTO` 大字、按钮“我有一个头疼的问题”（聚焦侧栏新建输入框：派发 `window.dispatchEvent(new Event('open-new-session'))`，Sidebar 监听它展开输入框）。\n- `ArticleReader`：按约定 props；段落 `<p data-idx>`，左侧显示小号段落编号；命中 passages 的段落加 `.reader-mark`（朱红左边框+淡红底），并在段尾显示 `why`（小字 muted，前缀“◆ ”）；`verified=false` 的标注显示“（未能逐字核对）”。右侧浮动“标注目录”列出 passages，点击滚动。`scrollToParagraph` 变化时 `scrollIntoView({behavior:'smooth', block:'center'})` 并加 1.5s 闪烁类。原文字号 17px、行高 1.9、宋体，最大宽度 760px。以“〔n〕”形式出现的注释号渲染为上标小字灰色。\n- `LibraryPage`：见 SPEC；搜索结果 snippet 中的【】转成 `<mark>`（手工切分字符串，不要 dangerouslySetInnerHTML）；卷分组可折叠，默认展开第一卷；核心篇在目录里带朱红“核心”徽标。\n- `LibraryArticlePage`：加载文章，显示 ArticleReader；顶部“← 返回书库”与“用它解决我的问题”：点击后展开会话选择列表（活跃会话），选中后 `navigate('/session/'+sid+'?focus='+articleId)`；无会话时提示先新建问题。\n- `SettingsPage`：见 SPEC；保存后显示“已保存”；测试连接显示结果（ok 绿色 / 失败红色）；说明文字：密钥仅保存在本机 SQLite。"
+}

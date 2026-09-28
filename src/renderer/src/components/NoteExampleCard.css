@@ -1,0 +1,113 @@
+.nex-card {
+  padding: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.nex-card > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #b8322a;
+  user-select: none;
+}
+
+.nex-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.nex-card > summary:hover {
+  background: #fbf6ec;
+}
+
+.nex-card[open] > summary {
+  border-bottom: 1px solid #e2d9c8;
+}
+
+.nex-body {
+  padding: 12px 14px 14px;
+}
+
+.nex-hint {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #8a7f6d;
+}
+
+.nex-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.nex-tab {
+  padding: 3px 9px;
+  border: 1px solid #e2d9c8;
+  border-radius: 6px;
+  background: #fffdf8;
+  color: #2b2b2b;
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.nex-tab:hover {
+  border-color: #b8322a;
+  color: #b8322a;
+}
+
+.nex-tab.is-on {
+  background: #b8322a;
+  border-color: #b8322a;
+  color: #fff;
+}
+
+.nex-subtitle {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2b2b2b;
+}
+
+.nex-methods {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.nex-methods li {
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #2b2b2b;
+}
+
+.nex-dot {
+  margin-right: 6px;
+  color: #b8322a;
+}
+
+.nex-wrong {
+  margin: 0 0 8px;
+  color: #8a7f6d;
+  font-size: 13px;
+}
+
+.nex-line {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #2b2b2b;
+}
+
+.nex-line b {
+  font-weight: 600;
+}
+
+.nex-foot {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #8a7f6d;
+}

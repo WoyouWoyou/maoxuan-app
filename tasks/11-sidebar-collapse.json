@@ -1,0 +1,6 @@
+{
+  "name": "左侧栏可收起",
+  "files": ["src/renderer/src/components/Sidebar.tsx", "src/renderer/src/components/Sidebar.css"],
+  "context": ["tasks/_renderer-contract.md", "src/renderer/src/components/Sidebar.tsx", "src/renderer/src/components/Sidebar.css", "src/renderer/src/App.tsx"],
+  "instructions": "在现有代码上做最小修改，输出两个完整文件，其余行为不变。\n\n需求：左侧栏（“毛选实用工具箱”）标题行最右边增加一个收起按钮（`btn btn-ghost btn-sm`，文字“«”，title“收起侧栏”），与会话页右侧面板的“»”折叠按钮风格一致。\n- 收起后侧栏宽度变为 44px（宽度变化加 0.2s 过渡），只显示一列竖排图标按钮：顶部“»”（title“展开侧栏”，点击展开）、“＋”（title“我有一个头疼的问题”，点击先展开侧栏再展开新建输入框）、底部“书”（title“原文书库”，跳转 /library）与“设”（title“设置”，跳转 /settings）。会话列表、标题、副标题在收起时不渲染。\n- 收起状态存 `localStorage['maoxuan.sidebarCollapsed']`（'1' / '0'），启动时读取。\n- 收到 `open-new-session` 事件时若处于收起状态，先自动展开。\n- 顶部需保留现有的 macOS 标题栏拖拽区高度（收起态的图标列从同样的顶部偏移开始），按钮都设 `-webkit-app-region: no-drag`。\n- 样式写在 Sidebar.css，收起态用根元素加 `.is-collapsed` 类实现。"
+}

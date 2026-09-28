@@ -1,0 +1,13 @@
+{
+  "name": "修复：嵌入阅读器布局",
+  "files": ["src/renderer/src/components/ArticleReader.tsx", "src/renderer/src/components/ArticleReader.css"],
+  "context": [
+    "tasks/_renderer-contract.md",
+    "src/renderer/src/styles.css",
+    "src/renderer/src/components/ArticleReader.tsx",
+    "src/renderer/src/components/ArticleReader.css",
+    "src/renderer/src/components/steps/StepFocus.tsx",
+    "src/renderer/src/components/steps/steps.css"
+  ],
+  "instructions": "在现有代码上做最小修改，输出两个完整文件。\n\n问题：在会话页第二步（`compact` 模式）中，阅读器所在列只有约 300px 宽（左侧文章列表 240px + 右侧面板 360px 占去了空间），而“标注目录”浮在正文右侧，把正文挤成一两个字宽的竖条，完全无法阅读。\n\n要求：\n1. `compact` 模式下不要侧栏式标注目录，改为正文上方一条 `position: sticky; top: 0` 的横向标签条（`.reader-toc-strip`，背景用 `--paper`，底部细线，`overflow-x: auto`、不换行），每个标签显示“第 N 段”（N = paragraphIndex + 1），hover 时 `title` 显示 quote，点击滚动到该段并闪烁高亮。没有 passages 时不渲染标签条。\n2. 正文列 `min-width: 0; width: 100%`，任何模式下都不能被挤压到小于 260px；非 compact 模式保留原来的右侧目录，但用 CSS grid `grid-template-columns: minmax(0, 1fr) 220px`，并在容器宽度不足 720px 时（用 `@container` 或给根元素加 `container-type: inline-size`）自动退化成与 compact 相同的顶部标签条样式。\n3. compact 模式正文字号 16px、左右内边距 20px，段落编号保留。\n4. 不改变组件 props 与对外行为。"
+}

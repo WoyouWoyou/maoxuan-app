@@ -1,0 +1,12 @@
+{
+  "name": "渲染进程右侧面板：教练对话 + 版本历史与对比",
+  "files": [
+    "src/renderer/src/components/ChatPanel.tsx",
+    "src/renderer/src/components/ChatPanel.css",
+    "src/renderer/src/components/VersionPanel.tsx",
+    "src/renderer/src/components/VersionPanel.css",
+    "src/renderer/src/lib/diff.ts"
+  ],
+  "context": ["tasks/_renderer-contract.md", "src/preload/index.d.ts"],
+  "instructions": "实现 SPEC.md 第 5 节“右侧面板”，严格遵守 tasks/_renderer-contract.md 中的 props。\n\n- `ChatPanel`：sessionId 变化时加载历史并清空流式状态。发送：`window.api.chat.send(sessionId, text, articleId)`，把返回的 userMessage 追加到列表，记下 requestId，显示一个流式中的助手气泡；在组件挂载时订阅 `onChunk/onDone/onError`（卸载时取消），只处理当前 pending 的 requestId（用 ref 保存，避免闭包过期）；done 时用 message 替换流式气泡；error 时气泡显示错误并允许重试（重发上一条用户文本）。Enter 发送、Shift+Enter 换行，输入法组合中（`e.nativeEvent.isComposing`）不发送。自动滚动到底部。助手消息用 react-markdown 渲染（不开 raw HTML）。空态：教练介绍一句 + 三个快捷提问按钮（`MINDSET_QUESTIONS` 改写为“我的主要矛盾是什么？”“我现在在哪个阶段？”“明天第一步该干什么？”）。有 articleId 时输入框上方显示小标签“正在读：《标题》”（通过 articles.get 取标题，缓存）。清空对话需二次确认。\n- `lib/diff.ts`：导出 `flatten(obj: unknown, prefix?: string): Record<string, string>`（对象用 `a.b`，数组用 `a[0]`，叶子值转字符串，空数组/空对象记为 `[]`/`{}`）；`diffData(oldData: SessionData, newData: SessionData): { path: string; kind: 'added' | 'removed' | 'changed'; before?: string; after?: string }[]`；`labelOfPath(path: string): string` 把路径翻译成中文可读标签，例如 `problem.text`→“问题”、`problem.background`→“背景”、`problem.tried`→“已尝试”、`diagnosis.mainContradiction`→“诊断·主要矛盾”、`readings[0].notes.action`→“阅读 1 · 笔记·具体行动”、`actions[2].status`→“行动 3 · 状态”、`mindset.firstStep`→“心法·第一步”等（覆盖 types.ts 中 SessionData 的所有字段，未知字段原样返回）。忽略 `generatedAt`、`createdAt`、`startedAt` 这类时间字段的差异。\n- `VersionPanel`：`versionNo` 变化时重新拉取 `versions.list`（倒序，最新在上）。每项：`v{n}`、label、步骤名（`STEPS`）、相对时间（刚刚 / n 分钟前 / n 小时前 / 日期）。最新版本标“当前”。点击一项展开详情，两个子视图：“快照”（只读摘要：问题、诊断主要矛盾、已读篇目及是否写笔记、行动数与完成数、心法）与“与当前对比”（用 diffData(version.data, currentData)，按 kind 着色：新增绿、删除红划线、修改显示 旧→新，长文本截断 120 字可展开；无差异显示“与当前一致”）。“恢复到此版本”按钮（当前版本不显示）：内联二次确认，调用 `versions.restore`，成功后 `onRestored(session)` 并派发 sessions-changed。顶部说明：“每一次关键动作都会留下版本，可随时对比与恢复，恢复不会删除任何历史。”"
+}

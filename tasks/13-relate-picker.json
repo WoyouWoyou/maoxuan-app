@@ -1,0 +1,6 @@
+{
+  "name": "第三步：选择已读文章区块加强层级",
+  "files": ["src/renderer/src/components/steps/StepRelate.tsx", "src/renderer/src/components/steps/RelatePicker.css"],
+  "context": ["src/renderer/src/components/steps/StepRelate.tsx"],
+  "instructions": "只改 StepRelate 顶部“选择一篇已读文章”这一块（`.relate-tabs` 那段 JSX），其余代码一字不动，输出完整 StepRelate.tsx 与新样式文件 RelatePicker.css（在 StepRelate.tsx 中 `import './RelatePicker.css'`，放在 steps.css 之后以便覆盖）。\n\n用户反馈：当前字号 12–13px、按钮底色与页面背景几乎相同，根本注意不到这是第三步的第一个操作。要求：\n1. 外层改为一个独立区块 `.rp-picker`：背景 `var(--paper-2)`，1px `var(--line)` 边框，左侧 4px `var(--red)` 竖条，圆角 `var(--radius)`，内边距 16px 18px，底部外边距 16px。\n2. 区块标题 `.rp-title`：文字“先选一篇已读的文章”，16px、600、`var(--ink)`；右侧 muted 13px 副标题“共 N 篇已读 · 已写笔记 M 篇”。标题下方 6px 间距。\n3. 文章按钮 `.rp-item`（替代原 `.relate-tab`，保留 onClick 逻辑）：卡片式，最小宽 180px，内边距 10px 14px，背景 `#fffdf8`，1px `var(--line)` 边框，圆角 `var(--radius)`；第一行标题用 `var(--serif)`、17px、`var(--ink)`；第二行 12px 状态：已写笔记显示绿色“✓ 已有笔记”（`var(--ok)`），否则朱红“待写 3 条”。hover：边框变 `var(--red)`、轻微阴影。\n4. 选中态 `.rp-item.is-on`：2px `var(--red)` 边框（用 box-shadow inset 或调整 padding 避免跳动）、背景 `var(--red-soft)`、标题 600 且 `var(--red)`，右上角小标签“正在写”（白字朱红底，11px，圆角）。\n5. 按钮区 flex、wrap、gap 10px。只有一篇文章时同样显示区块。"
+}

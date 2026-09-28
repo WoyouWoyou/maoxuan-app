@@ -1,0 +1,10 @@
+{
+  "name": "行动的阶段完成记录",
+  "files": [
+    "src/renderer/src/components/ActionProgressLog.tsx",
+    "src/renderer/src/components/ActionProgressLog.css",
+    "src/renderer/src/components/steps/StepApply.tsx"
+  ],
+  "context": ["tasks/_renderer-contract.md", "src/renderer/src/components/steps/types.ts", "src/renderer/src/components/steps/StepApply.tsx"],
+  "instructions": "行动往往不是一下子能干完的，要给每条行动加“阶段完成记录”（类型 `ActionProgress`，已加到 `ActionItem.progress`，旧数据读取时已补成空数组，但前端读取仍用 `item.progress ?? []` 兜底）。在现有代码上做最小修改，输出完整文件（ActionProgressLog 为新文件）。\n\n1. 新组件 `ActionProgressLog`（具名导出）：\n```ts\nexport function ActionProgressLog(props: {\n  progress: ActionProgress[]\n  disabled?: boolean              // 行动已放弃时为 true：只读\n  onAdd: (text: string) => Promise<void>\n  onEdit: (id: string, text: string) => Promise<void>\n  onRemove: (id: string) => Promise<void>\n})\n```\n   - 标题行：“阶段进展”+ muted“不是一下子能干完的，做完一段记一段”，右侧显示“已完成 N 个阶段”，有记录时再显示“最近：M 月 D 日”。\n   - 时间线（按时间正序）：左侧竖线与圆点，每条显示“第 N 阶段”（朱红小字）、日期时间（M/D HH:mm，muted）、文本（保留换行）；hover 显示“编辑”“删除”（删除需内联二次确认；编辑变为 textarea +“保存/取消”）。\n   - 底部新增：单行 input（placeholder“这一阶段完成了什么？例如：先把现有字段整理好了”，Enter 提交，输入法组合中不提交）+“记一笔”按钮（空时禁用，提交中 spinner），成功后清空。没有记录时时间线处显示 muted“还没有阶段记录”。\n   - 样式前缀 `.prog-`，写在 ActionProgressLog.css，与现有纸色、朱红主题一致，紧凑（字号 13px）。\n2. `StepApply`：\n   - 手动新增行动时对象加 `progress: []`。\n   - 每条行动卡片里，在截止日/状态按钮行与“结果”textarea 之间插入 `ActionProgressLog`；“结果”textarea 的 placeholder 改为“全部做完后，写下最终结果（失焦自动保存）”。\n   - onAdd：`update(latest => ...)` 按 action id 追加 `{ id: crypto.randomUUID(), text, createdAt: new Date().toISOString() }`，版本 label `第四步：记录阶段进展`；onEdit 同样按 id 修改文本，label `第四步：修改阶段进展`；onRemove 按 id 删除，label `第四步：删除阶段进展`。若 StepApply 当前还没有从 props 解构 `update`，一并解构。\n   - 行动头部状态徽标旁，若有阶段记录则额外显示小徽标“{N} 个阶段”。"
+}

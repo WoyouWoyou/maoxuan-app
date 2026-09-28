@@ -1,0 +1,45 @@
+{
+  "name": "maoxuan-app",
+  "productName": "毛选实用工具箱",
+  "version": "0.1.0",
+  "description": "带着问题读《毛选》：明确问题、聚焦核心、联系自身、反复应用",
+  "main": "./out/main/index.js",
+  "private": true,
+  "scripts": {
+    "extract": "python3 scripts/extract_epub.py",
+    "codegen": "node scripts/ds-codegen.mjs",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "dist": "electron-vite build && electron-builder --mac"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^17.0.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.2.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.0.0",
+    "electron-vite": "^5.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.0.0"
+  },
+  "build": {
+    "appId": "com.liamreed.maoxuan",
+    "productName": "毛选实用工具箱",
+    "files": ["out/**/*", "package.json"],
+    "extraResources": [{ "from": "resources/articles.json", "to": "articles.json" }],
+    "mac": { "target": "dmg", "category": "public.app-category.education" }
+  }
+}
