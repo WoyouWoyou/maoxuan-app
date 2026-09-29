@@ -1,0 +1,59 @@
+name: Build Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths:
+      - '.github/workflows/build-windows.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'electron.vite.config.ts'
+      - 'tsconfig*.json'
+      - 'src/**'
+      - 'resources/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies and rebuild native modules
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Build Windows x64 installer
+        run: npm run dist:win
+      - name: Generate SHA256 checksum
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem dist/*-windows-x64-setup.exe)
+          if ($installers.Count -ne 1) { throw 'Expected exactly one Windows installer' }
+          $installer = $installers[0]
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content dist/SHA256SUMS.txt -Encoding utf8
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: maoxuan-windows-x64
+          path: |
+            dist/*-windows-x64-setup.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

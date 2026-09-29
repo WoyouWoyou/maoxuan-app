@@ -12,7 +12,8 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "dist": "electron-vite build && electron-builder --mac"
+    "dist": "electron-vite build && electron-builder --mac",
+    "dist:win": "electron-vite build && electron-builder --win nsis --x64 --publish never"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
@@ -40,6 +41,15 @@
     "productName": "毛选实用工具箱",
     "files": ["out/**/*", "package.json"],
     "extraResources": [{ "from": "resources/articles.json", "to": "articles.json" }],
-    "mac": { "target": "dmg", "category": "public.app-category.education" }
+    "mac": { "target": "dmg", "category": "public.app-category.education" },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "maoxuan-${version}-windows-${arch}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

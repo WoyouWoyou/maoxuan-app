@@ -6,3 +6,5 @@ release
 _epub
 *.db
 .codegen
+.DS_Store
+*.log
