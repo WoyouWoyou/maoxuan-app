@@ -1,0 +1,52 @@
+name: Attach Windows installer to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag
+        required: true
+        type: string
+      run_id:
+        description: Successful Windows build run ID
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      BUILD_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - name: Verify build matches release
+        shell: bash
+        run: |
+          set -euo pipefail
+          run=$(gh api "repos/$GH_REPO/actions/runs/$BUILD_RUN_ID")
+          test "$(jq -r .conclusion <<< "$run")" = success
+          test "$(jq -r .path <<< "$run")" = .github/workflows/build-windows.yml
+          release_sha=$(gh api "repos/$GH_REPO/commits/$RELEASE_TAG" --jq .sha)
+          test "$(jq -r .head_sha <<< "$run")" = "$release_sha"
+          gh release view "$RELEASE_TAG"
+      - uses: actions/download-artifact@v5
+        with:
+          name: maoxuan-windows-x64
+          path: installer
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+      - name: Verify checksum and upload assets
+        working-directory: installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum --check SHA256SUMS.txt
+          mv SHA256SUMS.txt SHA256SUMS-windows.txt
+          gh release upload "$RELEASE_TAG" ./*-windows-x64-setup.exe SHA256SUMS-windows.txt
