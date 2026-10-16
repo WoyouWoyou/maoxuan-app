@@ -2,6 +2,8 @@
 
 产品规格见 `SPEC.md`，本文只讲“代码怎么组织、数据怎么流动、项目怎么开发”。
 
+本文记录现有架构。多书籍阅读的目标边界、依赖方向、数据归属与迁移约束见 [多书籍阅读架构决策](docs/multi-book-architecture.md)，尚未实现；功能范围见 [实施计划](docs/multi-book-reading-plan.md)。
+
 ## 1. 总览
 
 ```mermaid
