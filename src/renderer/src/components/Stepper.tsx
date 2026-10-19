@@ -1,4 +1,5 @@
 import type { SessionData, StepKey } from '@shared/types'
+import { readingPresentation } from '@shared/reading-presentation'
 import { STEPS } from '@shared/types'
 import { stepDone, stepUnlocked } from './steps/types'
 
@@ -12,7 +13,7 @@ export interface StepperProps {
 export function Stepper({ currentStep, viewStep, data, onSelect }: StepperProps) {
   return (
     <div className="stepper">
-      {STEPS.map(step => {
+      {STEPS.map((step) => {
         const unlocked = stepUnlocked(data, step.key)
         const done = stepDone(data, step.key)
         const classes = ['stepper-item']
@@ -26,13 +27,19 @@ export function Stepper({ currentStep, viewStep, data, onSelect }: StepperProps)
             type="button"
             className={classes.join(' ')}
             disabled={!unlocked.ok}
-            title={unlocked.ok ? step.hint : unlocked.reason}
+            title={
+              unlocked.ok
+                ? (readingPresentation(data).hints?.[step.no - 1] ?? step.hint)
+                : unlocked.reason
+            }
             onClick={() => onSelect(step.key)}
           >
             <span className="stepper-no">{done ? '✓' : step.no}</span>
             <span className="stepper-body">
               <span className="stepper-name">{step.name}</span>
-              <span className="stepper-hint">{step.hint}</span>
+              <span className="stepper-hint">
+                {readingPresentation(data).hints?.[step.no - 1] ?? step.hint}
+              </span>
             </span>
           </button>
         )

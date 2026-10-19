@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
-import type { Article, Reading, Reflection, SearchHit } from '@shared/types'
+import type { Article, ArticleMeta, Reading, Reflection, SearchHit } from '@shared/types'
 import { CORE_ARTICLES } from '@shared/core'
 import { ArticleReader } from '@renderer/components/ArticleReader'
 import { ReflectionPanel } from '@renderer/components/ReflectionPanel'
@@ -26,7 +26,14 @@ function toMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
-export function StepFocus({ session, goStep, update, focusArticleId, setFocusArticleId, scrollToParagraph }: StepProps) {
+export function StepFocus({
+  session,
+  goStep,
+  update,
+  focusArticleId,
+  setFocusArticleId,
+  scrollToParagraph
+}: StepProps) {
   const [article, setArticle] = useState<Article | null>(null)
   const [loadingArticle, setLoadingArticle] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -40,22 +47,41 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
   const [panelCollapsed, setPanelCollapsed] = useState(false)
 
   const data = session.data
+  const generic = data.book?.profile === 'generic'
+  const [catalog, setCatalog] = useState<ArticleMeta[]>([])
+  useEffect(() => {
+    let alive = true
+    void window.api.articles
+      .list(data.book)
+      .then((list) => {
+        if (alive) setCatalog(list)
+      })
+      .catch((e) => setErr(toMessage(e)))
+    return () => {
+      alive = false
+    }
+  }, [data.book?.revisionId])
   const recommendations = data.diagnosis?.recommendations ?? []
   const readings = data.readings
-  const reading = readings.find(r => r.articleId === focusArticleId) ?? null
-  const extraReadings = readings.filter(r => !CORE_ARTICLES.some(c => c.articleId === r.articleId))
+  const reading = readings.find((r) => r.articleId === focusArticleId) ?? null
+  const extraReadings = readings.filter(
+    (r) => !CORE_ARTICLES.some((c) => c.articleId === r.articleId)
+  )
 
   async function select(articleId: string, title?: string, focusQuestion = '') {
     setFocusArticleId(articleId)
-    if (readings.some(r => r.articleId === articleId)) return
+    if (readings.some((r) => r.articleId === articleId)) return
     let finalTitle = title ?? ''
     if (!finalTitle) {
-      const loaded = await window.api.articles.get(articleId)
+      const loaded = await window.api.articles.get(articleId, data.book)
       finalTitle = loaded?.title ?? articleId
     }
-    await update(latest => {
-      if (latest.readings.some(r => r.articleId === articleId)) return latest
-      return { ...latest, readings: [...latest.readings, makeReading(articleId, finalTitle, focusQuestion)] }
+    await update((latest) => {
+      if (latest.readings.some((r) => r.articleId === articleId)) return latest
+      return {
+        ...latest,
+        readings: [...latest.readings, makeReading(articleId, finalTitle, focusQuestion)]
+      }
     })
   }
 
@@ -72,7 +98,7 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
       void select(rec.articleId, rec.title, rec.focusQuestion)
       return
     }
-    void select(CORE_ARTICLES[0].articleId, CORE_ARTICLES[0].title)
+    if (!generic) void select(CORE_ARTICLES[0].articleId, CORE_ARTICLES[0].title)
     // 仅在挂载时决定默认篇目
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -85,8 +111,8 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
     let alive = true
     setLoadingArticle(true)
     window.api.articles
-      .get(focusArticleId)
-      .then(loaded => {
+      .get(focusArticleId, data.book)
+      .then((loaded) => {
         if (!alive) return
         setArticle(loaded)
         setLoadingArticle(false)
@@ -117,8 +143,8 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
     setSearching(true)
     const timer = window.setTimeout(() => {
       window.api.articles
-        .search(q, 20)
-        .then(results => {
+        .search(q, 20, data.book)
+        .then((results) => {
           setHits(results)
           setSearching(false)
         })
@@ -139,11 +165,15 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
     try {
       const result = await window.api.ai.findPassages(session.id, articleId)
       await update(
-        latest => ({
+        (latest) => ({
           ...latest,
-          readings: latest.readings.map(r =>
+          readings: latest.readings.map((r) =>
             r.articleId === articleId
-              ? { ...r, focusQuestion: result.focusQuestion || r.focusQuestion, passages: result.passages }
+              ? {
+                  ...r,
+                  focusQuestion: result.focusQuestion || r.focusQuestion,
+                  passages: result.passages
+                }
               : r
           )
         }),
@@ -161,9 +191,11 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
     const articleId = reading.articleId
     const title = reading.title
     await update(
-      latest => ({
+      (latest) => ({
         ...latest,
-        readings: latest.readings.map(r => (r.articleId === articleId ? { ...r, readDone: true } : r))
+        readings: latest.readings.map((r) =>
+          r.articleId === articleId ? { ...r, readDone: true } : r
+        )
       }),
       { versionLabel: `第二步：精读《${title}》`, step: 'relate' }
     )
@@ -173,9 +205,9 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
   async function addReflection(record: Reflection) {
     const articleId = reading?.articleId
     if (!articleId) return
-    await update(latest => ({
+    await update((latest) => ({
       ...latest,
-      readings: latest.readings.map(r =>
+      readings: latest.readings.map((r) =>
         r.articleId === articleId ? { ...r, reflections: [...(r.reflections ?? []), record] } : r
       )
     }))
@@ -184,16 +216,18 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
   async function removeReflection(id: string) {
     const articleId = reading?.articleId
     if (!articleId) return
-    await update(latest => ({
+    await update((latest) => ({
       ...latest,
-      readings: latest.readings.map(r =>
-        r.articleId === articleId ? { ...r, reflections: (r.reflections ?? []).filter(item => item.id !== id) } : r
+      readings: latest.readings.map((r) =>
+        r.articleId === articleId
+          ? { ...r, reflections: (r.reflections ?? []).filter((item) => item.id !== id) }
+          : r
       )
     }))
   }
 
   function toggleParagraph(index: number) {
-    setActiveParagraph(prev => (prev === index ? null : index))
+    setActiveParagraph((prev) => (prev === index ? null : index))
   }
 
   // 先置 null 再设值，保证连续点击同一段也能重新滚动
@@ -220,8 +254,12 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
     window.addEventListener('mouseup', onUp)
   }
 
-  const recommendedIds = recommendations.map(r => r.articleId)
-  const restCore = CORE_ARTICLES.filter(c => !recommendedIds.includes(c.articleId))
+  const recommendedIds = recommendations.map((r) => r.articleId)
+  const restCore = (
+    generic
+      ? catalog.map((c) => ({ articleId: c.id, title: c.title, solves: c.volume }))
+      : CORE_ARTICLES
+  ).filter((c) => !recommendedIds.includes(c.articleId))
   const scrollTarget = jumpTo ?? scrollToParagraph
 
   return (
@@ -230,7 +268,7 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
         {recommendations.length > 0 && (
           <div className="step-focus-group">
             <div className="step-focus-group-title">教练推荐</div>
-            {recommendations.map(rec => (
+            {recommendations.map((rec) => (
               <button
                 key={rec.articleId}
                 type="button"
@@ -249,8 +287,10 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
         )}
 
         <div className="step-focus-group">
-          <div className="step-focus-group-title">核心五篇</div>
-          {restCore.map(core => (
+          <div className="step-focus-group-title">
+            {generic ? '本书目录（也可自行选择）' : '核心五篇'}
+          </div>
+          {restCore.map((core) => (
             <button
               key={core.articleId}
               type="button"
@@ -269,7 +309,7 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
         {extraReadings.length > 0 && (
           <div className="step-focus-group">
             <div className="step-focus-group-title">已加入的篇目</div>
-            {extraReadings.map(item => (
+            {extraReadings.map((item) => (
               <button
                 key={item.articleId}
                 type="button"
@@ -290,15 +330,17 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
             className="input"
             value={query}
             placeholder="如：调查研究 / 群众路线"
-            onChange={e => setQuery(e.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
           />
           {searching && (
             <div className="muted step-focus-search-tip">
               <span className="spinner" /> 搜索中…
             </div>
           )}
-          {!searching && query.trim().length > 0 && hits.length === 0 && <div className="muted step-focus-search-tip">没有找到相关文章</div>}
-          {hits.map(hit => (
+          {!searching && query.trim().length > 0 && hits.length === 0 && (
+            <div className="muted step-focus-search-tip">没有找到相关文章</div>
+          )}
+          {hits.map((hit) => (
             <button
               key={hit.id}
               type="button"
@@ -317,13 +359,28 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
 
       <section className="step-focus-main">
         <div className="step-focus-toolbar">
-          <button type="button" className="btn btn-primary btn-sm" disabled={busy || !reading} onClick={() => void findPassages()}>
-            {busy && <span className="spinner" />} {reading && reading.passages.length > 0 ? '重新标注' : '帮我找到该读的段落'}
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={busy || !reading}
+            onClick={() => void findPassages()}
+          >
+            {busy && <span className="spinner" />}{' '}
+            {reading && reading.passages.length > 0 ? '重新标注' : '帮我找到该读的段落'}
           </button>
           <span className="muted">只看原文，不看解读。慢一点没关系。</span>
           <span className="spacer" />
-          {reading?.readDone ? <span className="badge badge-ok">已读完</span> : <span className="badge">未读完</span>}
-          <button type="button" className="btn btn-ghost btn-sm" disabled={!reading} onClick={() => void markReadDone()}>
+          {reading?.readDone ? (
+            <span className="badge badge-ok">已读完</span>
+          ) : (
+            <span className="badge">未读完</span>
+          )}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={!reading}
+            onClick={() => void markReadDone()}
+          >
             我读完了，去写 3 条笔记
           </button>
         </div>
@@ -353,11 +410,15 @@ export function StepFocus({ session, goStep, update, focusArticleId, setFocusArt
         {article && reading && (
           <>
             <div className="step-focus-splitter">
-              <div className="step-focus-splitter-bar" title="拖动调整感悟框高度" onMouseDown={startDrag} />
+              <div
+                className="step-focus-splitter-bar"
+                title="拖动调整感悟框高度"
+                onMouseDown={startDrag}
+              />
               <button
                 type="button"
                 className="step-focus-splitter-btn"
-                onClick={() => setPanelCollapsed(v => !v)}
+                onClick={() => setPanelCollapsed((v) => !v)}
               >
                 {panelCollapsed ? '展开感悟框' : '收起感悟框'}
               </button>

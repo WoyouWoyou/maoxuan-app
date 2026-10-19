@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Diagnosis, ProblemInput, ProblemRevision, Session } from '@shared/types'
 import './ReviseDialog.css'
+import { readingPresentation } from '@shared/reading-presentation'
 
 type FieldKey =
   | 'text'
@@ -35,15 +36,30 @@ function display(text: string): string {
 }
 
 function recText(list: Diagnosis['recommendations']): string {
-  return list.map(r => `《${r.title}》：${r.reason}`).join('\n')
+  return list.map((r) => `《${r.title}》：${r.reason}`).join('\n')
 }
 
-function buildRows(problem: ProblemInput, diagnosis: Diagnosis | null, revision: ProblemRevision): FieldRow[] {
+function buildRows(
+  problem: ProblemInput,
+  diagnosis: Diagnosis | null,
+  revision: ProblemRevision,
+  generic = false
+): FieldRow[] {
   const rows: Omit<FieldRow, 'changed'>[] = [
     { key: 'text', label: '问题', oldText: problem.text, newText: revision.problem.text },
-    { key: 'background', label: '背景', oldText: problem.background, newText: revision.problem.background },
+    {
+      key: 'background',
+      label: '背景',
+      oldText: problem.background,
+      newText: revision.problem.background
+    },
     { key: 'tried', label: '已经试过', oldText: problem.tried, newText: revision.problem.tried },
-    { key: 'restated', label: '复述', oldText: diagnosis?.restated ?? '', newText: revision.diagnosis.restated },
+    {
+      key: 'restated',
+      label: '复述',
+      oldText: diagnosis?.restated ?? '',
+      newText: revision.diagnosis.restated
+    },
     {
       key: 'symptoms',
       label: '症状',
@@ -52,11 +68,16 @@ function buildRows(problem: ProblemInput, diagnosis: Diagnosis | null, revision:
     },
     {
       key: 'mainContradiction',
-      label: '主要矛盾',
+      label: generic ? '当前关键障碍' : '主要矛盾',
       oldText: diagnosis?.mainContradiction ?? '',
       newText: revision.diagnosis.mainContradiction
     },
-    { key: 'stage', label: '所处阶段', oldText: diagnosis?.stage ?? '', newText: revision.diagnosis.stage },
+    {
+      key: 'stage',
+      label: generic ? '约束与待确认信息' : '所处阶段',
+      oldText: diagnosis?.stage ?? '',
+      newText: revision.diagnosis.stage
+    },
     {
       key: 'recommendations',
       label: '推荐篇目',
@@ -64,7 +85,7 @@ function buildRows(problem: ProblemInput, diagnosis: Diagnosis | null, revision:
       newText: recText(revision.diagnosis.recommendations)
     }
   ]
-  return rows.map(r => ({ ...r, changed: r.oldText.trim() !== r.newText.trim() }))
+  return rows.map((r) => ({ ...r, changed: r.oldText.trim() !== r.newText.trim() }))
 }
 
 export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
@@ -91,9 +112,14 @@ export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
       try {
         const rev = await window.api.ai.reviseProblem(sessionId)
         if (!alive) return
-        const rows = buildRows(currentProblem, currentDiagnosis, rev)
+        const rows = buildRows(
+          currentProblem,
+          currentDiagnosis,
+          rev,
+          readingPresentation(session.data).generic
+        )
         setRevision(rev)
-        setChecked(new Set(rows.filter(r => r.changed).map(r => r.key)))
+        setChecked(new Set(rows.filter((r) => r.changed).map((r) => r.key)))
         setLoading(false)
       } catch (e) {
         if (!alive) return
@@ -117,14 +143,22 @@ export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
   }, [onClose])
 
   const rows = useMemo(
-    () => (revision ? buildRows(currentProblem, currentDiagnosis, revision) : []),
+    () =>
+      revision
+        ? buildRows(
+            currentProblem,
+            currentDiagnosis,
+            revision,
+            readingPresentation(session.data).generic
+          )
+        : [],
     [revision, currentProblem, currentDiagnosis]
   )
-  const changedRows = rows.filter(r => r.changed)
-  const unchangedRows = rows.filter(r => !r.changed)
+  const changedRows = rows.filter((r) => r.changed)
+  const unchangedRows = rows.filter((r) => !r.changed)
 
   function toggle(key: FieldKey) {
-    setChecked(prev => {
+    setChecked((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -142,19 +176,23 @@ export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
 
       const nextProblem: ProblemInput = {
         text: checked.has('text') ? revision.problem.text : baseProblem.text,
-        background: checked.has('background') ? revision.problem.background : baseProblem.background,
+        background: checked.has('background')
+          ? revision.problem.background
+          : baseProblem.background,
         tried: checked.has('tried') ? revision.problem.tried : baseProblem.tried
       }
       const nextDiagnosis: Diagnosis = {
         restated: checked.has('restated') ? revision.diagnosis.restated : baseDiagnosis.restated,
-        symptoms: checked.has('symptoms') ? [...revision.diagnosis.symptoms] : [...baseDiagnosis.symptoms],
+        symptoms: checked.has('symptoms')
+          ? [...revision.diagnosis.symptoms]
+          : [...baseDiagnosis.symptoms],
         mainContradiction: checked.has('mainContradiction')
           ? revision.diagnosis.mainContradiction
           : baseDiagnosis.mainContradiction,
         stage: checked.has('stage') ? revision.diagnosis.stage : baseDiagnosis.stage,
         recommendations: checked.has('recommendations')
-          ? revision.diagnosis.recommendations.map(r => ({ ...r }))
-          : baseDiagnosis.recommendations.map(r => ({ ...r }))
+          ? revision.diagnosis.recommendations.map((r) => ({ ...r }))
+          : baseDiagnosis.recommendations.map((r) => ({ ...r }))
       }
       await onApply({ problem: nextProblem, diagnosis: nextDiagnosis })
     } catch (e) {
@@ -169,7 +207,12 @@ export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
     const body = (
       <>
         {selectable ? (
-          <input type="checkbox" className="rev-check" checked={on} onChange={() => toggle(row.key)} />
+          <input
+            type="checkbox"
+            className="rev-check"
+            checked={on}
+            onChange={() => toggle(row.key)}
+          />
         ) : (
           <span className="rev-check rev-check-off" />
         )}
@@ -201,12 +244,17 @@ export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
 
   return (
     <div className="rev-mask" onClick={onClose}>
-      <div className="rev-card" onClick={e => e.stopPropagation()}>
+      <div className="rev-card" onClick={(e) => e.stopPropagation()}>
         <header className="rev-head">
           <span className="rev-title">套用讨论结果</span>
           <span className="rev-sub muted">只套用你勾选的字段</span>
           <span className="spacer" />
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} disabled={applying}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onClose}
+            disabled={applying}
+          >
             关闭
           </button>
         </header>
@@ -221,7 +269,11 @@ export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
           {!loading && loadError && (
             <div className="rev-error">
               <span className="error-text">{loadError}</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReloadKey(k => k + 1)}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setReloadKey((k) => k + 1)}
+              >
                 重试
               </button>
             </div>
@@ -243,19 +295,21 @@ export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
               </div>
 
               <div className="rev-section-title">逐字段对比</div>
-              {changedRows.length === 0 && <p className="muted rev-no-change">所有字段都与当前一致</p>}
-              {changedRows.map(row => renderRow(row, true))}
+              {changedRows.length === 0 && (
+                <p className="muted rev-no-change">所有字段都与当前一致</p>
+              )}
+              {changedRows.map((row) => renderRow(row, true))}
 
               {unchangedRows.length > 0 && (
                 <>
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm rev-unchanged-toggle"
-                    onClick={() => setOpenUnchanged(v => !v)}
+                    onClick={() => setOpenUnchanged((v) => !v)}
                   >
                     未改动的字段（{unchangedRows.length}）{openUnchanged ? '收起' : '展开'}
                   </button>
-                  {openUnchanged && unchangedRows.map(row => renderRow(row, false))}
+                  {openUnchanged && unchangedRows.map((row) => renderRow(row, false))}
                 </>
               )}
             </>

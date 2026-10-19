@@ -63,7 +63,14 @@ export function LibraryArticlePage() {
     setPickerError(null)
     try {
       const list = await window.api.sessions.list()
-      setSessions(list.filter((s) => s.status === 'active' && s.mode === 'reading'))
+      setSessions(
+        list.filter(
+          (s) =>
+            s.status === 'active' &&
+            s.mode === 'reading' &&
+            (s.bookId ?? 'maoxuan') === (article?.bookId ?? 'maoxuan')
+        )
+      )
     } catch (e) {
       setPickerError(errText(e))
     } finally {
@@ -120,7 +127,9 @@ export function LibraryArticlePage() {
 
           {!pickerLoading && !pickerError && sessions.length === 0 ? (
             <div className="col">
-              <div className="muted">还没有阅读法会话。先写下你最头疼的一件事，再回来读这篇文章。</div>
+              <div className="muted">
+                还没有阅读法会话。先写下你最头疼的一件事，再回来读这篇文章。
+              </div>
               <div>
                 <button
                   className="btn btn-primary btn-sm"

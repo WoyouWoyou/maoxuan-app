@@ -112,7 +112,9 @@ export function ChatPanel({
       if (!pending || pending.requestId !== e.requestId) return
       pendingRef.current = null
       setSending(false)
-      setMessages((prev) => prev.map((m) => (m.id === pending.streamingId ? toDisplay(e.message) : m)))
+      setMessages((prev) =>
+        prev.map((m) => (m.id === pending.streamingId ? toDisplay(e.message) : m))
+      )
     })
 
     const offError = window.api.chat.onError((e) => {
@@ -122,7 +124,9 @@ export function ChatPanel({
       setSending(false)
       setMessages((prev) =>
         prev.map((m) =>
-          m.id === pending.streamingId ? { ...m, streaming: false, failed: true, errorText: e.error } : m
+          m.id === pending.streamingId
+            ? { ...m, streaming: false, failed: true, errorText: e.error }
+            : m
         )
       )
     })
@@ -263,19 +267,39 @@ export function ChatPanel({
       <div className="chat-head">
         <span className="chat-title">{title}</span>
         <span className="spacer" />
+        {sending && (
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => void window.api.models.cancel(sessionId)}
+          >
+            停止回复
+          </button>
+        )}
         {messages.length > 0 &&
           (confirmClear ? (
             <span className="chat-confirm">
               <span className="muted">清空全部对话？</span>
-              <button type="button" className="btn btn-sm btn-danger" onClick={() => void doClear()}>
+              <button
+                type="button"
+                className="btn btn-sm btn-danger"
+                onClick={() => void doClear()}
+              >
                 确定
               </button>
-              <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirmClear(false)}>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={() => setConfirmClear(false)}
+              >
                 取消
               </button>
             </span>
           ) : (
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirmClear(true)}>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              onClick={() => setConfirmClear(true)}
+            >
               清空
             </button>
           ))}
@@ -327,7 +351,12 @@ export function ChatPanel({
             {m.failed && (
               <div className="chat-error">
                 <span>{m.errorText || '发送失败'}</span>
-                <button type="button" className="btn btn-sm btn-ghost" disabled={sending} onClick={retry}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  disabled={sending}
+                  onClick={retry}
+                >
                   重试
                 </button>
               </div>
@@ -340,7 +369,9 @@ export function ChatPanel({
 
       {showApplyHint && (
         <div className="chat-apply-hint">
-          <span className="chat-apply-hint-text">对诊断有不同看法？讨论完可以把结论套用到第一步</span>
+          <span className="chat-apply-hint-text">
+            对诊断有不同看法？讨论完可以把结论套用到第一步
+          </span>
           <button
             type="button"
             className="btn btn-sm btn-ghost"

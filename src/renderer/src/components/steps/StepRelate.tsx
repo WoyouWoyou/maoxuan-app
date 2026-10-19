@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ActionItem, Reading, ThreeNotes } from '@shared/types'
 import { exampleFor, NOTE_FIELDS } from '@shared/core'
 import { NoteExampleCard } from '../NoteExampleCard'
 import type { StepProps } from './types'
 import './steps.css'
 import './RelatePicker.css'
+import { readingPresentation } from '@shared/reading-presentation'
 
 const EMPTY_NOTES: ThreeNotes = { coreMethod: '', relatedProblem: '', action: '' }
 
@@ -24,21 +25,33 @@ function toMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
-export function StepRelate({ session, goStep, openReader, focusArticleId, setFocusArticleId, update }: StepProps) {
+export function StepRelate({
+  session,
+  goStep,
+  openReader,
+  focusArticleId,
+  setFocusArticleId,
+  update
+}: StepProps) {
+  const edits = useRef(0)
   const data = session.data
-  const readReadings = data.readings.filter(r => r.readDone)
+  const presentation = readingPresentation(data)
+  const readReadings = data.readings.filter((r) => r.readDone)
   const preferred =
-    focusArticleId && readReadings.some(r => r.articleId === focusArticleId) ? focusArticleId : readReadings[0]?.articleId ?? ''
+    focusArticleId && readReadings.some((r) => r.articleId === focusArticleId)
+      ? focusArticleId
+      : (readReadings[0]?.articleId ?? '')
   const [selectedId, setSelectedId] = useState(preferred)
   const [notes, setNotes] = useState<ThreeNotes>(EMPTY_NOTES)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [saved, setSaved] = useState(false)
 
-  const selected: Reading | null = readReadings.find(r => r.articleId === selectedId) ?? readReadings[0] ?? null
+  const selected: Reading | null =
+    readReadings.find((r) => r.articleId === selectedId) ?? readReadings[0] ?? null
 
   useEffect(() => {
-    const target = readReadings.find(r => r.articleId === selectedId) ?? readReadings[0]
+    const target = readReadings.find((r) => r.articleId === selectedId) ?? readReadings[0]
     setNotes(target ? target.notes : EMPTY_NOTES)
     setSaved(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,14 +70,18 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
     )
   }
 
-  const filled = notes.coreMethod.trim().length > 0 && notes.relatedProblem.trim().length > 0 && notes.action.trim().length > 0
+  const filled =
+    notes.coreMethod.trim().length > 0 &&
+    notes.relatedProblem.trim().length > 0 &&
+    notes.action.trim().length > 0
   const feedback = selected.feedback
   const reflections = (selected.reflections ?? [])
     .slice()
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
   function setField(key: keyof ThreeNotes, value: string) {
-    setNotes(prev => {
+    edits.current++
+    setNotes((prev) => {
       const next: ThreeNotes = { ...prev }
       next[key] = value
       return next
@@ -77,14 +94,18 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
     if (!current || !filled || busy) return
     const articleId = current.articleId
     const title = current.title
+    const requestedEdits = edits.current
     setBusy(true)
     setErr('')
     try {
       const result = await window.api.ai.reviewNotes(session.id, articleId, notes)
+      if (edits.current !== requestedEdits) throw new Error('笔记草稿已修改，请重新获取反馈')
       await update(
-        latest => ({
+        (latest) => ({
           ...latest,
-          readings: latest.readings.map(r => (r.articleId === articleId ? { ...r, notes, feedback: result } : r))
+          readings: latest.readings.map((r) =>
+            r.articleId === articleId ? { ...r, notes, feedback: result } : r
+          )
         }),
         { versionLabel: `第三步：批改《${title}》笔记` }
       )
@@ -112,11 +133,15 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
       createdAt: new Date().toISOString()
     }
     await update(
-      latest => {
-        const exists = latest.actions.some(a => a.fromArticleId === articleId && a.text.trim() === actionText)
+      (latest) => {
+        const exists = latest.actions.some(
+          (a) => a.fromArticleId === articleId && a.text.trim() === actionText
+        )
         return {
           ...latest,
-          readings: latest.readings.map(r => (r.articleId === articleId ? { ...r, notes, notesDone: true } : r)),
+          readings: latest.readings.map((r) =>
+            r.articleId === articleId ? { ...r, notes, notesDone: true } : r
+          ),
           actions: exists ? latest.actions : [...latest.actions, newAction]
         }
       },
@@ -131,11 +156,12 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
         <div className="rp-head">
           <div className="rp-title">先选一篇已读的文章</div>
           <div className="rp-sub">
-            共 {readReadings.length} 篇已读 · 已写笔记 {readReadings.filter(r => r.notesDone).length} 篇
+            共 {readReadings.length} 篇已读 · 已写笔记{' '}
+            {readReadings.filter((r) => r.notesDone).length} 篇
           </div>
         </div>
         <div className="rp-list">
-          {readReadings.map(r => {
+          {readReadings.map((r) => {
             const isOn = r.articleId === selected.articleId
             return (
               <button
@@ -164,13 +190,17 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
         {reflections.length === 0 ? (
           <div className="relate-refl-empty">
             <span className="muted">第二步没有留下感悟。可以回去边读边记，再来写 3 条。</span>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => openReader(selected.articleId)}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => openReader(selected.articleId)}
+            >
               回去读原文
             </button>
           </div>
         ) : (
           <div className="relate-refl-list">
-            {reflections.map(r => {
+            {reflections.map((r) => {
               const idx = r.paragraphIndex
               return (
                 <div className="relate-refl-item" key={r.id}>
@@ -198,10 +228,10 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
         <div className="muted relate-tip">先看自己的感悟，再写下面 3 条。</div>
       </div>
 
-      <NoteExampleCard articleId={selected.articleId} />
+      {!presentation.generic && <NoteExampleCard articleId={selected.articleId} />}
 
       <div className="relate-form">
-        {NOTE_FIELDS.map(field => (
+        {(presentation.generic ? presentation.fields : NOTE_FIELDS).map((field) => (
           <div className="field" key={field.key}>
             <div className="relate-field-head">
               <span className="field-label">{field.label}</span>
@@ -211,26 +241,44 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
               className="textarea"
               rows={2}
               value={notes[field.key]}
-              placeholder={`例：${exampleFor(selected.articleId)[field.key]}`}
-              onChange={e => setField(field.key, e.target.value)}
+              placeholder={
+                presentation.generic
+                  ? field.guide
+                  : `例：${exampleFor(selected.articleId)[field.key]}`
+              }
+              onChange={(e) => setField(field.key, e.target.value)}
             />
           </div>
         ))}
       </div>
 
       <div className="step-actions-bar">
-        <button type="button" className="btn btn-primary" disabled={!filled || busy} onClick={() => void review()}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!filled || busy}
+          onClick={() => void review()}
+        >
           {busy && <span className="spinner" />} 请教员批改
         </button>
-        <button type="button" className="btn btn-ghost" disabled={!filled || busy} onClick={() => void saveNotes()}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled={!filled || busy}
+          onClick={() => void saveNotes()}
+        >
           保存笔记
         </button>
-        {!filled && <span className="muted">写不出来，说明没读懂——回去再读一遍标注段落</span>}
+        {!filled && <span className="muted">可以先回顾原文和自己的感受，再写一个小的尝试</span>}
         {err && <span className="error-text">{err}</span>}
         {saved && (
           <span className="ok-text">
             已加入行动清单
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => goStep('apply')}>
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={() => goStep('apply')}
+            >
               去干 1 件事 →
             </button>
           </span>
@@ -243,14 +291,20 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
         <div className="card relate-feedback">
           <div className="card-title">
             批改结果
-            {feedback.passed ? <span className="badge badge-ok">及格</span> : <span className="badge badge-red">不及格</span>}
+            {feedback.passed ? (
+              <span className="badge badge-ok">及格</span>
+            ) : (
+              <span className="badge badge-red">不及格</span>
+            )}
           </div>
 
-          {NOTE_FIELDS.map(field => (
+          {(presentation.generic ? presentation.fields : NOTE_FIELDS).map((field) => (
             <div className="relate-score" key={field.key}>
               <span className="relate-score-label">{field.label}</span>
               <span className="relate-bar">
-                <i style={{ width: `${Math.max(0, Math.min(5, feedback.scores[field.key])) * 20}%` }} />
+                <i
+                  style={{ width: `${Math.max(0, Math.min(5, feedback.scores[field.key])) * 20}%` }}
+                />
               </span>
               <b>{feedback.scores[field.key]}/5</b>
             </div>
@@ -267,7 +321,7 @@ export function StepRelate({ session, goStep, openReader, focusArticleId, setFoc
           {!feedback.passed && (
             <div className="relate-reread">
               <span className="muted">回去重读这几段：</span>
-              {feedback.rereadParagraphs.map(idx => (
+              {feedback.rereadParagraphs.map((idx) => (
                 <button
                   key={idx}
                   type="button"

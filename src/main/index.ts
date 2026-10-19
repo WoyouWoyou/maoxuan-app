@@ -1,12 +1,19 @@
 import path from 'path'
+import fs from 'node:fs'
+import { bootstrap } from './bootstrap'
 import { app, BrowserWindow, shell } from 'electron'
 import { config as loadEnv } from 'dotenv'
 import { TRASH_RETENTION_DAYS } from '@shared/core'
-import { initDb, purgeExpiredTrash } from './db'
-import { loadArticles } from './articles'
+import { initDb, purgeExpiredTrash } from './adapters/sqlite/session-repository'
+import { loadArticles } from './adapters/electron/builtin-library'
 import { registerIpc } from './ipc'
 
-if (!app.isPackaged) {
+if (!app.isPackaged && process.env.MAOXUAN_USER_DATA) {
+  fs.mkdirSync(process.env.MAOXUAN_USER_DATA, { recursive: true })
+  app.setPath('userData', process.env.MAOXUAN_USER_DATA)
+}
+
+if (!app.isPackaged && !process.env.MAOXUAN_TEST) {
   loadEnv({ path: path.join(app.getAppPath(), '.env') })
 }
 
@@ -56,7 +63,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  initDb()
+  bootstrap(initDb())
   purgeTrash()
   setInterval(purgeTrash, PURGE_INTERVAL_MS)
   loadArticles()

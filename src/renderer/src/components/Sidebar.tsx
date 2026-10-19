@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { MODE_META, stepMeta, type SessionMode, type SessionSummary, type StepKey } from '@shared/types'
+import {
+  MODE_META,
+  stepMeta,
+  type SessionMode,
+  type SessionSummary,
+  type StepKey
+} from '@shared/types'
 import { CloseSessionDialog } from './CloseSessionDialog'
 import './Sidebar.css'
+import { useBooks } from '../features/library/useBooks'
 
 const MIN_PROBLEM_LEN = 10
 const COLLAPSE_KEY = 'maoxuan.sidebarCollapsed'
@@ -23,7 +30,9 @@ function formatTime(iso: string): string {
   const now = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
   const sameDay =
-    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
   if (sameDay) return `${pad(d.getHours())}:${pad(d.getMinutes())}`
   if (d.getFullYear() === now.getFullYear()) return `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -38,6 +47,8 @@ function readCollapsed(): boolean {
 }
 
 export function Sidebar() {
+  const books = useBooks()
+  const [bookId, setBookId] = useState('maoxuan')
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -98,7 +109,12 @@ export function Sidebar() {
   }, [persistCollapsed])
 
   useEffect(() => {
-    const handler = () => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail
+      if (detail?.bookId) {
+        setBookId(detail.bookId)
+        setMode('reading')
+      }
       openNew()
     }
     window.addEventListener('open-new-session', handler)
@@ -122,7 +138,7 @@ export function Sidebar() {
     setBusy(true)
     setCreateError(null)
     try {
-      const session = await window.api.sessions.create(text, mode)
+      const session = await window.api.sessions.create(text, mode, bookId)
       setProblemText('')
       setCreating(false)
       setMode('reading')
@@ -155,21 +171,33 @@ export function Sidebar() {
           >
             »
           </button>
-          <button className="btn btn-ghost btn-sm sb-rail-btn" title="我有一个头疼的问题" onClick={openNew}>
+          <button
+            className="btn btn-ghost btn-sm sb-rail-btn"
+            title="我有一个头疼的问题"
+            onClick={openNew}
+          >
             ＋
           </button>
 
           <span className="spacer" />
 
           <button
-            className={onLibrary ? 'btn btn-ghost btn-sm sb-rail-btn active' : 'btn btn-ghost btn-sm sb-rail-btn'}
+            className={
+              onLibrary
+                ? 'btn btn-ghost btn-sm sb-rail-btn active'
+                : 'btn btn-ghost btn-sm sb-rail-btn'
+            }
             title="原文书库"
             onClick={() => navigate('/library')}
           >
             书
           </button>
           <button
-            className={onSettings ? 'btn btn-ghost btn-sm sb-rail-btn active' : 'btn btn-ghost btn-sm sb-rail-btn'}
+            className={
+              onSettings
+                ? 'btn btn-ghost btn-sm sb-rail-btn active'
+                : 'btn btn-ghost btn-sm sb-rail-btn'
+            }
             title="设置"
             onClick={() => navigate('/settings')}
           >
@@ -215,6 +243,25 @@ export function Sidebar() {
               ))}
             </div>
 
+            {mode === 'reading' && (
+              <label className="field">
+                选择书籍
+                <select
+                  className="input"
+                  value={bookId}
+                  onChange={(e) => setBookId(e.target.value)}
+                >
+                  {books.map((b) => (
+                    <option key={b.bookId} value={b.bookId}>
+                      {b.title}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn btn-ghost btn-sm" onClick={() => navigate('/library')}>
+                  导入其他书籍
+                </button>
+              </label>
+            )}
             <textarea
               ref={textareaRef}
               className="textarea sb-new-input"
@@ -236,7 +283,11 @@ export function Sidebar() {
               <button className="btn btn-sm btn-ghost" onClick={cancelCreate} disabled={busy}>
                 取消
               </button>
-              <button className="btn btn-sm btn-primary" onClick={() => void submitCreate()} disabled={!canSubmit}>
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => void submitCreate()}
+                disabled={!canSubmit}
+              >
                 {busy ? <span className="spinner" /> : null}
                 {mode === 'workbench' ? '建立项目' : '开始'}
               </button>
@@ -297,16 +348,26 @@ export function Sidebar() {
       </div>
 
       <nav className="sb-foot">
-        <NavLink className={({ isActive }) => (isActive ? 'sb-nav active' : 'sb-nav')} to="/library">
+        <NavLink
+          className={({ isActive }) => (isActive ? 'sb-nav active' : 'sb-nav')}
+          to="/library"
+        >
           原文书库
         </NavLink>
-        <NavLink className={({ isActive }) => (isActive ? 'sb-nav active' : 'sb-nav')} to="/settings">
+        <NavLink
+          className={({ isActive }) => (isActive ? 'sb-nav active' : 'sb-nav')}
+          to="/settings"
+        >
           设置
         </NavLink>
       </nav>
 
       {closing ? (
-        <CloseSessionDialog session={closing} onClose={() => setClosing(null)} onDone={handleClosed} />
+        <CloseSessionDialog
+          session={closing}
+          onClose={() => setClosing(null)}
+          onDone={handleClosed}
+        />
       ) : null}
     </aside>
   )

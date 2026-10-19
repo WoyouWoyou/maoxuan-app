@@ -1,3 +1,8 @@
+import type { ModelProfile } from './contracts/models'
+import type { ReadingCommand } from './contracts/reading'
+import type { StepKey } from './types'
+import type { Book, BookScope, Task, ImportEdits } from './contracts/library'
+import type { UsageQuery, UsageStats } from './contracts/usage'
 import type {
   Article,
   ArticleMeta,
@@ -33,10 +38,41 @@ import type {
 
 /** Exposed by preload as `window.api`. Every method maps 1:1 to an ipcMain.handle channel named `${group}:${method}`. */
 export interface MaoxuanApi {
+  reading: {
+    apply(
+      id: string,
+      commands: ReadingCommand[],
+      expectedStateVersion: number,
+      label?: string,
+      step?: StepKey
+    ): Promise<Session>
+  }
+  library: {
+    list(includeHidden?: boolean): Promise<Book[]>
+    hide(id: string, hidden: boolean): Promise<void>
+    choose(encoding?: string): Promise<string | null>
+    confirm(id: string, title: string, author: string, edits?: ImportEdits): Promise<string>
+    index(bookId: string): Promise<Task>
+  }
+  tasks: {
+    list(): Promise<Task[]>
+    get(id: string): Promise<Task>
+    cancel(id: string): Promise<void>
+    onChanged(cb: (task: Task) => void): () => void
+  }
+  usage: { query(query?: UsageQuery): Promise<UsageStats> }
+  models: {
+    routes(): Promise<Record<string, string>>
+    setRoute(purpose: string, id: string): Promise<void>
+    cancel(sessionId: string): Promise<void>
+    list(): Promise<ModelProfile[]>
+    save(id: string | undefined, name: string, settings: Settings): Promise<ModelProfile>
+    select(id: string): Promise<void>
+  }
   articles: {
-    list(): Promise<ArticleMeta[]>
-    get(id: string): Promise<Article | null>
-    search(query: string, limit?: number): Promise<SearchHit[]>
+    list(scope?: BookScope): Promise<ArticleMeta[]>
+    get(id: string, scope?: BookScope): Promise<Article | null>
+    search(query: string, limit?: number, scope?: BookScope): Promise<SearchHit[]>
   }
   sessions: {
     /** 仅进行中：status='active' 且不在回收站。 */
@@ -47,7 +83,7 @@ export interface MaoxuanApi {
     listTrash(): Promise<SessionSummary[]>
     get(id: string): Promise<Session | null>
     /** mode 缺省为 reading。workbench 会话：problemText 写入 form.objective，currentStep = 'wb_intake'。 */
-    create(problemText: string, mode?: SessionMode): Promise<Session>
+    create(problemText: string, mode?: SessionMode, bookId?: string): Promise<Session>
     /** When `versionLabel` is given, a full snapshot is appended to the version history. */
     update(id: string, patch: SessionPatch, versionLabel?: string): Promise<Session>
     /** 彻底删除（级联删除版本与对话），不可恢复。 */
@@ -70,7 +106,11 @@ export interface MaoxuanApi {
   chat: {
     list(sessionId: string): Promise<ChatMessage[]>
     /** Persists the user message, starts streaming, resolves immediately with a requestId. */
-    send(sessionId: string, content: string, articleId?: string | null): Promise<{ requestId: string; userMessage: ChatMessage }>
+    send(
+      sessionId: string,
+      content: string,
+      articleId?: string | null
+    ): Promise<{ requestId: string; userMessage: ChatMessage }>
     clear(sessionId: string): Promise<void>
     onChunk(cb: (e: ChatChunkEvent) => void): () => void
     onDone(cb: (e: ChatDoneEvent) => void): () => void
@@ -80,7 +120,10 @@ export interface MaoxuanApi {
     diagnose(sessionId: string): Promise<Diagnosis>
     /** 读取该会话的教练对话，结合当前问题与诊断，给出修订建议（不写库）。 */
     reviseProblem(sessionId: string): Promise<ProblemRevision>
-    findPassages(sessionId: string, articleId: string): Promise<{ focusQuestion: string; passages: Passage[] }>
+    findPassages(
+      sessionId: string,
+      articleId: string
+    ): Promise<{ focusQuestion: string; passages: Passage[] }>
     reviewNotes(sessionId: string, articleId: string, notes: ThreeNotes): Promise<NoteFeedback>
     reviewSituation(sessionId: string, newSituation: string): Promise<Review>
     mindset(sessionId: string): Promise<Mindset>

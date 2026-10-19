@@ -41,7 +41,9 @@ export function formBlock(wb: WorkbenchData): string {
 export function factsBlock(wb: WorkbenchData): string {
   const facts = wb.intake?.facts ?? []
   if (!facts.length) return '（事实台账为空）'
-  return facts.map((x) => `${x.id}｜${KIND_LABEL[x.kind]}｜${CONF_LABEL[x.confidence]}｜${x.content}`).join('\n')
+  return facts
+    .map((x) => `${x.id}｜${KIND_LABEL[x.kind]}｜${CONF_LABEL[x.confidence]}｜${x.content}`)
+    .join('\n')
 }
 
 function questionsBlock(wb: WorkbenchData): string {
@@ -87,7 +89,9 @@ function routesBlock(wb: WorkbenchData): string {
 function objSubjBlock(wb: WorkbenchData): string {
   const o = wb.diagnosis.objSubj
   if (!o) return '（未完成）'
-  const rows = WB_OBJSUBJ.map((m) => `${m.group}·${m.name}：${o[m.key].score} 分｜${o[m.key].reason}`)
+  const rows = WB_OBJSUBJ.map(
+    (m) => `${m.group}·${m.name}：${o[m.key].score} 分｜${o[m.key].reason}`
+  )
   return [
     ...rows,
     `当前具备的条件：${o.ready}`,
@@ -115,7 +119,10 @@ function actionsBlock(wb: WorkbenchData): string {
   const status = { todo: '进行中', done: '已完成', dropped: '已放弃' } as const
   return wb.actions
     .map((a) => {
-      const progress = a.progress.slice(-3).map((p) => `    · ${p.text}`).join('\n')
+      const progress = a.progress
+        .slice(-3)
+        .map((p) => `    · ${p.text}`)
+        .join('\n')
       return `- [${a.horizon}｜${status[a.status]}] ${a.action}（验证：${a.verify}）${progress ? `\n${progress}` : ''}`
     })
     .join('\n')
@@ -124,7 +131,12 @@ function actionsBlock(wb: WorkbenchData): string {
 function ledgerBlock(wb: WorkbenchData, n = 5): string {
   const xs = wb.ledger.slice(-n)
   if (!xs.length) return '（无）'
-  return xs.map((e) => `- ${e.createdAt.slice(0, 10)}｜${e.inputType}｜${e.summary || e.rawInput.slice(0, 80)}`).join('\n')
+  return xs
+    .map(
+      (e) =>
+        `- ${e.createdAt.slice(0, 10)}｜${e.inputType}｜${e.summary || e.rawInput.slice(0, 80)}`
+    )
+    .join('\n')
 }
 
 /* ------------------------------ 第一步：摸清事实 ------------------------------ */
@@ -166,7 +178,16 @@ export function buildWbIntakeUser(wb: WorkbenchData): string {
 /* ------------------------------ 第二步：三路诊断 ------------------------------ */
 
 function diagnoseContext(wb: WorkbenchData): string {
-  return ['【原始输入】', formBlock(wb), '', '【事实台账】', factsBlock(wb), '', '【追问与回答】', questionsBlock(wb)].join('\n')
+  return [
+    '【原始输入】',
+    formBlock(wb),
+    '',
+    '【事实台账】',
+    factsBlock(wb),
+    '',
+    '【追问与回答】',
+    questionsBlock(wb)
+  ].join('\n')
 }
 
 export const WB_CONTRADICTION_SYSTEM = `${WB_RULES}
@@ -219,7 +240,9 @@ export function buildWbRoutesUser(wb: WorkbenchData): string {
   return diagnoseContext(wb)
 }
 
-const OBJSUBJ_TABLE = WB_OBJSUBJ.map((m) => `- ${m.key}｜${m.group}·${m.name}｜${m.desc}`).join('\n')
+const OBJSUBJ_TABLE = WB_OBJSUBJ.map((m) => `- ${m.key}｜${m.group}·${m.name}｜${m.desc}`).join(
+  '\n'
+)
 
 export const WB_OBJSUBJ_SYSTEM = `${WB_RULES}
 
@@ -249,7 +272,9 @@ export function buildWbObjSubjUser(wb: WorkbenchData): string {
 
 /* ------------------------------ 第三步：综合决策 ------------------------------ */
 
-const ENHANCEMENT_TABLE = WB_ENHANCEMENTS.map((e) => `- ${e.key}｜${e.name}｜适用：${e.when}｜要写出：${e.output}`).join('\n')
+const ENHANCEMENT_TABLE = WB_ENHANCEMENTS.map(
+  (e) => `- ${e.key}｜${e.name}｜适用：${e.when}｜要写出：${e.output}`
+).join('\n')
 
 export const WB_DECIDE_SYSTEM = `${WB_RULES}
 
@@ -291,7 +316,14 @@ export function buildWbDecideUser(wb: WorkbenchData, failing: WbCheck[]): string
     objSubjBlock(wb)
   ]
   if (failing.length) {
-    lines.push('', '【上一版决策】', decisionBlock(wb), '', '【上一版检查未通过项】', list(failing.map((c) => c.message)))
+    lines.push(
+      '',
+      '【上一版决策】',
+      decisionBlock(wb),
+      '',
+      '【上一版检查未通过项】',
+      list(failing.map((c) => c.message))
+    )
   }
   return lines.join('\n')
 }
@@ -333,16 +365,24 @@ export function buildWbRedteamUser(wb: WorkbenchData, scope: 'decision' | 'actio
   if (scope === 'actions') {
     const detail = wb.actions
       .filter((a) => a.status !== 'dropped')
-      .map((a) => `- [${a.horizon}] 动作：${a.action}｜目的：${a.purpose}｜验证：${a.verify}｜执行标准：${a.standards.join('、')}｜KPI：${a.kpi}`)
+      .map(
+        (a) =>
+          `- [${a.horizon}] 动作：${a.action}｜目的：${a.purpose}｜验证：${a.verify}｜执行标准：${a.standards.join('、')}｜KPI：${a.kpi}`
+      )
     lines.push('', '【待审核的行动】', detail.join('\n') || '（无）')
   }
-  lines.push('', `【本次只审核】${scope === 'actions' ? '行动（第 7 条为主，兼顾与决策的一致性）' : '事实、三模块与决策快照（第 1–6 条）'}`)
+  lines.push(
+    '',
+    `【本次只审核】${scope === 'actions' ? '行动（第 7 条为主，兼顾与决策的一致性）' : '事实、三模块与决策快照（第 1–6 条）'}`
+  )
   return lines.join('\n')
 }
 
 /* ------------------------------ 第四步：行动与复盘 ------------------------------ */
 
-const STANDARD_TABLE = WB_STANDARDS.map((s) => `- ${s.name}｜何时用：${s.when}｜写法：${s.hint}`).join('\n')
+const STANDARD_TABLE = WB_STANDARDS.map(
+  (s) => `- ${s.name}｜何时用：${s.when}｜写法：${s.hint}`
+).join('\n')
 
 export const WB_ACTIONS_SYSTEM = `${WB_RULES}
 

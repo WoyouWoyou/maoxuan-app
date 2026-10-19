@@ -13,6 +13,10 @@ on:
       - 'tsconfig*.json'
       - 'src/**'
       - 'resources/**'
+      - 'tests/**'
+      - 'scripts/run-tests.mjs'
+      - 'scripts/check-boundaries.mjs'
+      - 'vitest.config.ts'
 
 permissions:
   contents: read
@@ -35,6 +39,10 @@ jobs:
           cache: npm
       - name: Install dependencies and rebuild native modules
         run: npm ci
+      - name: Check module boundaries
+        run: npm run check:boundaries
+      - name: Run regression tests
+        run: npm test
       - name: Type check
         run: npm run typecheck
       - name: Build Windows x64 installer

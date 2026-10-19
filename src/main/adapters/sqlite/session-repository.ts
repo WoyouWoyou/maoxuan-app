@@ -1,4 +1,15 @@
 import path from 'path'
+import fs from 'node:fs'
+import { safeStorage } from 'electron'
+import { migrate } from './migrations'
+import {
+  activeModel,
+  saveModel,
+  listModels,
+  modelForPurpose
+} from '../../modules/model-config/public'
+import { requireBook } from '../../modules/library/public'
+import { validateReadingData } from '../../modules/reading/validation'
 import { randomUUID } from 'crypto'
 import { app } from 'electron'
 import Database from 'better-sqlite3'
@@ -52,6 +63,7 @@ interface SessionRow {
   data: string
   version_no: number
   deleted_at: string | null
+  state_version: number
   created_at: string
   updated_at: string
 }
@@ -92,7 +104,17 @@ export function initDb(): SqliteDb {
     handle.exec("ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'reading'")
   }
 
+  if (Number(handle.pragma('user_version', { simple: true })) < 2) {
+    const backup = path.join(app.getPath('userData'), 'maoxuan-before-multibook.db')
+    if (!fs.existsSync(backup)) handle.exec(`VACUUM INTO '${backup.replace(/'/g, "''")}'`)
+    migrate(handle)
+  }
   db = handle
+  const key = readSetting('apiKey')
+  if (key && !key.startsWith('encrypted:') && safeStorage.isEncryptionAvailable())
+    handle
+      .prepare('UPDATE settings SET value=? WHERE key=?')
+      .run('encrypted:' + safeStorage.encryptString(key).toString('base64'), 'apiKey')
   return handle
 }
 
@@ -149,6 +171,13 @@ function parseData(value: string): SessionData {
   data.readings = (data.readings ?? []).map((r) => ({ ...r, reflections: r.reflections ?? [] }))
   data.actions = (data.actions ?? []).map((a) => ({ ...a, progress: a.progress ?? [] }))
   if (data.workbench) data.workbench = normalizeWorkbench(data.workbench)
+  data.book ??= {
+    bookId: 'maoxuan',
+    revisionId: 'maoxuan-v1',
+    title: '毛泽东选集',
+    profile: 'maoxuan',
+    profileVersion: '1'
+  }
   return data
 }
 
@@ -160,6 +189,9 @@ function rowToSummary(row: SessionRow): SessionSummary {
     currentStep: row.current_step as StepKey,
     status: row.status === 'archived' ? 'archived' : 'active',
     deletedAt: row.deleted_at ?? null,
+    stateVersion: row.state_version,
+    bookId: parseData(row.data).book?.bookId ?? 'maoxuan',
+    bookTitle: parseData(row.data).book?.title ?? '毛泽东选集',
     versionNo: row.version_no,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -197,7 +229,8 @@ function rowToMessage(row: MessageRow): ChatMessage {
 }
 
 function readSetting(key: string): string | null {
-  const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
+  const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as
+    { value: string } | undefined
   return row ? row.value : null
 }
 
@@ -209,38 +242,76 @@ function readSettingWithFallback(key: string, envName: string, fallback: string)
   return fallback
 }
 
-export function getSettings(): Settings {
+function readApiKey(): string {
+  const stored = readSetting('apiKey') ?? ''
+  if (stored.startsWith('encrypted:')) {
+    if (!safeStorage.isEncryptionAvailable()) return ''
+    return safeStorage.decryptString(Buffer.from(stored.slice(10), 'base64'))
+  }
+  return stored || process.env.DEEPSEEK_API_KEY || ''
+}
+export function publicSettings(): Settings {
+  const settings = getSettings()
+  return { ...settings, apiKey: '', hasApiKey: !!settings.apiKey }
+}
+export function getSettings(purpose?: string): Settings {
+  if (purpose) {
+    const routed = modelForPurpose(purpose)
+    if (routed) return routed
+  }
+  const active = activeModel()
+  if (active) return active
   return {
-    apiKey: readSettingWithFallback('apiKey', 'DEEPSEEK_API_KEY', ''),
+    apiKey: readApiKey(),
+    temperatureEnabled: readSetting('temperatureEnabled') !== 'false',
+    streamUsage: readSetting('streamUsage') !== 'false',
     baseUrl: readSettingWithFallback('baseUrl', 'DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1'),
     model: readSettingWithFallback('model', 'DEEPSEEK_MODEL', 'deepseek-v4-flash')
   }
 }
 
 export function setSettings(settings: Settings): Settings {
+  if (settings.configId) {
+    const name = listModels().find((m) => m.id === settings.configId)?.name ?? '模型配置'
+    saveModel(settings.configId, name, settings)
+    return publicSettings()
+  }
   const handle = getDb()
   const upsert = handle.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
   )
   const run = handle.transaction((value: Settings) => {
-    upsert.run('apiKey', value.apiKey.trim())
+    if (value.apiKey.trim()) {
+      if (!safeStorage.isEncryptionAvailable())
+        throw new Error('系统密钥存储不可用，请启用系统密钥环')
+      upsert.run(
+        'apiKey',
+        'encrypted:' + safeStorage.encryptString(value.apiKey.trim()).toString('base64')
+      )
+    }
+    upsert.run('temperatureEnabled', String(value.temperatureEnabled !== false))
+    upsert.run('streamUsage', String(value.streamUsage !== false))
     upsert.run('baseUrl', value.baseUrl.trim().replace(/\/+$/, '') || 'https://api.deepseek.com/v1')
     upsert.run('model', value.model.trim() || 'deepseek-v4-flash')
   })
   run(settings)
-  return getSettings()
+  return publicSettings()
 }
 
 export function listSessions(): SessionSummary[] {
   const rows = getDb()
-    .prepare("SELECT * FROM sessions WHERE deleted_at IS NULL AND status = 'active' ORDER BY updated_at DESC")
+    .prepare(
+      "SELECT * FROM sessions WHERE deleted_at IS NULL AND status = 'active' ORDER BY updated_at DESC"
+    )
     .all() as SessionRow[]
   return rows.map(rowToSummary)
 }
 
 export function listArchivedSessions(): SessionSummary[] {
   const rows = getDb()
-    .prepare("SELECT * FROM sessions WHERE deleted_at IS NULL AND status = 'archived' ORDER BY updated_at DESC")
+    .prepare(
+      "SELECT * FROM sessions WHERE deleted_at IS NULL AND status = 'archived' ORDER BY updated_at DESC"
+    )
     .all() as SessionRow[]
   return rows.map(rowToSummary)
 }
@@ -253,17 +324,31 @@ export function listTrashSessions(): SessionSummary[] {
 }
 
 export function getSession(id: string): Session | null {
-  const row = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | undefined
+  const row = getDb().prepare('SELECT * FROM sessions WHERE id = ?').get(id) as
+    SessionRow | undefined
   return row ? rowToSession(row) : null
 }
 
-export function createSession(problemText: string, mode: SessionMode = 'reading'): Session {
+export function createSession(
+  problemText: string,
+  mode: SessionMode = 'reading',
+  bookId = 'maoxuan'
+): Session {
   const handle = getDb()
   const id = randomUUID()
   const timestamp = nowIso()
   const text = problemText.trim()
   const title = text.slice(0, 24) || '未命名问题'
   const data = emptySessionData()
+  const book = requireBook(mode === 'workbench' ? 'maoxuan' : bookId)
+  if (book.hidden) throw new Error('书籍已隐藏，请先恢复书籍')
+  data.book = {
+    bookId: book.bookId,
+    revisionId: book.revisionId,
+    title: book.title,
+    profile: book.profile,
+    profileVersion: '1'
+  }
 
   let currentStep: StepKey = 'problem'
   let label = '创建问题'
@@ -298,10 +383,18 @@ export function createSession(problemText: string, mode: SessionMode = 'reading'
 export function updateSession(id: string, patch: SessionPatch, versionLabel?: string): Session {
   const handle = getDb()
   const run = handle.transaction(() => {
-    const row = handle.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as SessionRow | undefined
+    const row = handle.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as
+      SessionRow | undefined
     if (!row) throw new Error('会话不存在')
 
-    const nextData: SessionData = patch.data ?? parseData(row.data)
+    if (
+      patch.expectedStateVersion !== undefined &&
+      patch.expectedStateVersion !== row.state_version
+    )
+      throw new Error('内容已在其他窗口更新，请重新打开问题后重试')
+    const previous = parseData(row.data)
+    const nextData: SessionData = patch.data ?? previous
+    validateReadingData(previous, nextData)
     const nextStep: StepKey = patch.currentStep ?? (row.current_step as StepKey)
     const nextTitle = patch.title ?? row.title
     const nextStatus = patch.status ?? row.status
@@ -312,7 +405,7 @@ export function updateSession(id: string, patch: SessionPatch, versionLabel?: st
 
     handle
       .prepare(
-        'UPDATE sessions SET title = ?, current_step = ?, status = ?, data = ?, version_no = ?, updated_at = ? WHERE id = ?'
+        'UPDATE sessions SET title = ?, current_step = ?, status = ?, data = ?, version_no = ?, state_version = state_version + 1, updated_at = ? WHERE id = ?'
       )
       .run(nextTitle, nextStep, nextStatus, payload, versionNo, timestamp, id)
 
@@ -382,7 +475,8 @@ export function listVersions(sessionId: string): VersionSummary[] {
 }
 
 export function getVersion(id: string): Version | null {
-  const row = getDb().prepare('SELECT * FROM versions WHERE id = ?').get(id) as VersionRow | undefined
+  const row = getDb().prepare('SELECT * FROM versions WHERE id = ?').get(id) as
+    VersionRow | undefined
   return row ? rowToVersion(row) : null
 }
 
@@ -391,12 +485,12 @@ export function restoreVersion(versionId: string): Session {
   let sessionId = ''
 
   const run = handle.transaction(() => {
-    const version = handle.prepare('SELECT * FROM versions WHERE id = ?').get(versionId) as VersionRow | undefined
+    const version = handle.prepare('SELECT * FROM versions WHERE id = ?').get(versionId) as
+      VersionRow | undefined
     if (!version) throw new Error('版本不存在')
 
     const row = handle.prepare('SELECT * FROM sessions WHERE id = ?').get(version.session_id) as
-      | SessionRow
-      | undefined
+      SessionRow | undefined
     if (!row) throw new Error('会话不存在')
 
     sessionId = row.id
@@ -405,7 +499,9 @@ export function restoreVersion(versionId: string): Session {
     const label = `恢复自 v${version.version_no}`
 
     handle
-      .prepare('UPDATE sessions SET data = ?, current_step = ?, version_no = ?, updated_at = ? WHERE id = ?')
+      .prepare(
+        'UPDATE sessions SET data = ?, current_step = ?, version_no = ?, state_version = state_version + 1, updated_at = ? WHERE id = ?'
+      )
       .run(version.data, version.step, versionNo, timestamp, row.id)
 
     handle
@@ -446,7 +542,14 @@ export function addMessage(
     .prepare(
       'INSERT INTO messages (id, session_id, role, content, article_id, created_at) VALUES (?, ?, ?, ?, ?, ?)'
     )
-    .run(message.id, message.sessionId, message.role, message.content, message.articleId, message.createdAt)
+    .run(
+      message.id,
+      message.sessionId,
+      message.role,
+      message.content,
+      message.articleId,
+      message.createdAt
+    )
   return message
 }
 

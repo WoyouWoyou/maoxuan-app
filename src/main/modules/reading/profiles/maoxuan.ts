@@ -15,7 +15,7 @@ import type {
   Settings,
   ThreeNotes
 } from '@shared/types'
-import { callJson, type LlmMessage } from './ai'
+import { callJson, type LlmMessage } from '../../model-runtime/public'
 import {
   DIAGNOSE_SYSTEM,
   FIND_PASSAGES_SYSTEM,
@@ -30,7 +30,7 @@ import {
   buildReviewNotesUser,
   buildReviewSituationUser,
   buildReviseProblemUser
-} from './prompts'
+} from './maoxuan-prompts'
 
 const NO_API_KEY = '请先在设置中填写 DeepSeek API Key'
 
@@ -67,7 +67,10 @@ const FALLBACK_RULES: { pattern: RegExp; articleId: string }[] = [
   { pattern: /(弱|竞争|对手|资源少|打不过|强势|劣势|小)/, articleId: 'Section0211' }
 ]
 
-function fallbackRecommendation(data: SessionData, mainContradiction: string): ArticleRecommendation {
+function fallbackRecommendation(
+  data: SessionData,
+  mainContradiction: string
+): ArticleRecommendation {
   const haystack = [
     data.problem.text,
     data.problem.background,
@@ -77,7 +80,8 @@ function fallbackRecommendation(data: SessionData, mainContradiction: string): A
   ].join(' ')
   const hit = FALLBACK_RULES.find((r) => r.pattern.test(haystack))
   const core =
-    (hit ? CORE_BY_ID.get(hit.articleId) : undefined) ?? (CORE_ARTICLES[0] as (typeof CORE_ARTICLES)[number])
+    (hit ? CORE_BY_ID.get(hit.articleId) : undefined) ??
+    (CORE_ARTICLES[0] as (typeof CORE_ARTICLES)[number])
   return {
     articleId: core.articleId,
     title: core.title,
@@ -115,7 +119,9 @@ function normalizeDiagnosis(
   }
   if (!recommendations.length) {
     // 修订场景优先沿用旧诊断的推荐，只有旧诊断也没有时才用兜底规则
-    const inherited = fallbackRecommendations.filter((r) => r && CORE_BY_ID.has(r.articleId)).slice(0, 3)
+    const inherited = fallbackRecommendations
+      .filter((r) => r && CORE_BY_ID.has(r.articleId))
+      .slice(0, 3)
     if (inherited.length) recommendations.push(...inherited.map((r) => ({ ...r })))
     else recommendations.push(fallbackRecommendation(data, mainContradiction))
   }
@@ -166,8 +172,12 @@ export async function reviseProblem(
   const rawDiagnosis = raw?.diagnosis
   const diagnosis =
     rawDiagnosis && typeof rawDiagnosis === 'object'
-      ? normalizeDiagnosis(rawDiagnosis as Partial<Diagnosis>, data, oldDiagnosis?.recommendations ?? [])
-      : oldDiagnosis ?? normalizeDiagnosis({}, data)
+      ? normalizeDiagnosis(
+          rawDiagnosis as Partial<Diagnosis>,
+          data,
+          oldDiagnosis?.recommendations ?? []
+        )
+      : (oldDiagnosis ?? normalizeDiagnosis({}, data))
 
   const problem = normalizeProblem(raw?.problem, data.problem)
   let changes = asStringArray(raw?.changes, 10)
@@ -175,8 +185,14 @@ export async function reviseProblem(
     const before: Record<string, unknown> = { ...data.problem, ...(oldDiagnosis ?? {}) }
     const after: Record<string, unknown> = { ...problem, ...diagnosis }
     const labels: Record<string, string> = {
-      text: '问题', background: '背景', tried: '已经试过', restated: '复述', symptoms: '症状',
-      mainContradiction: '主要矛盾', stage: '所处阶段', recommendations: '推荐篇目'
+      text: '问题',
+      background: '背景',
+      tried: '已经试过',
+      restated: '复述',
+      symptoms: '症状',
+      mainContradiction: '主要矛盾',
+      stage: '所处阶段',
+      recommendations: '推荐篇目'
     }
     changes = Object.keys(labels)
       .filter((k) => JSON.stringify(before[k] ?? null) !== JSON.stringify(after[k] ?? null))
@@ -260,7 +276,8 @@ function verifyPassage(article: Article, raw: unknown): Passage | null {
   const why = asString(obj.why)
 
   const rawIndex = Number(obj.paragraphIndex)
-  let index = Number.isInteger(rawIndex) && rawIndex >= 0 && rawIndex < paragraphs.length ? rawIndex : -1
+  let index =
+    Number.isInteger(rawIndex) && rawIndex >= 0 && rawIndex < paragraphs.length ? rawIndex : -1
 
   if (index >= 0 && (paragraphs[index] ?? '').includes(quote)) {
     return { paragraphIndex: index, quote, why, verified: true }
@@ -271,7 +288,7 @@ function verifyPassage(article: Article, raw: unknown): Passage | null {
   }
   // 原文里找不到这句：退回目标段落前 80 字，并标记未通过校验
   if (index < 0) index = 0
-  return { paragraphIndex: index, quote: (paragraphs[index] ?? '').slice(0, 80), why, verified: false }
+  return null
 }
 
 export async function findPassages(

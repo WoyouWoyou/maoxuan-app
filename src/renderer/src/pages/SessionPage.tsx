@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import type { Diagnosis, ProblemInput, Reading, Session, SessionData, SessionPatch, StepKey } from '@shared/types'
+import type {
+  Diagnosis,
+  ProblemInput,
+  Reading,
+  Session,
+  SessionData,
+  SessionPatch,
+  StepKey
+} from '@shared/types'
 import { STEPS } from '@shared/types'
 import { ChatPanel } from '@renderer/components/ChatPanel'
 import { DontsTicker } from '@renderer/components/DontsTicker'
@@ -14,6 +22,8 @@ import { StepRelate } from '@renderer/components/steps/StepRelate'
 import { stepUnlocked } from '@renderer/components/steps/types'
 import { WorkbenchPage } from './WorkbenchPage'
 import './SessionPage.css'
+import { readingCommands } from '@shared/contracts/reading'
+import { readingPresentation } from '@shared/reading-presentation'
 
 const ORDER: StepKey[] = ['problem', 'focus', 'relate', 'apply']
 
@@ -84,7 +94,21 @@ export function SessionPage() {
       setSaveError('')
       try {
         return await enqueue(async () => {
-          const updated = await window.api.sessions.update(id, patch, versionLabel)
+          const current = sessionRef.current
+          if (!current) return null
+          const updated = patch.data
+            ? await window.api.reading.apply(
+                id,
+                readingCommands(current.data, patch.data),
+                current.stateVersion ?? 0,
+                versionLabel,
+                patch.currentStep
+              )
+            : await window.api.sessions.update(
+                id,
+                { ...patch, expectedStateVersion: current.stateVersion },
+                versionLabel
+              )
           if (idRef.current === id) applySession(updated)
           window.dispatchEvent(new Event('sessions-changed'))
           return updated
@@ -107,7 +131,10 @@ export function SessionPage() {
   )
 
   const update = useCallback(
-    async (fn: (latest: SessionData) => SessionData, opts?: { versionLabel?: string; step?: StepKey }) => {
+    async (
+      fn: (latest: SessionData) => SessionData,
+      opts?: { versionLabel?: string; step?: StepKey }
+    ) => {
       setSaveError('')
       try {
         await enqueue(async () => {
@@ -115,12 +142,19 @@ export function SessionPage() {
           if (!latest) return
           const patch: SessionPatch = { data: fn(latest) }
           if (opts?.step) patch.currentStep = opts.step
-          const next = await window.api.sessions.update(id, patch, opts?.versionLabel)
+          const next = await window.api.reading.apply(
+            id,
+            readingCommands(latest, patch.data!),
+            sessionRef.current?.stateVersion ?? 0,
+            opts?.versionLabel,
+            patch.currentStep
+          )
           if (idRef.current === id) applySession(next)
           window.dispatchEvent(new Event('sessions-changed'))
         })
       } catch (e) {
         setSaveError(toMessage(e))
+        throw e
       }
     },
     [applySession, enqueue, id]
@@ -193,7 +227,7 @@ export function SessionPage() {
 
   const handleReviseApply = useCallback(
     async (next: { problem: ProblemInput; diagnosis: Diagnosis }) => {
-      await update(latest => ({ ...latest, problem: next.problem, diagnosis: next.diagnosis }), {
+      await update((latest) => ({ ...latest, problem: next.problem, diagnosis: next.diagnosis }), {
         versionLabel: '第一步：根据讨论修订'
       })
       setReviseOpen(false)
@@ -231,7 +265,10 @@ export function SessionPage() {
     let alive = true
     void (async () => {
       try {
-        const article = await window.api.articles.get(articleId)
+        const article = await window.api.articles.get(
+          articleId,
+          (sessionRef.current ?? session).data.book
+        )
         if (!alive) return
         if (!article) {
           navigate(location.pathname, { replace: true })
@@ -239,16 +276,22 @@ export function SessionPage() {
         }
         setFocusArticleId(articleId)
         setViewStep('focus')
-        const already = (sessionRef.current ?? session).data.readings.some(r => r.articleId === articleId)
-        const stepPatch: StepKey | undefined = orderOf('focus') > orderOf(session.currentStep) ? 'focus' : undefined
+        const already = (sessionRef.current ?? session).data.readings.some(
+          (r) => r.articleId === articleId
+        )
+        const stepPatch: StepKey | undefined =
+          orderOf('focus') > orderOf(session.currentStep) ? 'focus' : undefined
         if (already) {
           if (stepPatch) await commit({ currentStep: stepPatch })
         } else {
           await update(
-            latest =>
-              latest.readings.some(r => r.articleId === articleId)
+            (latest) =>
+              latest.readings.some((r) => r.articleId === articleId)
                 ? latest
-                : { ...latest, readings: [...latest.readings, makeReading(article.id, article.title)] },
+                : {
+                    ...latest,
+                    readings: [...latest.readings, makeReading(article.id, article.title)]
+                  },
             { versionLabel: `从书库加入《${article.title}》`, step: stepPatch }
           )
         }
@@ -293,7 +336,7 @@ export function SessionPage() {
 
   if (session.mode === 'workbench') return <WorkbenchPage key={session.id} initial={session} />
 
-  const currentStepName = STEPS.find(s => s.key === session.currentStep)?.name ?? ''
+  const currentStepName = STEPS.find((s) => s.key === session.currentStep)?.name ?? ''
   const chatArticleId = viewStep === 'focus' || viewStep === 'relate' ? focusArticleId : null
   const stepProps = {
     session,
@@ -316,9 +359,9 @@ export function SessionPage() {
               className="input sp-title-input"
               value={titleDraft}
               autoFocus
-              onChange={e => setTitleDraft(e.target.value)}
+              onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={() => void commitTitle()}
-              onKeyDown={e => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') e.currentTarget.blur()
                 if (e.key === 'Escape') {
                   setTitleDraft(session.title)
@@ -340,11 +383,18 @@ export function SessionPage() {
             </button>
           )}
           <div className="sp-sub muted">
-            当前进度：第 {STEPS.find(s => s.key === session.currentStep)?.no ?? 1} 步 · {currentStepName} · 共 {session.versionNo} 个版本快照
+            《{session.data.book?.title ?? '毛泽东选集'}》 · 当前进度：第{' '}
+            {STEPS.find((s) => s.key === session.currentStep)?.no ?? 1} 步 · {currentStepName} · 共{' '}
+            {session.versionNo} 个版本快照
           </div>
         </header>
 
-        <Stepper currentStep={session.currentStep} viewStep={viewStep} data={session.data} onSelect={handleSelectStep} />
+        <Stepper
+          currentStep={session.currentStep}
+          viewStep={viewStep}
+          data={session.data}
+          onSelect={handleSelectStep}
+        />
 
         {saveError && <div className="error-text sp-errorbar">保存失败：{saveError}</div>}
 
@@ -355,32 +405,56 @@ export function SessionPage() {
           {viewStep === 'apply' && <StepApply {...stepProps} />}
         </div>
 
-        <DontsTicker />
+        {session.data.book?.profile !== 'generic' && <DontsTicker />}
       </div>
 
       <aside className={collapsed ? 'sp-panel is-collapsed' : 'sp-panel'}>
         {collapsed ? (
-          <button type="button" className="sp-panel-toggle" title="展开右侧面板" onClick={() => setCollapsed(false)}>
+          <button
+            type="button"
+            className="sp-panel-toggle"
+            title="展开右侧面板"
+            onClick={() => setCollapsed(false)}
+          >
             <span className="sp-panel-toggle-text">教练对话 · 版本历史</span>
           </button>
         ) : (
           <>
             <div className="sp-panel-head">
               <div className="sp-tabs">
-                <button type="button" className={panelTab === 'chat' ? 'is-on' : ''} onClick={() => setPanelTab('chat')}>
+                <button
+                  type="button"
+                  className={panelTab === 'chat' ? 'is-on' : ''}
+                  onClick={() => setPanelTab('chat')}
+                >
                   教练对话
                 </button>
-                <button type="button" className={panelTab === 'version' ? 'is-on' : ''} onClick={() => setPanelTab('version')}>
+                <button
+                  type="button"
+                  className={panelTab === 'version' ? 'is-on' : ''}
+                  onClick={() => setPanelTab('version')}
+                >
                   版本历史
                 </button>
               </div>
-              <button type="button" className="btn btn-ghost btn-sm" title="折叠" onClick={() => setCollapsed(true)}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                title="折叠"
+                onClick={() => setCollapsed(true)}
+              >
                 »
               </button>
             </div>
             <div className="sp-panel-body">
               {panelTab === 'chat' ? (
-                <ChatPanel sessionId={session.id} articleId={chatArticleId} onApplyToProblem={openRevise} />
+                <ChatPanel
+                  sessionId={session.id}
+                  articleId={chatArticleId}
+                  onApplyToProblem={openRevise}
+                  intro={readingPresentation(session.data).intro}
+                  quickQuestions={readingPresentation(session.data).questions ?? undefined}
+                />
               ) : (
                 <VersionPanel
                   sessionId={session.id}
@@ -394,7 +468,9 @@ export function SessionPage() {
         )}
       </aside>
 
-      {reviseOpen && <ReviseDialog session={session} onClose={closeRevise} onApply={handleReviseApply} />}
+      {reviseOpen && (
+        <ReviseDialog session={session} onClose={closeRevise} onApply={handleReviseApply} />
+      )}
     </div>
   )
 }

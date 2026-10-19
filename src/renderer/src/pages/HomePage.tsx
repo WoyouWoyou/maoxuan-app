@@ -61,8 +61,8 @@ export function HomePage() {
     <div className="home">
       <div className="home-inner">
         <header>
-          <div className="home-kicker">毛选实用工具箱</div>
-          <h1 className="home-title serif">带着问题读《毛选》</h1>
+          <div className="home-kicker">问题式阅读工具箱</div>
+          <h1 className="home-title serif">带着问题读一本书</h1>
           <p className="home-sub">读的标准不是“看懂原文”，而是“能用在自己身上”。</p>
           <p className="home-motto">{MOTTO}</p>
           <button className="btn btn-primary home-cta" onClick={startNew}>
@@ -97,15 +97,26 @@ export function HomePage() {
               <div className="card home-step" key={s.key}>
                 <div className="home-step-no">{s.no}</div>
                 <div className="home-step-name">{s.name}</div>
-                <div className="home-step-hint muted">{s.hint}</div>
+                <div className="home-step-hint muted">
+                  {
+                    [
+                      '先写清楚一个现实问题',
+                      '读相关原文，并写下感受',
+                      '写出理解、联系和行动',
+                      '记录结果，带着新问题再读'
+                    ][s.no - 1]
+                  }
+                </div>
               </div>
             ))}
           </div>
         </section>
 
         <section>
-          <h2 className="home-h2">核心五篇</h2>
-          <p className="home-note muted">先读这五篇。大部分其他篇目与你当下的问题无关，等遇到类似局面再翻。</p>
+          <h2 className="home-h2">内置毛选：核心五篇</h2>
+          <p className="home-note muted">
+            毛选可先从这五篇开始。想读其他书，到原文书库导入 EPUB 或 TXT，再为新问题选择书籍。
+          </p>
           <div className="home-core-grid">
             {CORE_ARTICLES.map((a) => (
               <div className="card home-core-card" key={a.articleId}>

@@ -1,5 +1,12 @@
 import { CORE_ARTICLES, CORE_EXAMPLES, MINDSET_QUESTIONS, NOTE_EXAMPLE } from '@shared/core'
-import type { Article, ChatMessage, Passage, Reflection, SessionData, ThreeNotes } from '@shared/types'
+import type {
+  Article,
+  ChatMessage,
+  Passage,
+  Reflection,
+  SessionData,
+  ThreeNotes
+} from '@shared/types'
 
 /** 所有 system prompt 的公共前缀：角色 + 读法 + 四不要铁律。 */
 export const BASE_RULES = `你是「《毛选》实用阅读教练」，帮用户带着自己的问题读《毛选》，把文章用在眼下的困境上。
@@ -196,7 +203,9 @@ function diagnosisBlock(data: SessionData): string {
   const d = data.diagnosis
   if (!d) return '【教练诊断】（暂无）'
   const symptoms = d.symptoms.length ? d.symptoms.join('；') : '（无）'
-  const titles = d.recommendations.length ? d.recommendations.map((r) => `《${r.title}》`).join('、') : '（无）'
+  const titles = d.recommendations.length
+    ? d.recommendations.map((r) => `《${r.title}》`).join('、')
+    : '（无）'
   return [
     '【教练诊断】',
     `复述：${d.restated || '（无）'}`,
@@ -211,7 +220,9 @@ function readingsBlock(data: SessionData): string {
   if (!data.readings.length) return '（还没读过）'
   return data.readings
     .map((r) => {
-      const lines = [`- 《${r.title}》${r.notesDone ? '（已写 3 条笔记）' : r.readDone ? '（已读完，笔记未完成）' : '（在读）'}`]
+      const lines = [
+        `- 《${r.title}》${r.notesDone ? '（已写 3 条笔记）' : r.readDone ? '（已读完，笔记未完成）' : '（在读）'}`
+      ]
       if (r.notes.coreMethod) lines.push(`  核心方法：${r.notes.coreMethod}`)
       if (r.notes.relatedProblem) lines.push(`  关联问题：${r.notes.relatedProblem}`)
       if (r.notes.action) lines.push(`  具体行动：${r.notes.action}`)
@@ -231,7 +242,9 @@ function actionsBlock(data: SessionData): string {
     .slice(-10)
     .map((a) => {
       const head = `- [${actionStatus(a.status)}] ${a.text}（截止 ${a.dueDate}）${a.result ? `｜结果：${a.result}` : ''}`
-      const progress = (a.progress ?? []).slice(-5).map((p) => `  已完成阶段（${p.createdAt.slice(0, 10)}）：${p.text}`)
+      const progress = (a.progress ?? [])
+        .slice(-5)
+        .map((p) => `  已完成阶段（${p.createdAt.slice(0, 10)}）：${p.text}`)
       return [head, ...progress].join('\n')
     })
     .join('\n')
@@ -406,7 +419,9 @@ export function buildMindsetUser(data: SessionData): string {
     actionsBlock(data),
     '',
     '【历次复盘】',
-    data.reviews.length ? data.reviews.map((r) => `- ${r.newSituation}`).join('\n') : '（还没有复盘）',
+    data.reviews.length
+      ? data.reviews.map((r) => `- ${r.newSituation}`).join('\n')
+      : '（还没有复盘）',
     '',
     '请回答心法三问，每个答案不超过 60 字，只输出 JSON。'
   ].join('\n')
@@ -425,7 +440,12 @@ export function buildChatSystem(data: SessionData, article: Article | null): str
 
   const d = data.diagnosis
   if (d) {
-    lines.push('', '【此前给过的诊断】', `主要矛盾：${d.mainContradiction || '（未给出）'}`, `所处阶段：${d.stage || '（未给出）'}`)
+    lines.push(
+      '',
+      '【此前给过的诊断】',
+      `主要矛盾：${d.mainContradiction || '（未给出）'}`,
+      `所处阶段：${d.stage || '（未给出）'}`
+    )
     if (d.symptoms.length) lines.push(`症状：${d.symptoms.join('；')}`)
   }
 

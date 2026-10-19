@@ -8,3 +8,5 @@ _epub
 .codegen
 .DS_Store
 *.log
+
+output/

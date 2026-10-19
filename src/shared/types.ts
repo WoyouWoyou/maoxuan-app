@@ -1,3 +1,4 @@
+import type { BookScope, ReadingProfile, SourceRef } from './contracts/library'
 export type ReadingStepKey = 'problem' | 'focus' | 'relate' | 'apply'
 export type WbStepKey = 'wb_intake' | 'wb_diagnose' | 'wb_decide' | 'wb_act'
 export type StepKey = ReadingStepKey | WbStepKey
@@ -36,10 +37,15 @@ export const MODE_META: Record<SessionMode, { name: string; short: string; desc:
 }
 
 export function stepMeta(key: StepKey): StepMeta | undefined {
-  return (STEPS as StepMeta[]).find((s) => s.key === key) ?? (WB_STEPS as StepMeta[]).find((s) => s.key === key)
+  return (
+    (STEPS as StepMeta[]).find((s) => s.key === key) ??
+    (WB_STEPS as StepMeta[]).find((s) => s.key === key)
+  )
 }
 
 export interface ArticleMeta {
+  bookId?: string
+  revisionId?: string
   id: string
   title: string
   volume: string
@@ -51,6 +57,7 @@ export interface ArticleMeta {
 export interface Article extends ArticleMeta {
   content: string
   paragraphs: string[]
+  paragraphIds?: string[]
 }
 
 export interface SearchHit {
@@ -66,7 +73,13 @@ export interface ProblemInput {
   tried: string
 }
 
+export interface AIContext {
+  problemSignature: string
+  revisionId: string
+}
+
 export interface ArticleRecommendation {
+  evidence?: { paragraphIndex: number; quote: string; source: SourceRef }
   articleId: string
   title: string
   reason: string
@@ -74,6 +87,7 @@ export interface ArticleRecommendation {
 }
 
 export interface Diagnosis {
+  _context?: AIContext
   restated: string
   symptoms: string[]
   mainContradiction: string
@@ -89,6 +103,8 @@ export interface ProblemRevision {
 }
 
 export interface Passage {
+  _context?: AIContext
+  source?: SourceRef
   paragraphIndex: number
   quote: string
   why: string
@@ -102,6 +118,7 @@ export interface ThreeNotes {
 }
 
 export interface NoteFeedback {
+  _context?: AIContext
   passed: boolean
   scores: { coreMethod: number; relatedProblem: number; action: number }
   comments: string[]
@@ -110,6 +127,7 @@ export interface NoteFeedback {
 
 /** 第二步阅读时随手记下的感悟，可关联某一段原文。 */
 export interface Reflection {
+  source?: SourceRef
   id: string
   paragraphIndex: number | null
   quote: string
@@ -151,6 +169,7 @@ export interface ActionItem {
 }
 
 export interface Review {
+  _context?: AIContext
   id: string
   createdAt: string
   newSituation: string
@@ -159,6 +178,7 @@ export interface Review {
 }
 
 export interface Mindset {
+  _context?: AIContext
   mainContradiction: string
   stage: string
   firstStep: string
@@ -399,6 +419,7 @@ export function emptyWorkbench(objective = ''): WorkbenchData {
 }
 
 export interface SessionData {
+  book?: BookScope & { title: string; profile: ReadingProfile; profileVersion: string }
   problem: ProblemInput
   diagnosis: Diagnosis | null
   readings: Reading[]
@@ -410,6 +431,9 @@ export interface SessionData {
 }
 
 export interface SessionSummary {
+  bookId?: string
+  bookTitle?: string
+  stateVersion?: number
   id: string
   title: string
   mode: SessionMode
@@ -427,6 +451,7 @@ export interface Session extends SessionSummary {
 }
 
 export interface SessionPatch {
+  expectedStateVersion?: number
   title?: string
   currentStep?: StepKey
   status?: 'active' | 'archived'
@@ -456,6 +481,10 @@ export interface ChatMessage {
 }
 
 export interface Settings {
+  configId?: string
+  hasApiKey?: boolean
+  temperatureEnabled?: boolean
+  streamUsage?: boolean
   apiKey: string
   baseUrl: string
   model: string

@@ -34,21 +34,9 @@ import {
   ruleChecksActions,
   ruleChecksDecision
 } from '@shared/workbench'
-import { callJson as rawCallJson, type LlmMessage } from './ai'
+import { callJson as rawCallJson, type LlmMessage } from '../model-runtime/public'
 
-const TRANSIENT = /(fetch failed|ECONNRESET|ETIMEDOUT|socket hang up|EAI_AGAIN|UND_ERR)/i
-
-/** 网络闪断（不含超时）自动重试一次：工作台一次要连发三四个请求，偶发断连不该让用户重来。 */
-async function callJson<T>(s: Settings, system: string, user: string): Promise<T> {
-  try {
-    return await rawCallJson<T>(s, system, user)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    if (!TRANSIENT.test(message)) throw error
-    await new Promise((r) => setTimeout(r, 1500))
-    return rawCallJson<T>(s, system, user)
-  }
-}
+const callJson = rawCallJson
 import {
   WB_ACTIONS_SYSTEM,
   WB_CONTRADICTION_SYSTEM,
@@ -67,7 +55,7 @@ import {
   buildWbRecapUser,
   buildWbRedteamUser,
   buildWbRoutesUser
-} from './wbPrompts'
+} from './prompts'
 
 const NO_API_KEY = '请先在设置中填写 DeepSeek API Key'
 const FACT_LIMIT = 40
@@ -125,7 +113,9 @@ function requireIntake(wb: WorkbenchData): WbIntake {
 /** 三个诊断模块共用的元字段：事实引用必须在台账里且是事实。 */
 function baseMeta(raw: unknown, wb: WorkbenchData): WbModuleMeta {
   const src = asRecord(raw)
-  const factIds = new Set((wb.intake?.facts ?? []).filter((f) => f.kind === 'fact').map((f) => f.id))
+  const factIds = new Set(
+    (wb.intake?.facts ?? []).filter((f) => f.kind === 'fact').map((f) => f.id)
+  )
   const factRefs: string[] = []
   const rawRefs = Array.isArray(src.factRefs) ? src.factRefs : []
   for (const item of rawRefs) {
@@ -163,7 +153,9 @@ export async function wbIntake(s: Settings, wb: WorkbenchData): Promise<WbIntake
     seenContents.add(content)
     const rawId = asString(src.id)
     const id =
-      rawId && oldById.has(rawId) && !used.has(rawId) ? rawId : `F${nextFactNo([...used, ...oldIds])}`
+      rawId && oldById.has(rawId) && !used.has(rawId)
+        ? rawId
+        : `F${nextFactNo([...used, ...oldIds])}`
     used.add(id)
     facts.push({
       id,
@@ -212,7 +204,9 @@ export async function wbIntake(s: Settings, wb: WorkbenchData): Promise<WbIntake
 export async function wbContradiction(s: Settings, wb: WorkbenchData): Promise<WbContradiction> {
   ensureKey(s)
   requireIntake(wb)
-  const raw = asRecord(await callJson<unknown>(s, WB_CONTRADICTION_SYSTEM, buildWbContradictionUser(wb)))
+  const raw = asRecord(
+    await callJson<unknown>(s, WB_CONTRADICTION_SYSTEM, buildWbContradictionUser(wb))
+  )
   return {
     ...baseMeta(raw, wb),
     all: asStringArray(raw.all, 6),
@@ -286,7 +280,9 @@ export async function wbDecide(s: Settings, wb: WorkbenchData): Promise<WbDecisi
 
   const routeText = asString(raw.route)
   const route: WbRouteKey =
-    routeText === 'steady' || routeText === 'breakthrough' || routeText === 'defensive' ? routeText : 'steady'
+    routeText === 'steady' || routeText === 'breakthrough' || routeText === 'defensive'
+      ? routeText
+      : 'steady'
 
   const enhancements: WbEnhancement[] = []
   const enhancementKeys = new Set<string>()
@@ -332,7 +328,10 @@ export async function wbRecheck(s: Settings, wb: WorkbenchData): Promise<WbCheck
 
 /* ------------------------------ 第四步：行动与复盘 ------------------------------ */
 
-export async function wbActions(s: Settings, wb: WorkbenchData): Promise<{ actions: WbAction[]; checks: WbCheck[] }> {
+export async function wbActions(
+  s: Settings,
+  wb: WorkbenchData
+): Promise<{ actions: WbAction[]; checks: WbCheck[] }> {
   ensureKey(s)
   if (!wb.decision?.confirmed) throw new Error('先确认综合决策')
 
@@ -347,7 +346,8 @@ export async function wbActions(s: Settings, wb: WorkbenchData): Promise<{ actio
     const action = asString(src.action)
     if (!action) continue
     const horizonText = asString(src.horizon)
-    const horizon: WbHorizon = horizonText === '7d' || horizonText === '30d' || horizonText === '90d' ? horizonText : '7d'
+    const horizon: WbHorizon =
+      horizonText === '7d' || horizonText === '30d' || horizonText === '90d' ? horizonText : '7d'
     const standards: string[] = []
     for (const name of asStringArray(src.standards, 6)) {
       if (!(WB_STANDARD_NAMES as readonly string[]).includes(name)) continue
@@ -373,7 +373,11 @@ export async function wbActions(s: Settings, wb: WorkbenchData): Promise<{ actio
   return { actions, checks: mergeWaived(wb.actionChecks, checks) }
 }
 
-export async function wbRecap(s: Settings, wb: WorkbenchData, input: WbRecapInput): Promise<WbRecapResult> {
+export async function wbRecap(
+  s: Settings,
+  wb: WorkbenchData,
+  input: WbRecapInput
+): Promise<WbRecapResult> {
   ensureKey(s)
   const progress = (input.progress ?? '').trim()
   const factChanges = (input.factChanges ?? '').trim()
@@ -434,7 +438,9 @@ async function runChecks(s: Settings, wb: WorkbenchData, scope: CheckScope): Pro
   const ai: WbCheck[] = []
 
   try {
-    const raw = asRecord(await callJson<unknown>(s, WB_REDTEAM_SYSTEM, buildWbRedteamUser(wb, scope)))
+    const raw = asRecord(
+      await callJson<unknown>(s, WB_REDTEAM_SYSTEM, buildWbRedteamUser(wb, scope))
+    )
     const failItems = Array.isArray(raw.failItems) ? raw.failItems : []
     for (let i = 0; i < failItems.length; i++) {
       if (ai.length >= 6) break
@@ -442,7 +448,9 @@ async function runChecks(s: Settings, wb: WorkbenchData, scope: CheckScope): Pro
       const message = asString(src.message)
       if (!message) continue
       const areaText = asString(src.area)
-      const area = (CHECK_AREAS as readonly string[]).includes(areaText) ? (areaText as CheckArea) : fallbackArea
+      const area = (CHECK_AREAS as readonly string[]).includes(areaText)
+        ? (areaText as CheckArea)
+        : fallbackArea
       ai.push({ id: `ai:${scope}:${i}`, source: 'ai', area, passed: false, message, waived: false })
     }
     if (!ai.length) {

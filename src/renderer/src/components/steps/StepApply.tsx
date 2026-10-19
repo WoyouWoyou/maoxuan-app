@@ -1,3 +1,4 @@
+import { readingPresentation } from '@shared/reading-presentation'
 import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { ActionItem, ActionProgress, ActionStatus, Reading, SessionData } from '@shared/types'
@@ -55,7 +56,7 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
     let alive = true
     window.api.articles
       .list()
-      .then(list => {
+      .then((list) => {
         if (!alive) return
         const map: Record<string, string> = {}
         for (const item of list) map[item.id] = item.title
@@ -68,24 +69,29 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
   }, [])
 
   function titleOf(articleId: string): string {
-    const found = data.readings.find(r => r.articleId === articleId)
+    const found = data.readings.find((r) => r.articleId === articleId)
     return found?.title ?? titles[articleId] ?? articleId
   }
 
   async function setStatus(item: ActionItem, status: ActionStatus) {
-    const actions = data.actions.map(a => (a.id === item.id ? { ...a, status } : a))
-    const label = status === 'done' ? '第四步：完成行动' : status === 'dropped' ? '第四步：放弃行动' : '第四步：更新行动'
+    const actions = data.actions.map((a) => (a.id === item.id ? { ...a, status } : a))
+    const label =
+      status === 'done'
+        ? '第四步：完成行动'
+        : status === 'dropped'
+          ? '第四步：放弃行动'
+          : '第四步：更新行动'
     await save({ ...data, actions }, { versionLabel: label })
   }
 
   async function setDue(item: ActionItem, dueDate: string) {
-    const actions = data.actions.map(a => (a.id === item.id ? { ...a, dueDate } : a))
+    const actions = data.actions.map((a) => (a.id === item.id ? { ...a, dueDate } : a))
     await save({ ...data, actions }, { versionLabel: '第四步：更新行动' })
   }
 
   async function setResult(item: ActionItem, result: string) {
     if (result === item.result) return
-    const actions = data.actions.map(a => (a.id === item.id ? { ...a, result } : a))
+    const actions = data.actions.map((a) => (a.id === item.id ? { ...a, result } : a))
     await save({ ...data, actions })
   }
 
@@ -115,9 +121,11 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
       createdAt: new Date().toISOString()
     }
     await update(
-      latest => ({
+      (latest) => ({
         ...latest,
-        actions: latest.actions.map(a => (a.id === actionId ? { ...a, progress: [...(a.progress ?? []), entry] } : a))
+        actions: latest.actions.map((a) =>
+          a.id === actionId ? { ...a, progress: [...(a.progress ?? []), entry] } : a
+        )
       }),
       { versionLabel: '第四步：记录阶段进展' }
     )
@@ -127,11 +135,16 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
     const trimmed = text.trim()
     if (!trimmed) return
     await update(
-      latest => ({
+      (latest) => ({
         ...latest,
-        actions: latest.actions.map(a =>
+        actions: latest.actions.map((a) =>
           a.id === actionId
-            ? { ...a, progress: (a.progress ?? []).map(p => (p.id === progressId ? { ...p, text: trimmed } : p)) }
+            ? {
+                ...a,
+                progress: (a.progress ?? []).map((p) =>
+                  p.id === progressId ? { ...p, text: trimmed } : p
+                )
+              }
             : a
         )
       }),
@@ -141,10 +154,12 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
 
   async function removeProgress(actionId: string, progressId: string) {
     await update(
-      latest => ({
+      (latest) => ({
         ...latest,
-        actions: latest.actions.map(a =>
-          a.id === actionId ? { ...a, progress: (a.progress ?? []).filter(p => p.id !== progressId) } : a
+        actions: latest.actions.map((a) =>
+          a.id === actionId
+            ? { ...a, progress: (a.progress ?? []).filter((p) => p.id !== progressId) }
+            : a
         )
       }),
       { versionLabel: '第四步：删除阶段进展' }
@@ -161,7 +176,7 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
     setErr('')
     try {
       const review = await window.api.ai.reviewSituation(session.id, situation)
-      await update(latest => ({ ...latest, reviews: [...latest.reviews, review] }), {
+      await update((latest) => ({ ...latest, reviews: [...latest.reviews, review] }), {
         versionLabel: '第四步：新情况复盘'
       })
       setNewSituation('')
@@ -174,11 +189,11 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
   }
 
   async function openReread(articleId: string) {
-    if (!data.readings.some(r => r.articleId === articleId)) {
+    if (!data.readings.some((r) => r.articleId === articleId)) {
       const loaded = await window.api.articles.get(articleId)
       const title = loaded?.title ?? titles[articleId] ?? articleId
-      await update(latest =>
-        latest.readings.some(r => r.articleId === articleId)
+      await update((latest) =>
+        latest.readings.some((r) => r.articleId === articleId)
           ? latest
           : { ...latest, readings: [...latest.readings, makeReading(articleId, title)] }
       )
@@ -191,7 +206,7 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
     setErr('')
     try {
       const mindset = await window.api.ai.mindset(session.id)
-      await update(latest => ({ ...latest, mindset }), { versionLabel: '第四步：心法三问' })
+      await update((latest) => ({ ...latest, mindset }), { versionLabel: '第四步：阅读与实践小结' })
     } catch (e) {
       setErr(toMessage(e))
     } finally {
@@ -199,7 +214,9 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
     }
   }
 
-  const mindsetAnswers = data.mindset ? [data.mindset.mainContradiction, data.mindset.stage, data.mindset.firstStep] : []
+  const mindsetAnswers = data.mindset
+    ? [data.mindset.mainContradiction, data.mindset.stage, data.mindset.firstStep]
+    : []
   const reviews = [...data.reviews].reverse()
   const t = today()
   const savedData: SessionData = data
@@ -214,9 +231,11 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
           <span className="muted">写完笔记只是半程，干完才算数。</span>
         </div>
 
-        {savedData.actions.length === 0 && <div className="muted">还没有行动。回到第三步保存笔记，会自动生成一条。</div>}
+        {savedData.actions.length === 0 && (
+          <div className="muted">还没有行动。回到第三步保存笔记，会自动生成一条。</div>
+        )}
 
-        {savedData.actions.map(item => {
+        {savedData.actions.map((item) => {
           const overdue = item.status === 'todo' && item.dueDate < t
           const progress = item.progress ?? []
           return (
@@ -226,7 +245,9 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
                 {item.fromArticleId && <span className="badge">{titleOf(item.fromArticleId)}</span>}
                 {overdue && <span className="badge badge-red">已逾期</span>}
                 <span className="spacer" />
-                <span className={item.status === 'done' ? 'badge badge-ok' : 'badge'}>{statusLabel(item.status)}</span>
+                <span className={item.status === 'done' ? 'badge badge-ok' : 'badge'}>
+                  {statusLabel(item.status)}
+                </span>
                 {progress.length > 0 && <span className="badge">{progress.length} 个阶段</span>}
               </div>
               <div className="apply-action-meta">
@@ -236,7 +257,7 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
                     type="date"
                     className="input apply-date"
                     value={item.dueDate}
-                    onChange={e => {
+                    onChange={(e) => {
                       const value = e.target.value
                       if (!value) return
                       void setDue(item, value)
@@ -272,9 +293,9 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
               <ActionProgressLog
                 progress={progress}
                 disabled={item.status === 'dropped'}
-                onAdd={text => addProgress(item.id, text)}
+                onAdd={(text) => addProgress(item.id, text)}
                 onEdit={(id, text) => editProgress(item.id, id, text)}
-                onRemove={id => removeProgress(item.id, id)}
+                onRemove={(id) => removeProgress(item.id, id)}
               />
 
               <textarea
@@ -282,7 +303,7 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
                 rows={2}
                 defaultValue={item.result}
                 placeholder="全部做完后，写下最终结果（失焦自动保存）"
-                onBlur={e => void setResult(item, e.target.value)}
+                onBlur={(e) => void setResult(item, e.target.value)}
               />
             </div>
           )
@@ -293,12 +314,17 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
             className="input"
             value={newAction}
             placeholder="手动加一条行动，例如：明天上午列出全部债务清单"
-            onChange={e => setNewAction(e.target.value)}
-            onKeyDown={e => {
+            onChange={(e) => setNewAction(e.target.value)}
+            onKeyDown={(e) => {
               if (e.key === 'Enter') void addAction()
             }}
           />
-          <button type="button" className="btn btn-ghost btn-sm" disabled={!newAction.trim()} onClick={() => void addAction()}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={!newAction.trim()}
+            onClick={() => void addAction()}
+          >
             添加
           </button>
         </div>
@@ -314,12 +340,17 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
           rows={3}
           value={newSituation}
           placeholder="例：房东突然要涨租，原来的还债计划要全部重排。"
-          onChange={e => {
+          onChange={(e) => {
             setNewSituation(e.target.value)
           }}
         />
         <div className="step-actions-bar">
-          <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void doReview()}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy !== null}
+            onClick={() => void doReview()}
+          >
             {busy === 'review' && <span className="spinner" />} 请教练建议重读哪篇
           </button>
           <span className="muted">教练只推荐篇目，不会替你总结。</span>
@@ -327,14 +358,16 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
 
         {reviews.length > 0 && (
           <div className="apply-reviews">
-            {reviews.map(review => (
+            {reviews.map((review) => (
               <div className="apply-review" key={review.id}>
                 <button
                   type="button"
                   className="apply-review-head"
                   onClick={() => setOpenReview(openReview === review.id ? null : review.id)}
                 >
-                  <span className="apply-review-time muted">{new Date(review.createdAt).toLocaleString('zh-CN')}</span>
+                  <span className="apply-review-time muted">
+                    {new Date(review.createdAt).toLocaleString('zh-CN')}
+                  </span>
                   <span className="apply-review-situation">{review.newSituation}</span>
                   <span className="muted">{openReview === review.id ? '收起' : '展开'}</span>
                 </button>
@@ -346,7 +379,7 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
                     {review.rereadArticleIds.length > 0 && (
                       <div className="apply-reread">
                         <span className="muted">建议重读：</span>
-                        {review.rereadArticleIds.map(articleId => (
+                        {review.rereadArticleIds.map((articleId) => (
                           <button
                             key={articleId}
                             type="button"
@@ -368,19 +401,29 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
 
       <section className="apply-section">
         <div className="apply-section-title">
-          心法三问
+          阅读与实践小结
           <span className="muted">把这一轮的东西压成三句话。</span>
         </div>
         <div className="step-actions-bar">
-          <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void genMindset()}>
-            {busy === 'mindset' && <span className="spinner" />} {data.mindset ? '重新生成我的心法三问' : '生成我的心法三问'}
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy !== null}
+            onClick={() => void genMindset()}
+          >
+            {busy === 'mindset' && <span className="spinner" />}{' '}
+            {data.mindset ? '重新生成我的阅读与实践小结' : '生成我的阅读与实践小结'}
           </button>
-          {data.mindset && <span className="muted">生成于 {new Date(data.mindset.generatedAt).toLocaleString('zh-CN')}</span>}
+          {data.mindset && (
+            <span className="muted">
+              生成于 {new Date(data.mindset.generatedAt).toLocaleString('zh-CN')}
+            </span>
+          )}
         </div>
 
         {data.mindset ? (
           <div className="apply-mindset">
-            {MINDSET_QUESTIONS.map((question, i) => (
+            {(readingPresentation(data).questions ?? MINDSET_QUESTIONS).map((question, i) => (
               <div className="apply-mindset-card" key={question}>
                 <div className="apply-mindset-q">{question}</div>
                 <div className="apply-mindset-a serif">{mindsetAnswers[i]}</div>
@@ -391,7 +434,9 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
           <div className="muted">还没有心法。先干完一件事，再来生成。</div>
         )}
 
-        <p className="apply-motto serif">{MOTTO}</p>
+        <p className="apply-motto serif">
+          {readingPresentation(data).generic ? '记录结果，带着新问题再读原文。' : MOTTO}
+        </p>
       </section>
     </div>
   )

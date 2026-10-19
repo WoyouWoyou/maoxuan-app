@@ -3,6 +3,7 @@ import type { ArticleRecommendation, Diagnosis, ProblemInput, Reading } from '@s
 import type { StepProps } from './types'
 import './steps.css'
 import './StepProblem.css'
+import { readingPresentation } from '@shared/reading-presentation'
 
 type DiagField = 'restated' | 'mainContradiction' | 'stage'
 
@@ -73,10 +74,15 @@ function DiagEdit({ label, value, strong, onSave }: DiagEditProps) {
             rows={3}
             autoFocus
             value={draft}
-            onChange={e => setDraft(e.target.value)}
+            onChange={(e) => setDraft(e.target.value)}
           />
           <div className="sp1-edit-actions">
-            <button type="button" className="btn btn-primary btn-sm" disabled={busy || !draft.trim()} onClick={() => void commit()}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={busy || !draft.trim()}
+              onClick={() => void commit()}
+            >
               {busy && <span className="spinner" />} 保存
             </button>
             <button
@@ -119,20 +125,24 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const dirtyRef = useRef(false)
+  const editVersion = useRef(0)
 
   const data = session.data
+  const presentation = readingPresentation(data)
   const diagnosis = data.diagnosis
   const tooShort = problem.text.trim().length < 10
   const changed =
     diagnosis !== null &&
-    (problem.text !== data.problem.text || problem.background !== data.problem.background || problem.tried !== data.problem.tried)
+    (problem.text !== data.problem.text ||
+      problem.background !== data.problem.background ||
+      problem.tried !== data.problem.tried)
 
   // 外部数据（套用讨论结果 / 版本恢复 / 手动修订）变化时同步本地表单，
   // 但用户正在输入且尚未保存时不覆盖。
   useEffect(() => {
     if (dirtyRef.current) return
     const ext = session.data.problem
-    setProblem(prev =>
+    setProblem((prev) =>
       prev.text === ext.text && prev.background === ext.background && prev.tried === ext.tried
         ? prev
         : { text: ext.text, background: ext.background, tried: ext.tried }
@@ -149,22 +159,32 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
     ) {
       return
     }
-    void update(latest => ({ ...latest, problem }))
+    void update((latest) => ({ ...latest, problem }))
   }
 
   function editProblem(field: keyof ProblemInput, value: string) {
     dirtyRef.current = true
-    setProblem(prev => ({ ...prev, [field]: value }))
+    editVersion.current++
+    setProblem((prev) => ({ ...prev, [field]: value }))
   }
 
   async function diagnose() {
     if (tooShort || busy) return
+    const requestedVersion = editVersion.current
     setBusy(true)
     setErr('')
     try {
-      await update(latest => ({ ...latest, problem }))
+      await update((latest) => ({ ...latest, problem }))
       const result = await window.api.ai.diagnose(session.id)
-      await update(latest => ({ ...latest, problem, diagnosis: result }), { versionLabel: '第一步：教练诊断' })
+      if (editVersion.current !== requestedVersion) throw new Error('问题草稿已修改，请重新诊断')
+      await update(
+        (latest) => {
+          if (JSON.stringify(latest.problem) !== JSON.stringify(problem))
+            throw new Error('问题已修改，请重新生成')
+          return { ...latest, diagnosis: result }
+        },
+        { versionLabel: '第一步：教练诊断' }
+      )
       dirtyRef.current = false
     } catch (e) {
       setErr(toMessage(e))
@@ -178,7 +198,10 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
     setBusy(true)
     setErr('')
     try {
-      await save({ ...data, problem, diagnosis }, { versionLabel: '第一步：明确问题', step: 'focus' })
+      await save(
+        { ...data, problem, diagnosis },
+        { versionLabel: '第一步：明确问题', step: 'focus' }
+      )
       dirtyRef.current = false
       goStep('focus')
     } catch (e) {
@@ -189,14 +212,19 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
   }
 
   async function openRecommendation(rec: ArticleRecommendation) {
-    const existing = data.readings.find(r => r.articleId === rec.articleId)
+    const existing = data.readings.find((r) => r.articleId === rec.articleId)
     let next = data
     if (!existing) {
-      next = { ...data, readings: [...data.readings, makeReading(rec.articleId, rec.title, rec.focusQuestion)] }
+      next = {
+        ...data,
+        readings: [...data.readings, makeReading(rec.articleId, rec.title, rec.focusQuestion)]
+      }
     } else if (!existing.focusQuestion && rec.focusQuestion) {
       next = {
         ...data,
-        readings: data.readings.map(r => (r.articleId === rec.articleId ? { ...r, focusQuestion: rec.focusQuestion } : r))
+        readings: data.readings.map((r) =>
+          r.articleId === rec.articleId ? { ...r, focusQuestion: rec.focusQuestion } : r
+        )
       }
     }
     await save(next)
@@ -205,12 +233,13 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
 
   function saveDiagField(field: DiagField, value: string) {
     return update(
-      latest => {
+      (latest) => {
         if (!latest.diagnosis) return latest
         const diagnosisNext: Diagnosis = {
           ...latest.diagnosis,
           restated: field === 'restated' ? value : latest.diagnosis.restated,
-          mainContradiction: field === 'mainContradiction' ? value : latest.diagnosis.mainContradiction,
+          mainContradiction:
+            field === 'mainContradiction' ? value : latest.diagnosis.mainContradiction,
           stage: field === 'stage' ? value : latest.diagnosis.stage
         }
         return { ...latest, diagnosis: diagnosisNext }
@@ -226,9 +255,7 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
 
   return (
     <div className="step-problem scroll">
-      <p className="step-lead serif">
-        拿出你最头疼的问题。没有问题，就不要翻开《毛选》。
-      </p>
+      <p className="step-lead serif">拿出你最头疼的问题。没有问题，就不要翻开《毛选》。</p>
 
       <div className="step-problem-grid">
         <div className="field">
@@ -239,41 +266,46 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
             rows={3}
             value={problem.text}
             placeholder="例：店铺连续三个月亏损，我不知道该关店还是继续撑。"
-            onChange={e => editProblem('text', e.target.value)}
+            onChange={(e) => editProblem('text', e.target.value)}
             onBlur={persistProblem}
           />
-          {tooShort && <div className="error-text">没有问题，就不要翻开《毛选》——先把最头疼的一件事写具体</div>}
+          {tooShort && <div className="error-text">先把想解决的一件事写具体，至少 10 字</div>}
         </div>
 
         <div className="field">
           <div className="field-label">2. 背景</div>
-          <div className="field-hint">这件事怎么发生的？涉及谁、多少钱、拖了多久？</div>
+          <div className="field-hint">这件事怎么发生的？涉及谁、什么约束、持续多久？</div>
           <textarea
             className="textarea"
             rows={3}
             value={problem.background}
             placeholder="例：去年扩店借了 20 万，客流没起来，每月还要还 1.2 万。"
-            onChange={e => editProblem('background', e.target.value)}
+            onChange={(e) => editProblem('background', e.target.value)}
             onBlur={persistProblem}
           />
         </div>
 
         <div className="field">
           <div className="field-label">3. 已经试过什么办法</div>
-          <div className="field-hint">试过什么、结果如何。这决定主要矛盾在哪。</div>
+          <div className="field-hint">试过什么、结果如何，哪些信息还不确定？</div>
           <textarea
             className="textarea"
             rows={3}
             value={problem.tried}
             placeholder="例：投过两次广告、找朋友借过钱，都没解决客流问题。"
-            onChange={e => editProblem('tried', e.target.value)}
+            onChange={(e) => editProblem('tried', e.target.value)}
             onBlur={persistProblem}
           />
         </div>
       </div>
 
       <div className="step-actions-bar">
-        <button type="button" className="btn btn-primary" disabled={tooShort || busy} onClick={() => void diagnose()}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={tooShort || busy}
+          onClick={() => void diagnose()}
+        >
           {busy && <span className="spinner" />} 请教练诊断
         </button>
         {changed && <span className="muted">问题已改动，建议重新诊断</span>}
@@ -293,7 +325,11 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
             </button>
           </div>
 
-          <DiagEdit label="复述你的问题" value={diagnosis.restated} onSave={v => saveDiagField('restated', v)} />
+          <DiagEdit
+            label="复述你的问题"
+            value={diagnosis.restated}
+            onSave={(v) => saveDiagField('restated', v)}
+          />
 
           {diagnosis.symptoms.length > 0 && (
             <div className="diag-block">
@@ -309,27 +345,52 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
           )}
 
           <DiagEdit
-            label="主要矛盾"
+            label={presentation.obstacle}
             value={diagnosis.mainContradiction}
             strong
-            onSave={v => saveDiagField('mainContradiction', v)}
+            onSave={(v) => saveDiagField('mainContradiction', v)}
           />
 
-          <DiagEdit label="所处阶段" value={diagnosis.stage} onSave={v => saveDiagField('stage', v)} />
+          <DiagEdit
+            label={presentation.constraints}
+            value={diagnosis.stage}
+            onSave={(v) => saveDiagField('stage', v)}
+          />
 
           <div className="diag-block">
-            <div className="diag-label">推荐篇目（只读这几篇就够）</div>
+            <div className="diag-label">推荐篇目（可自行选择其他章节）</div>
+            {diagnosis.recommendations.length === 0 && (
+              <p className="muted">
+                暂未找到有原文证据的推荐。进入第二步后可浏览本书目录自行选章。
+              </p>
+            )}
             <div className="rec-list">
-              {diagnosis.recommendations.map(rec => (
+              {diagnosis.recommendations.map((rec) => (
                 <div className="rec-card" key={rec.articleId}>
                   <div className="rec-head">
                     <span className="rec-title serif">{rec.title}</span>
                     <span className="spacer" />
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void openRecommendation(rec)}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => void openRecommendation(rec)}
+                    >
                       去读原文
                     </button>
                   </div>
                   <p className="rec-reason">{rec.reason}</p>
+                  {rec.evidence && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        void openRecommendation(rec).then(() =>
+                          openReader(rec.articleId, rec.evidence!.paragraphIndex)
+                        )
+                      }}
+                    >
+                      原文依据：“{rec.evidence.quote}”
+                    </button>
+                  )}
                   <p className="rec-focus">带着这个问题读：{rec.focusQuestion}</p>
                 </div>
               ))}
@@ -339,7 +400,36 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
       )}
 
       <div className="step-actions-bar">
-        <button type="button" className="btn btn-primary" disabled={tooShort || !diagnosis || busy} onClick={() => void confirm()}>
+        {!diagnosis && (
+          <button
+            className="btn btn-ghost"
+            disabled={tooShort || busy}
+            onClick={() =>
+              void update(
+                (latest) => ({
+                  ...latest,
+                  problem,
+                  diagnosis: {
+                    restated: problem.text,
+                    symptoms: [],
+                    mainContradiction: '',
+                    stage: '',
+                    recommendations: []
+                  }
+                }),
+                { versionLabel: '确认问题，自行选章', step: 'focus' }
+              ).then(() => goStep('focus'))
+            }
+          >
+            自行选章，直接阅读 →
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={tooShort || !diagnosis || busy}
+          onClick={() => void confirm()}
+        >
           确认问题，进入第二步 →
         </button>
         <span className="muted">教练只指路，原文和笔记得你自己来。</span>
