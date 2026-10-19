@@ -280,6 +280,45 @@ try {
   assert.equal(manualSaved.currentStep, 'apply')
   await evaluate(`location.hash='/library'`)
   await delay(600)
+  assert.equal(await evaluate("document.querySelectorAll('.lib-vol-head').length"), 7)
+  assert.equal(
+    await evaluate("document.querySelectorAll('.lib-vol-head[aria-expanded=true]').length"),
+    1
+  )
+  assert.equal(await evaluate("document.querySelectorAll('.book-core-section button').length"), 5)
+  await clickText('全部收起')
+  assert.equal(
+    await evaluate("document.querySelectorAll('.book-toc-root .lib-toc-item').length"),
+    0
+  )
+  await clickText('全部展开')
+  assert.equal(
+    await evaluate("document.querySelectorAll('.book-toc-root .lib-toc-item').length"),
+    388
+  )
+  await clickText('全部收起')
+  await evaluate("document.querySelector('.lib-vol-head').click()")
+  await cdp('Page.enable')
+  await fs.mkdir('output/qa', { recursive: true })
+  const tocShot = await cdp('Page.captureScreenshot', {
+    format: 'png',
+    captureBeyondViewport: true
+  })
+  await fs.writeFile('output/qa/library-toc.png', Buffer.from(tocShot.data, 'base64'))
+  await evaluate("document.querySelector('.book-toc-root .lib-toc-item').click()")
+  await delay(350)
+  assert.match(await evaluate('document.body.innerText'), /中国社会各阶级的分析/)
+  await evaluate("location.hash='/library'")
+  await delay(500)
+  await evaluate('document.querySelector(\'input[placeholder="在本书标题与正文中搜索"]\').focus()')
+  await cdp('Input.insertText', { text: '中国社会各阶级的分析' })
+  await delay(600)
+  assert.match(
+    await evaluate(
+      "[...document.querySelectorAll('.lib-hit')].find(el => el.querySelector('.lib-hit-title')?.textContent === '中国社会各阶级的分析')?.querySelector('.lib-hit-vol')?.textContent"
+    ),
+    /第一卷/
+  )
   await evaluate(`document.querySelectorAll('.book-grid button')[1].click()`)
   await delay(250)
   const text = await evaluate('document.body.innerText')
@@ -327,6 +366,7 @@ try {
           'exact provider usage',
           'index resumability/cache',
           'real rendered library and reading UI',
+          'seven original volumes, core shortcuts, collapse/expand, chapter navigation and search location',
           'manual four-step React command wiring',
           'history restore',
           'hidden book source retention'

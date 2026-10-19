@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { CORE_ARTICLES } from '@shared/core'
 import type { ArticleMeta, SearchHit } from '@shared/types'
 import type { ImportPreview } from '@shared/contracts/library'
 import { useBooks, refreshBooks } from '../features/library/useBooks'
+import { BookToc } from '../features/library/BookToc'
 import { useTasks } from '../features/tasks/useTasks'
 import './LibraryPage.css'
 import '../features/library/library.css'
@@ -335,21 +337,53 @@ export function LibraryPage() {
             placeholder="在本书标题与正文中搜索"
           />
           <div className="book-chapters">
-            {(query.trim() ? hits : chapters).map((c, i) => (
-              <button
-                className="lib-toc-item"
-                key={c.id}
-                onClick={() => navigate(`/library/${c.id}`)}
-              >
-                <span className="lib-toc-index">{i + 1}</span>
-                <span>
-                  {c.title}
-                  {'snippet' in c && (
-                    <small className="book-search-snippet">{String(c.snippet)}</small>
-                  )}
-                </span>
-              </button>
-            ))}
+            {query.trim() ? (
+              <div className="lib-results">
+                <p className="muted">
+                  {hits.length
+                    ? `搜索结果 · ${hits.length} 篇（最多显示 60 篇）`
+                    : '未找到匹配的篇章'}
+                </p>
+                {hits.map((c) => (
+                  <button
+                    className="lib-hit"
+                    key={c.id}
+                    onClick={() => navigate(`/library/${c.id}`)}
+                  >
+                    <span className="lib-hit-vol">
+                      {book.title} › {c.volume.replaceAll(' / ', ' › ')}
+                    </span>
+                    <span className="lib-hit-title">{c.title}</span>
+                    <small className="book-search-snippet">{c.snippet}</small>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <>
+                {book.profile === 'maoxuan' && (
+                  <section className="lib-section book-core-section">
+                    <h3 className="lib-h2">核心五篇</h3>
+                    <div className="lib-core-grid">
+                      {CORE_ARTICLES.map((a) => (
+                        <button
+                          key={a.articleId}
+                          className="card lib-core-card"
+                          onClick={() => navigate(`/library/${a.articleId}`)}
+                        >
+                          <span className="lib-core-title">{a.title}</span>
+                          <span className="lib-core-solves muted">解决：{a.solves}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
+                <BookToc
+                  key={`${book.bookId}:${book.revisionId}`}
+                  chapters={chapters}
+                  onSelect={(id) => navigate(`/library/${id}`)}
+                />
+              </>
+            )}
           </div>
         </section>
       )}

@@ -75,3 +75,20 @@
   margin-top: 6px;
   line-height: 1.6;
 }
+
+.book-toc-root {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.book-toc-toolbar {
+  margin-bottom: 10px;
+}
+.lib-toc-label {
+  font-family: var(--serif);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.lib-toc .lib-vol {
+  margin-top: 8px;
+}
