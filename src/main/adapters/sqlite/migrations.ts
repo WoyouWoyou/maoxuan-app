@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3'
+export const DATABASE_VERSION = 4
 export function migrate(handle: Database.Database): void {
   const version = Number(handle.pragma('user_version', { simple: true }))
   if (version < 1)
@@ -32,5 +33,40 @@ export function migrate(handle: Database.Database): void {
       handle.exec(`CREATE TABLE IF NOT EXISTS model_profiles(id TEXT PRIMARY KEY,name TEXT NOT NULL,config TEXT NOT NULL,secret TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS index_blocks(article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,signature TEXT NOT NULL,ord INTEGER NOT NULL,summary TEXT NOT NULL,PRIMARY KEY(article_id,signature,ord));
       PRAGMA user_version = 2;`)
+    })()
+  if (version < 3)
+    handle.transaction(() => {
+      handle.exec(`
+        ALTER TABLE sessions ADD COLUMN book_id TEXT NOT NULL DEFAULT 'maoxuan';
+        ALTER TABLE sessions ADD COLUMN book_title TEXT NOT NULL DEFAULT '毛泽东选集';
+        CREATE TABLE session_mutations(session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,id TEXT NOT NULL,signature TEXT NOT NULL,PRIMARY KEY(session_id,id));
+
+      `)
+      const columns = handle.pragma('table_info(sessions)') as { name: string }[]
+      if (columns.some((c) => c.name === 'status'))
+        handle.exec('CREATE INDEX sessions_summary ON sessions(status,deleted_at,updated_at)')
+      if (columns.some((c) => c.name === 'data'))
+        handle.exec(`UPDATE sessions SET
+        book_id=COALESCE(json_extract(data,'$.book.bookId'),'maoxuan'),
+        book_title=COALESCE(json_extract(data,'$.book.title'),'毛泽东选集')`)
+      handle.exec(`
+        CREATE TRIGGER articles_fts_insert AFTER INSERT ON articles BEGIN
+          INSERT INTO articles_fts(rowid,title,content) VALUES(new.rowid,new.title,new.content);
+        END;
+        CREATE TRIGGER articles_fts_delete AFTER DELETE ON articles BEGIN
+          INSERT INTO articles_fts(articles_fts,rowid,title,content) VALUES('delete',old.rowid,old.title,old.content);
+        END;
+        CREATE TRIGGER articles_fts_update AFTER UPDATE OF title,content ON articles BEGIN
+          INSERT INTO articles_fts(articles_fts,rowid,title,content) VALUES('delete',old.rowid,old.title,old.content);
+          INSERT INTO articles_fts(rowid,title,content) VALUES(new.rowid,new.title,new.content);
+        END;
+        INSERT INTO articles_fts(articles_fts) VALUES('rebuild');
+      `)
+      handle.pragma('user_version = 3')
+    })()
+  if (version < 4)
+    handle.transaction(() => {
+      handle.exec(`CREATE TABLE IF NOT EXISTS standalone_actions (id TEXT PRIMARY KEY, data TEXT NOT NULL);
+        PRAGMA user_version = 4;`)
     })()
 }

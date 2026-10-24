@@ -1,3 +1,5 @@
+import { ReaderPreferencesFields } from '../features/reader/ReaderOptions'
+import { ProxySettingsPanel } from '../features/settings/ProxySettingsPanel'
 import { useEffect, useState } from 'react'
 import type { ModelProfile } from '@shared/contracts/models'
 import type { Settings } from '@shared/types'
@@ -278,6 +280,12 @@ export function SettingsPage() {
           </select>
         </label>
       ))}
+      <section className="reader-settings-section" aria-label="阅读与朗读设置">
+        <h2>阅读与朗读</h2>
+        <ReaderPreferencesFields />
+        <p className="reader-option-hint">自动保存，与阅读页的「阅读选项」同步。</p>
+      </section>
+      <ProxySettingsPanel />
       <UsagePanel />
       <h2 className="set-title" style={{ fontSize: 20, marginTop: 32 }}>
         回收站与归档

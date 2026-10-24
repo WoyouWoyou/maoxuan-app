@@ -1,4 +1,5 @@
 import type { Session, WbStepKey, WorkbenchData } from '@shared/types'
+import type { WorkbenchCommand } from '@shared/contracts/workbench'
 import type { WbSourceArea } from '@shared/workbench'
 
 export interface WbSaveOpts {
@@ -6,6 +7,8 @@ export interface WbSaveOpts {
   versionLabel?: string
   /** 同时推进 currentStep */
   step?: WbStepKey
+  /** 响应丢失后的重试复用同一个幂等 ID */
+  mutationId?: string
 }
 
 export interface WbStepProps {
@@ -17,6 +20,10 @@ export interface WbStepProps {
    * AI 调用前先 await 一次（把表单草稿写进库），AI 返回后再用它写回结果，避免覆盖期间的其他改动。
    */
   updateWb: (fn: (latest: WorkbenchData) => WorkbenchData, opts?: WbSaveOpts) => Promise<void>
+  /** 显式命令提交：批量加入待办 / 移回候选，一次命令一次事务与快照。 */
+  applyWorkbench: (commands: WorkbenchCommand[], opts?: WbSaveOpts) => Promise<void>
+  /** 版本冲突后从服务端重新读取当前会话。 */
+  reloadSession: () => Promise<void>
   goStep: (step: WbStepKey) => void
   /** 打开右侧抽屉，显示该模块对应的原文依据 */
   openSource: (area: WbSourceArea) => void

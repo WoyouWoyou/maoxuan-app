@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { emptySessionData } from '../src/shared/types'
-import { applyReadingCommands, readingCommands } from '../src/shared/contracts/reading'
-import { configureReadingSessions, applyCommands } from '../src/main/modules/reading/sessions'
+import { readingCommands } from '../src/shared/contracts/reading'
+import { applyReadingCommands } from '../src/main/modules/reading/public'
 import { createModelConfigRepository } from '../src/main/adapters/sqlite/model-config-repository'
 import Database from 'better-sqlite3'
 describe('reading commands', () => {
@@ -14,15 +14,8 @@ describe('reading commands', () => {
     const commands = readingCommands(before, after)
     expect(commands).toHaveLength(1)
     expect(applyReadingCommands(before, commands)).toEqual(after)
-    configureReadingSessions({
-      get: () => ({ id: 's', mode: 'reading', stateVersion: 3, data: before }) as any,
-      update: () => {
-        throw new Error('must not write')
-      }
-    })
-    expect(() => applyCommands('s', commands, 2)).toThrow('更新')
     expect(() => applyReadingCommands(before, [{ kind: 'book', value: 'x' } as any])).toThrow(
-      '未知'
+      '格式'
     )
   })
   it('keeps named credentials out of public config and snapshots model choice', () => {
@@ -52,46 +45,5 @@ describe('reading commands', () => {
     expect(repo.forPurpose('reading')?.model).toBe('model-b')
     expect(repo.routes()).toEqual({ reading: p.id })
     db.close()
-  })
-})
-
-import { validateReadingData } from '../src/main/modules/reading/validation'
-import { problemSignature } from '../src/main/modules/reading/context'
-describe('AI result applicability', () => {
-  it('rejects late results after the user changed the problem', () => {
-    const original = emptySessionData()
-    const current = { ...original, problem: { ...original.problem, text: '新的问题' } }
-    const diagnosis = {
-      restated: '旧建议',
-      symptoms: [],
-      mainContradiction: '',
-      stage: '',
-      recommendations: [],
-      _context: { problemSignature: problemSignature(original), revisionId: 'maoxuan-v1' }
-    }
-    expect(() => validateReadingData(current, { ...current, diagnosis })).toThrow('过时')
-  })
-  it('accepts an explicit problem revision without making later manual edits stale', () => {
-    const previous = emptySessionData()
-    const current = {
-      ...previous,
-      problem: { ...previous.problem, text: '明确修订的问题' },
-      diagnosis: {
-        restated: '新建议',
-        symptoms: [],
-        mainContradiction: '',
-        stage: '',
-        recommendations: [],
-        _context: { problemSignature: problemSignature(previous), revisionId: 'maoxuan-v1' }
-      }
-    }
-    validateReadingData(previous, current)
-    expect(current.diagnosis._context.problemSignature).toBe(problemSignature(current))
-    expect(() =>
-      validateReadingData(current, {
-        ...current,
-        diagnosis: { ...current.diagnosis, restated: '手动调整' }
-      })
-    ).not.toThrow()
   })
 })

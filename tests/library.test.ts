@@ -72,6 +72,12 @@ describe('immutable library migration', () => {
     const chapter = repo.listChapters(book)[0]
     expect(() => repo.getChapter(chapter.id, repo.requireBook())).toThrow('不属于')
     expect(repo.searchChapters('新书', 10, repo.requireBook())).toHaveLength(0)
+    expect(repo.listChapters({ bookId: 'maoxuan', revisionId: book.revisionId })).toHaveLength(0)
+    expect(
+      repo.searchChapters('新书第一段', 10, { bookId: 'maoxuan', revisionId: book.revisionId })
+    ).toHaveLength(0)
+    expect(repo.searchChapters('新书第一段', 10, book)).toHaveLength(1)
+    expect(() => repo.requireBook('')).toThrow('不存在')
     repo.hideBook(book.bookId, true)
     expect(repo.listBooks()).toHaveLength(1)
     expect(repo.getChapter(chapter.id, book)).not.toBeNull()

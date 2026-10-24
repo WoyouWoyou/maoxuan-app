@@ -254,3 +254,6 @@ export async function testConnection(s: Settings): Promise<{ ok: boolean; messag
     return { ok: false, message: e instanceof Error ? e.message : '连接失败' }
   }
 }
+export { RequestError } from './transport'
+export type { ModelTransportPort } from './transport'
+export { normalizeUsage } from './usage'

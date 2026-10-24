@@ -1,13 +1,5 @@
 import { useState } from 'react'
-import type {
-  WbConfidence,
-  WbFact,
-  WbFactKind,
-  WbForm,
-  WbLedgerEntry,
-  WbStage,
-  WbTimeScale
-} from '@shared/types'
+import type { WbConfidence, WbFact, WbFactKind, WbForm, WbStage, WbTimeScale } from '@shared/types'
 import {
   WB_SOURCES,
   WB_STAGES,
@@ -15,7 +7,6 @@ import {
   WB_TIME_SCALES,
   isAssumptionDraft,
   nextFactNo,
-  wbRawInputText,
   wbStepUnlocked
 } from '@shared/workbench'
 import type { WbStepProps } from './types'
@@ -72,14 +63,14 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
 
   const intake = wb.intake
   const gate = wbStepUnlocked(wb, 'wb_diagnose')
-  const source = WB_SOURCES.find(s => s.area === 'intake')
+  const source = WB_SOURCES.find((s) => s.area === 'intake')
 
-  const timeHint = WB_TIME_SCALES.find(s => s.key === draft.timeScale)?.hint ?? ''
+  const timeHint = WB_TIME_SCALES.find((s) => s.key === draft.timeScale)?.hint ?? ''
   const stageHint = draft.stage ? WB_STAGE_HINT[draft.stage] : ''
 
-  const unanswered = intake ? intake.questions.filter(q => q.answer.trim() === '').length : 0
+  const unanswered = intake ? intake.questions.filter((q) => q.answer.trim() === '').length : 0
   const confirmedCount = intake
-    ? intake.facts.filter(f => f.kind === 'fact' && f.confidence === 'confirmed').length
+    ? intake.facts.filter((f) => f.kind === 'fact' && f.confidence === 'confirmed').length
     : 0
   const assumptionNote =
     unanswered > 0
@@ -89,11 +80,11 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
         : '还没有已确认的事实'
 
   function setField(patch: Partial<WbForm>) {
-    setDraft(prev => ({ ...prev, ...patch }))
+    setDraft((prev) => ({ ...prev, ...patch }))
   }
 
   function setBlocker(index: number, value: string) {
-    setDraft(prev => {
+    setDraft((prev) => {
       const blockers = [...prev.blockers]
       blockers[index] = value
       return { ...prev, blockers }
@@ -102,31 +93,33 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
 
   function persist() {
     if (sameForm(draft, wb.form)) return
-    void updateWb(l => ({ ...l, form: draft }))
+    void updateWb((l) => ({ ...l, form: draft }))
   }
 
   function pickTimeScale(value: WbTimeScale) {
     const next: WbForm = { ...draft, timeScale: draft.timeScale === value ? '' : value }
     setDraft(next)
-    void updateWb(l => ({ ...l, form: next }))
+    void updateWb((l) => ({ ...l, form: next }))
   }
 
   function pickStage(value: WbStage) {
     const next: WbForm = { ...draft, stage: draft.stage === value ? '' : value }
     setDraft(next)
-    void updateWb(l => ({ ...l, form: next }))
+    void updateWb((l) => ({ ...l, form: next }))
   }
 
   function patchFacts(fn: (facts: WbFact[]) => WbFact[]) {
-    void updateWb(l => (l.intake ? { ...l, intake: { ...l.intake, facts: fn(l.intake.facts) } } : l))
+    void updateWb((l) =>
+      l.intake ? { ...l, intake: { ...l.intake, facts: fn(l.intake.facts) } } : l
+    )
   }
 
   function patchFact(id: string, patch: Partial<WbFact>) {
-    patchFacts(facts => facts.map(f => (f.id === id ? { ...f, ...patch } : f)))
+    patchFacts((facts) => facts.map((f) => (f.id === id ? { ...f, ...patch } : f)))
   }
 
   function removeFact(id: string) {
-    patchFacts(facts => facts.filter(f => f.id !== id))
+    patchFacts((facts) => facts.filter((f) => f.id !== id))
   }
 
   function cycleConf(fact: WbFact) {
@@ -136,13 +129,13 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
   function addFact() {
     const content = newFact.trim()
     if (!content || !intake) return
-    const id = `F${nextFactNo(intake.facts.map(f => f.id))}`
+    const id = `F${nextFactNo(intake.facts.map((f) => f.id))}`
     setNewFact('')
-    patchFacts(facts => [...facts, { id, kind: 'fact', content, confidence: 'confirmed' }])
+    patchFacts((facts) => [...facts, { id, kind: 'fact', content, confidence: 'confirmed' }])
   }
 
   function setAnswer(index: number, answer: string) {
-    void updateWb(l =>
+    void updateWb((l) =>
       l.intake
         ? {
             ...l,
@@ -161,26 +154,11 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
     setBusy(true)
     setErr('')
     try {
-      await updateWb(l => ({ ...l, form: draft }))
+      await updateWb((l) => ({ ...l, form: draft }))
       const res = await window.api.wb.intake(session.id)
-      await updateWb(
-        l => {
-          const next = { ...l, intake: res }
-          const entry: WbLedgerEntry = {
-            id: crypto.randomUUID(),
-            createdAt: new Date().toISOString(),
-            inputType: first ? 'new' : 'update',
-            rawInput: wbRawInputText(next),
-            factDelta: [],
-            judgmentDelta: [],
-            actionsDelta: [],
-            oldAssumptionsToFix: [],
-            summary: `事实台账 ${res.facts.length} 条，缺失 ${res.missing.length} 项`
-          }
-          return { ...next, ledger: [...l.ledger, entry] }
-        },
-        { versionLabel: first ? '第一步：整理事实台账' : '第一步：补充事实后重整' }
-      )
+      await updateWb((l) => ({ ...l, intake: res }), {
+        versionLabel: first ? '第一步：整理事实台账' : '第一步：补充事实后重整'
+      })
     } catch (e) {
       setErr(toMessage(e))
     } finally {
@@ -204,7 +182,9 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
 
       <div className="card wb-card">
         <div className="card-title">原始输入</div>
-        <p className="muted wb-card-sub">一个项目只围绕一个主目标；数字、资源、约束写得越实，判断越准</p>
+        <p className="muted wb-card-sub">
+          一个项目只围绕一个主目标；数字、资源、约束写得越实，判断越准
+        </p>
 
         <div className="field">
           <div className="field-label">项目名</div>
@@ -212,7 +192,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
             className="input"
             value={draft.projectName}
             placeholder="例：社区烘焙店"
-            onChange={e => setField({ projectName: e.target.value })}
+            onChange={(e) => setField({ projectName: e.target.value })}
             onBlur={persist}
           />
         </div>
@@ -225,7 +205,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
             rows={2}
             value={draft.objective}
             placeholder="例：12 个月内把单店做到月流水 10 万并稳定盈利"
-            onChange={e => setField({ objective: e.target.value })}
+            onChange={(e) => setField({ objective: e.target.value })}
             onBlur={persist}
           />
         </div>
@@ -233,7 +213,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
         <div className="field">
           <div className="field-label">时间尺度</div>
           <div className="wb-chips">
-            {WB_TIME_SCALES.map(item => (
+            {WB_TIME_SCALES.map((item) => (
               <button
                 key={item.key}
                 type="button"
@@ -250,7 +230,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
         <div className="field">
           <div className="field-label">当前阶段</div>
           <div className="wb-chips">
-            {WB_STAGES.map(item => (
+            {WB_STAGES.map((item) => (
               <button
                 key={item}
                 type="button"
@@ -267,13 +247,13 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
         <div className="field">
           <div className="field-label">当前最卡的 3 个问题</div>
           <div className="wb-grid3">
-            {[0, 1, 2].map(i => (
+            {[0, 1, 2].map((i) => (
               <input
                 key={i}
                 className="input"
                 value={draft.blockers[i]}
                 placeholder={BLOCKER_PLACEHOLDER[i]}
-                onChange={e => setBlocker(i, e.target.value)}
+                onChange={(e) => setBlocker(i, e.target.value)}
                 onBlur={persist}
               />
             ))}
@@ -287,7 +267,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
             className="textarea"
             rows={3}
             value={draft.background}
-            onChange={e => setField({ background: e.target.value })}
+            onChange={(e) => setField({ background: e.target.value })}
             onBlur={persist}
           />
         </div>
@@ -300,7 +280,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
             rows={4}
             value={draft.knownFacts}
             placeholder="例：月租 8000，日客流 60 人，客单价 25 元，现金流还能撑 4 个月"
-            onChange={e => setField({ knownFacts: e.target.value })}
+            onChange={(e) => setField({ knownFacts: e.target.value })}
             onBlur={persist}
           />
         </div>
@@ -313,7 +293,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
               className="textarea"
               rows={2}
               value={draft.opponents}
-              onChange={e => setField({ opponents: e.target.value })}
+              onChange={(e) => setField({ opponents: e.target.value })}
               onBlur={persist}
             />
           </div>
@@ -324,7 +304,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
               className="textarea"
               rows={2}
               value={draft.allies}
-              onChange={e => setField({ allies: e.target.value })}
+              onChange={(e) => setField({ allies: e.target.value })}
               onBlur={persist}
             />
           </div>
@@ -335,7 +315,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
               className="textarea"
               rows={2}
               value={draft.swing}
-              onChange={e => setField({ swing: e.target.value })}
+              onChange={(e) => setField({ swing: e.target.value })}
               onBlur={persist}
             />
           </div>
@@ -343,7 +323,12 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
       </div>
 
       <div className="wb-bar">
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void runIntake()}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={busy}
+          onClick={() => void runIntake()}
+        >
           {busy && <span className="spinner" />} {intake ? '根据补充重新整理' : '整理事实台账'}
         </button>
         <span className="muted wb-bar-note">AI 只切分你给的内容，不会添加你没说过的事实</span>
@@ -362,8 +347,8 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
             <div className="card-title">事实台账</div>
             <p className="muted wb-card-sub">只有“事实”能被后面的判断引用；判断和愿望先分开放着</p>
             <div className="wb-grid3">
-              {KIND_ORDER.map(kind => {
-                const items = intake.facts.filter(f => f.kind === kind)
+              {KIND_ORDER.map((kind) => {
+                const items = intake.facts.filter((f) => f.kind === kind)
                 return (
                   <div className="wb-ledger-col" key={kind}>
                     <div className="wb-col-head">
@@ -371,7 +356,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
                       <span className="badge">{items.length}</span>
                     </div>
                     <div className="wb-fact-list">
-                      {items.map(fact => (
+                      {items.map((fact) => (
                         <div className="wb-fact" key={fact.id}>
                           <div className="wb-fact-head">
                             <span className="wb-fact-id">{fact.id}</span>
@@ -388,9 +373,11 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
                               className="wb-kind"
                               value={fact.kind}
                               title="改分类"
-                              onChange={e => patchFact(fact.id, { kind: e.target.value as WbFactKind })}
+                              onChange={(e) =>
+                                patchFact(fact.id, { kind: e.target.value as WbFactKind })
+                              }
                             >
-                              {KIND_ORDER.map(k => (
+                              {KIND_ORDER.map((k) => (
                                 <option key={k} value={k}>
                                   {KIND_LABEL[k]}
                                 </option>
@@ -410,12 +397,13 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
                               className="input wb-fact-input"
                               autoFocus
                               defaultValue={fact.content}
-                              onBlur={e => {
+                              onBlur={(e) => {
                                 setEditingId(null)
                                 const value = e.target.value.trim()
-                                if (value && value !== fact.content) patchFact(fact.id, { content: value })
+                                if (value && value !== fact.content)
+                                  patchFact(fact.id, { content: value })
                               }}
-                              onKeyDown={e => {
+                              onKeyDown={(e) => {
                                 if (e.key === 'Enter') e.currentTarget.blur()
                               }}
                             />
@@ -437,12 +425,17 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
                           className="input"
                           value={newFact}
                           placeholder="手动补一条已确认的事实"
-                          onChange={e => setNewFact(e.target.value)}
-                          onKeyDown={e => {
+                          onChange={(e) => setNewFact(e.target.value)}
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter') addFact()
                           }}
                         />
-                        <button type="button" className="btn btn-sm" disabled={!newFact.trim()} onClick={addFact}>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          disabled={!newFact.trim()}
+                          onClick={addFact}
+                        >
                           添加
                         </button>
                       </div>
@@ -488,14 +481,16 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
                     key={`${q.id}:${q.answer}`}
                     defaultValue={q.answer}
                     placeholder="把你知道的写清楚：数字、时间、人名、结果"
-                    onBlur={e => {
+                    onBlur={(e) => {
                       if (e.target.value !== q.answer) setAnswer(i, e.target.value)
                     }}
                   />
                 </div>
               ))
             )}
-            <p className="muted wb-card-sub">回答完点上面的『根据补充重新整理』，回答会转成事实。</p>
+            <p className="muted wb-card-sub">
+              回答完点上面的『根据补充重新整理』，回答会转成事实。
+            </p>
           </div>
 
           <div className="card wb-card">

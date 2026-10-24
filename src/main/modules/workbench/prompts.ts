@@ -115,17 +115,29 @@ function decisionBlock(wb: WorkbenchData): string {
 }
 
 function actionsBlock(wb: WorkbenchData): string {
-  if (!wb.actions.length) return '（暂无行动）'
-  const status = { todo: '进行中', done: '已完成', dropped: '已放弃' } as const
-  return wb.actions
-    .map((a) => {
-      const progress = a.progress
-        .slice(-3)
-        .map((p) => `    · ${p.text}`)
-        .join('\n')
-      return `- [${a.horizon}｜${status[a.status]}] ${a.action}（验证：${a.verify}）${progress ? `\n${progress}` : ''}`
-    })
-    .join('\n')
+  const queued = wb.actions.filter((a) => a.planningState === 'queued')
+  const candidates = wb.actions.filter((a) => a.planningState !== 'queued')
+  const status = { todo: '待办', done: '已完成', dropped: '已放弃' } as const
+  const line = (a: (typeof wb.actions)[number], state: string): string => {
+    const progress = a.progress
+      .slice(-3)
+      .map((p) => `    · ${p.text}`)
+      .join('\n')
+    return `- [${a.horizon}｜${state}] ${a.action}（验证：${a.verify}）${progress ? `\n${progress}` : ''}`
+  }
+  const queuedText = queued.length
+    ? queued.map((a) => line(a, status[a.status])).join('\n')
+    : '（还没有加入待办的行动）'
+  const candidateText = candidates.length
+    ? candidates.map((a) => line(a, '候选')).join('\n')
+    : '（没有候选策略）'
+  return [
+    '【已加入待办 · 只有这些算执行承诺】',
+    queuedText,
+    '',
+    '【候选策略 · 只是备选参考，用户还没决定做】',
+    candidateText
+  ].join('\n')
 }
 
 function ledgerBlock(wb: WorkbenchData, n = 5): string {
@@ -367,9 +379,15 @@ export function buildWbRedteamUser(wb: WorkbenchData, scope: 'decision' | 'actio
       .filter((a) => a.status !== 'dropped')
       .map(
         (a) =>
-          `- [${a.horizon}] 动作：${a.action}｜目的：${a.purpose}｜验证：${a.verify}｜执行标准：${a.standards.join('、')}｜KPI：${a.kpi}`
+          `- [${a.horizon}｜${a.planningState === 'queued' ? '已加入待办' : '候选策略'}] 动作：${a.action}｜目的：${a.purpose}｜验证：${a.verify}｜执行标准：${a.standards.join('、')}｜KPI：${a.kpi}`
       )
-    lines.push('', '【待审核的行动】', detail.join('\n') || '（无）')
+    lines.push(
+      '',
+      '【待审核的行动】',
+      detail.join('\n') || '（无）',
+      '',
+      '注意：候选策略尚未被用户选中，不算执行承诺；多线作战的判断只针对已加入待办且未完成的行动。'
+    )
   }
   lines.push(
     '',
@@ -398,7 +416,8 @@ export const WB_ACTIONS_SYSTEM = `${WB_RULES}
 ${STANDARD_TABLE}
 - kpi：与 KPI 或组织结果的关系——一句话。
 
-已有行动会一并给出：已完成或进行中的不要重复，可以接着往下排。
+你输出的每一条都只是候选策略：用户会逐条筛选后才加入待办，所以不要假设任何一条已经在执行。
+已有行动分两类给出：已加入待办的是用户已承诺执行的，候选策略只是备选参考；已完成或已加入待办的不要重复，可以接着往下排。
 
 输出 JSON：
 {"actions":[{"horizon":"7d","action":"","purpose":"","verify":"","standards":["调查研究"],"kpi":""}]}`
@@ -429,6 +448,9 @@ export const WB_RECAP_SYSTEM = `${WB_RULES}
 
 【当前任务】复盘纠偏 + 实践认识循环（《实践论》：实践、认识、再实践、再认识）。
 用户做了一段时间，带回了最新进展。你要形成一条追加进项目台账的记录，不覆盖旧记录。
+
+【行动的两类状态】只有“已加入待办”的行动才是用户的执行承诺，可以作为已做的工作来复盘；
+“候选策略”只是备选参考，没有被选择就不算做过，也不要当成执行成果。
 
 输出：
 - factDelta：这次新增或变化的事实（逐条，引用或对照旧事实编号）。

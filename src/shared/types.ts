@@ -74,6 +74,13 @@ export interface ProblemInput {
 }
 
 export interface AIContext {
+  conversationSignature?: string
+  requestId?: string
+  sessionId?: string
+  profileVersion?: string
+  purpose?: string
+  inputSignature?: string
+  articleId?: string
   problemSignature: string
   revisionId: string
 }
@@ -87,6 +94,7 @@ export interface ArticleRecommendation {
 }
 
 export interface Diagnosis {
+  analysis?: { obstacle: string; constraints: string }
   _context?: AIContext
   restated: string
   symptoms: string[]
@@ -149,6 +157,14 @@ export interface Reading {
 }
 
 export type ActionStatus = 'todo' | 'done' | 'dropped'
+export type ActionQuadrant = 'do' | 'plan' | 'delegate' | 'reduce'
+
+/** Optional so historical actions remain unclassified until the user decides. */
+export interface ActionPlanning {
+  quadrant?: ActionQuadrant | null
+  purpose?: string
+  verify?: string
+}
 
 /** 行动的一次阶段完成记录；行动往往要分几段才能干完。 */
 export interface ActionProgress {
@@ -157,7 +173,7 @@ export interface ActionProgress {
   createdAt: string
 }
 
-export interface ActionItem {
+export interface ActionItem extends ActionPlanning {
   id: string
   text: string
   fromArticleId: string | null
@@ -178,6 +194,7 @@ export interface Review {
 }
 
 export interface Mindset {
+  analysis?: { obstacle: string; constraints: string }
   _context?: AIContext
   mainContradiction: string
   stage: string
@@ -232,6 +249,7 @@ export interface WbQuestion {
 }
 
 export interface WbIntake {
+  _context?: AIContext
   facts: WbFact[]
   missing: string[]
   questions: WbQuestion[]
@@ -243,6 +261,7 @@ export interface WbIntake {
 }
 
 export interface WbModuleMeta {
+  _context?: AIContext
   /** 引用的事实 id，已在代码里校验存在且为 kind='fact' */
   factRefs: string[]
   /** 本模块认为还缺的事实 */
@@ -311,6 +330,7 @@ export interface WbEnhancement {
 }
 
 export interface WbCheck {
+  _context?: AIContext
   id: string
   /** rule = 代码硬规则；ai = 红队审核 */
   source: 'rule' | 'ai'
@@ -322,6 +342,7 @@ export interface WbCheck {
 }
 
 export interface WbDecision {
+  _context?: AIContext
   primaryContradiction: string
   route: WbRouteKey
   routeReason: string
@@ -340,7 +361,16 @@ export interface WbDecision {
 
 export type WbHorizon = '7d' | '30d' | '90d'
 
+/**
+ * 纳入状态：候选 = 只是可以考虑做什么；已纳入 = 用户本轮决定要做。
+ * 与执行结果 `status` 回答不同问题，不能互相推导。
+ */
+export type WbActionPlanningState = 'candidate' | 'queued'
+
 export interface WbAction {
+  quadrant?: ActionQuadrant | null
+  dueDate?: string
+  _context?: AIContext
   id: string
   horizon: WbHorizon
   action: string
@@ -349,6 +379,8 @@ export interface WbAction {
   /** 毛选执行标准，取值见 WB_STANDARDS */
   standards: string[]
   kpi: string
+  /** 是否已被用户纳入工作清单；候选不进入清单，也没有执行操作。 */
+  planningState: WbActionPlanningState
   status: ActionStatus
   progress: ActionProgress[]
   createdAt: string
@@ -358,6 +390,7 @@ export type WbLedgerType = 'new' | 'update' | 'revision' | 'feedback'
 
 /** 项目台账：只追加，不覆盖。 */
 export interface WbLedgerEntry {
+  _context?: AIContext
   id: string
   createdAt: string
   inputType: WbLedgerType
@@ -419,6 +452,7 @@ export function emptyWorkbench(objective = ''): WorkbenchData {
 }
 
 export interface SessionData {
+  schemaVersion?: number
   book?: BookScope & { title: string; profile: ReadingProfile; profileVersion: string }
   problem: ProblemInput
   diagnosis: Diagnosis | null
@@ -433,7 +467,7 @@ export interface SessionData {
 export interface SessionSummary {
   bookId?: string
   bookTitle?: string
-  stateVersion?: number
+  stateVersion: number
   id: string
   title: string
   mode: SessionMode
@@ -450,12 +484,14 @@ export interface Session extends SessionSummary {
   data: SessionData
 }
 
-export interface SessionPatch {
-  expectedStateVersion?: number
+export interface SessionMetadataPatch {
   title?: string
   currentStep?: StepKey
   status?: 'active' | 'archived'
-  data?: SessionData
+}
+export interface SessionPatch extends SessionMetadataPatch {
+  mutationId?: string
+  expectedStateVersion: number
 }
 
 export interface VersionSummary {
@@ -505,8 +541,11 @@ export interface ChatErrorEvent {
   error: string
 }
 
+/** v3：工作台行动新增必填 `planningState`，旧行动迁移为 queued。 */
+export const SESSION_DATA_VERSION = 3
 export function emptySessionData(): SessionData {
   return {
+    schemaVersion: SESSION_DATA_VERSION,
     problem: { text: '', background: '', tried: '' },
     diagnosis: null,
     readings: [],

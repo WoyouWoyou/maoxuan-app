@@ -15,8 +15,8 @@ import {
   listVersions,
   getVersion,
   restoreVersion
-} from '../sqlite/session-repository'
-import { register, requireSession, requireArticle, requireWorkbench, toError } from './transport'
+} from '../../modules/sessions/public'
+import { register, toError } from './transport'
 export function registerSessionHandlers(): void {
   register<[], ReturnType<typeof listSessions>>('sessions:list', () => listSessions())
   register<[], ReturnType<typeof listArchivedSessions>>('sessions:listArchived', () =>
@@ -58,5 +58,5 @@ export function registerSessionHandlers(): void {
   register<[string], ReturnType<typeof getVersion>>('versions:get', (versionId) =>
     getVersion(versionId)
   )
-  register<[string], Session>('versions:restore', (versionId) => restoreVersion(versionId))
+  register('versions:restore', restoreVersion)
 }

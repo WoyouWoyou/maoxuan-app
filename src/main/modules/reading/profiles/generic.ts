@@ -35,7 +35,7 @@ const context = (data: SessionData) =>
     reviews: data.reviews
   }).slice(0, 50000)
 export async function diagnose(s: Settings, data: SessionData): Promise<Diagnosis> {
-  const found = await candidates(s, data, scopeOf(data))
+  const found = await candidates(s, data.problem, scopeOf(data))
   const source = found.map(({ article, excerpts }) => ({
     id: article.id,
     title: article.title,
@@ -44,7 +44,7 @@ export async function diagnose(s: Settings, data: SessionData): Promise<Diagnosi
   const raw = await callJson<any>(
     s,
     RULES,
-    `问题：${JSON.stringify(data.problem)}\n本书真实候选：${JSON.stringify(source)}\n返回 {"restated":"复述问题","symptoms":["具体困难"],"mainContradiction":"当前关键障碍（兼容字段，不强制矛盾分析）","stage":"约束和待确认信息","recommendations":[{"articleId":"候选id","reason":"原文与问题的联系及局限","focusQuestion":"带读问题","paragraphIndex":0,"quote":"证据原文"}]}。推荐最多3项，找不到相关内容返回空数组。`
+    `问题：${JSON.stringify(data.problem)}\n本书真实候选：${JSON.stringify(source)}\n返回 {"restated":"复述问题","symptoms":["具体困难"],"analysis":{"obstacle":"当前关键障碍","constraints":"约束和待确认信息"},"recommendations":[{"articleId":"候选id","reason":"原文与问题的联系及局限","focusQuestion":"带读问题","paragraphIndex":0,"quote":"证据原文"}]}。推荐最多3项，找不到相关内容返回空数组。`
   )
   const recommendations: Diagnosis['recommendations'] = []
   for (const r of Array.isArray(raw.recommendations) ? raw.recommendations : []) {
@@ -77,8 +77,12 @@ export async function diagnose(s: Settings, data: SessionData): Promise<Diagnosi
   return {
     restated: str(raw.restated),
     symptoms: strings(raw.symptoms),
-    mainContradiction: str(raw.mainContradiction),
-    stage: str(raw.stage),
+    analysis: {
+      obstacle: str(raw.analysis?.obstacle),
+      constraints: str(raw.analysis?.constraints)
+    },
+    mainContradiction: '',
+    stage: '',
     recommendations
   }
 }
@@ -206,11 +210,15 @@ export async function mindset(s: Settings, data: SessionData): Promise<Mindset> 
   const raw = await callJson<any>(
     s,
     RULES,
-    `记录：${context(data)}\n返回 {"mainContradiction":"当前关键障碍","stage":"已知约束与尚待验证","firstStep":"下一项可验证行动"}`
+    `记录：${context(data)}\n返回 {"analysis":{"obstacle":"当前关键障碍","constraints":"已知约束与尚待验证"},"firstStep":"下一项可验证行动"}`
   )
   return {
-    mainContradiction: str(raw.mainContradiction),
-    stage: str(raw.stage),
+    analysis: {
+      obstacle: str(raw.analysis?.obstacle),
+      constraints: str(raw.analysis?.constraints)
+    },
+    mainContradiction: '',
+    stage: '',
     firstStep: str(raw.firstStep),
     generatedAt: new Date().toISOString()
   }

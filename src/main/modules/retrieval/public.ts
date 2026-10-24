@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { Article, Settings, SessionData } from '@shared/types'
+import type { Article, Settings } from '@shared/types'
 import type { BookScope, Task } from '@shared/contracts/library'
 import { listChapters, getChapter, searchChapters } from '../library/public'
 import { callJson, withModelContext } from '../model-runtime/public'
@@ -75,13 +75,18 @@ export function startIndex(scope: BookScope, settings: Settings): Task {
     }
   )
 }
+export interface QueryContext {
+  text: string
+  background: string
+  tried: string
+}
 export async function candidates(
   settings: Settings,
-  data: SessionData,
+  query: QueryContext,
   scope: BookScope
 ): Promise<{ article: Article; excerpts: { index: number; text: string }[] }[]> {
   const chapters = listChapters(scope)
-  const problem = [data.problem.text, data.problem.background, data.problem.tried].join('\n')
+  const problem = [query.text, query.background, query.tried].join('\n')
   const expanded = await callJson<{ terms?: string[] }>(
     settings,
     '从用户问题提取用于书籍检索的中文关键词和同义表达，最多10个，每项2至8字。只输出 JSON {"terms":[]}。',
@@ -89,7 +94,7 @@ export async function candidates(
   )
   const terms = [
     ...new Set(
-      (expanded.terms ?? [])
+      (Array.isArray(expanded?.terms) ? expanded.terms : [])
         .filter((t) => typeof t === 'string' && t.length >= 2 && t.length <= 20)
         .slice(0, 10)
     )

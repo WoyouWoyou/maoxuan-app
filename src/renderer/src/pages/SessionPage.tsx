@@ -1,3 +1,4 @@
+import { useSessionMutations } from '@renderer/features/sessions/useSessionMutations'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type {
@@ -6,7 +7,7 @@ import type {
   Reading,
   Session,
   SessionData,
-  SessionPatch,
+  SessionMetadataPatch,
   StepKey
 } from '@shared/types'
 import { STEPS } from '@shared/types'
@@ -72,7 +73,6 @@ export function SessionPage() {
 
   // 最新会话快照 + 串行写入队列：AI 调用期间用户的其他改动不会被旧数据覆盖
   const sessionRef = useRef<Session | null>(null)
-  const queueRef = useRef<Promise<unknown>>(Promise.resolve())
   const idRef = useRef(id)
 
   const applySession = useCallback((next: Session) => {
@@ -80,56 +80,38 @@ export function SessionPage() {
     setSession(next)
   }, [])
 
-  const enqueue = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
-    const run = queueRef.current.then(task)
-    queueRef.current = run.then(
-      () => undefined,
-      () => undefined
-    )
-    return run
-  }, [])
-
+  const {
+    metadata,
+    applyReading,
+    reading: writeReading
+  } = useSessionMutations(id, sessionRef, applySession)
   const commit = useCallback(
-    async (patch: SessionPatch, versionLabel?: string): Promise<Session | null> => {
+    async (patch: SessionMetadataPatch, versionLabel?: string): Promise<Session | null> => {
       setSaveError('')
       try {
-        return await enqueue(async () => {
-          const current = sessionRef.current
-          if (!current) return null
-          const updated = patch.data
-            ? await window.api.reading.apply(
-                id,
-                readingCommands(current.data, patch.data),
-                current.stateVersion ?? 0,
-                versionLabel,
-                patch.currentStep
-              )
-            : await window.api.sessions.update(
-                id,
-                { ...patch, expectedStateVersion: current.stateVersion },
-                versionLabel
-              )
-          if (idRef.current === id) applySession(updated)
-          window.dispatchEvent(new Event('sessions-changed'))
-          return updated
-        })
+        return await metadata(patch, versionLabel)
       } catch (e) {
         setSaveError(toMessage(e))
         return null
       }
     },
-    [applySession, enqueue, id]
+    [metadata]
   )
-
   const save = useCallback(
     async (data: SessionData, opts?: { versionLabel?: string; step?: StepKey }) => {
-      const patch: SessionPatch = { data }
-      if (opts?.step) patch.currentStep = opts.step
-      await commit(patch, opts?.versionLabel)
+      setSaveError('')
+      try {
+        // Compare with the state displayed to the caller, not a newer queued update.
+        const before = session?.data ?? sessionRef.current?.data
+        if (!before) throw new Error('问题尚未载入')
+        await applyReading(readingCommands(before, data), opts)
+      } catch (e) {
+        setSaveError(toMessage(e))
+        throw e
+      }
     },
-    [commit]
+    [applyReading, session]
   )
-
   const update = useCallback(
     async (
       fn: (latest: SessionData) => SessionData,
@@ -137,27 +119,13 @@ export function SessionPage() {
     ) => {
       setSaveError('')
       try {
-        await enqueue(async () => {
-          const latest = sessionRef.current?.data
-          if (!latest) return
-          const patch: SessionPatch = { data: fn(latest) }
-          if (opts?.step) patch.currentStep = opts.step
-          const next = await window.api.reading.apply(
-            id,
-            readingCommands(latest, patch.data!),
-            sessionRef.current?.stateVersion ?? 0,
-            opts?.versionLabel,
-            patch.currentStep
-          )
-          if (idRef.current === id) applySession(next)
-          window.dispatchEvent(new Event('sessions-changed'))
-        })
+        await writeReading(fn, opts)
       } catch (e) {
         setSaveError(toMessage(e))
         throw e
       }
     },
-    [applySession, enqueue, id]
+    [writeReading]
   )
 
   useEffect(() => {
@@ -165,7 +133,6 @@ export function SessionPage() {
     handledFocus.current = ''
     idRef.current = id
     sessionRef.current = null
-    queueRef.current = Promise.resolve()
     setLoading(true)
     setLoadError('')
     setSaveError('')
@@ -460,6 +427,7 @@ export function SessionPage() {
                   sessionId={session.id}
                   currentData={session.data}
                   versionNo={session.versionNo}
+                  stateVersion={session.stateVersion ?? 0}
                   onRestored={handleRestored}
                 />
               )}

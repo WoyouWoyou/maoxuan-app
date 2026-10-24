@@ -1,6 +1,14 @@
+import { configureActions } from './modules/action-planning/public'
+import { createActionRepository } from './adapters/sqlite/action-repository'
+import { createProxyController } from './adapters/network/proxy'
+import { session } from 'electron'
 import { createIndexRepository } from './adapters/sqlite/index-repository'
-import { configureReadingSessions } from './modules/reading/sessions'
-import { getSession, updateSession } from './adapters/sqlite/session-repository'
+import { configureSessions } from './modules/sessions/public'
+import { validateReadingSession } from './modules/reading/public'
+import { validateWorkbenchSession } from './modules/workbench/public'
+import { configureSettings, configureProxy } from './modules/settings/public'
+import { createSettingsRepository } from './adapters/sqlite/settings-repository'
+import { createSessionRepository } from './adapters/sqlite/session-repository'
 import { chatCompletionsTransport } from './adapters/model/chat-completions'
 import { configureImporting } from './modules/importing/public'
 import { createImportFilesAdapter } from './adapters/electron/import-files'
@@ -12,24 +20,36 @@ import { configureModels } from './modules/model-config/public'
 import { createModelConfigRepository } from './adapters/sqlite/model-config-repository'
 import { safeStorage } from 'electron'
 import { BrowserWindow } from 'electron'
-import { configureLibrary } from './modules/library/public'
+import { configureLibrary, requireBook } from './modules/library/public'
 import { configureTasks } from './modules/tasks/public'
 import { configureUsage, beginCall, finishCall } from './modules/usage/public'
 import { configureModelRuntime } from './modules/model-runtime/public'
 import { configureRetrieval } from './modules/retrieval/public'
-export function bootstrap(handle: Database.Database): void {
+export async function bootstrap(handle: Database.Database): Promise<void> {
+  configureActions(createActionRepository(handle))
   configureImporting(createImportFilesAdapter())
-  configureModels(
-    createModelConfigRepository(handle, {
-      encrypt: (value) => {
-        if (!safeStorage.isEncryptionAvailable()) throw new Error('系统密钥存储不可用')
-        return safeStorage.encryptString(value).toString('base64')
-      },
-      decrypt: (value) => safeStorage.decryptString(Buffer.from(value, 'base64'))
-    })
-  )
-  configureReadingSessions({ get: getSession, update: updateSession })
+  const secrets = {
+    encrypt: (value: string) => {
+      if (!safeStorage.isEncryptionAvailable()) throw new Error('系统密钥存储不可用')
+      return safeStorage.encryptString(value).toString('base64')
+    },
+    decrypt: (value: string) => safeStorage.decryptString(Buffer.from(value, 'base64'))
+  }
   configureLibrary(createLibraryRepository(handle))
+  configureModels(createModelConfigRepository(handle, secrets))
+  configureSettings(createSettingsRepository(handle, secrets), {
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseUrl: process.env.DEEPSEEK_BASE_URL,
+    model: process.env.DEEPSEEK_MODEL
+  })
+  await configureProxy(createProxyController(() => [session.defaultSession]))
+  configureSessions(createSessionRepository(handle), {
+    requireBook,
+    validate: (session, next, restoring, step) =>
+      session.mode === 'reading'
+        ? validateReadingSession(session, next, restoring, step)
+        : validateWorkbenchSession(session, next, restoring, step)
+  })
   configureTasks(createTaskRepository(handle), (task) => {
     for (const w of BrowserWindow.getAllWindows()) w.webContents.send('tasks:changed', task)
   })

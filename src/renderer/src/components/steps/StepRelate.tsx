@@ -98,6 +98,10 @@ export function StepRelate({
     setBusy(true)
     setErr('')
     try {
+      await update((latest) => ({
+        ...latest,
+        readings: latest.readings.map((r) => (r.articleId === articleId ? { ...r, notes } : r))
+      }))
       const result = await window.api.ai.reviewNotes(session.id, articleId, notes)
       if (edits.current !== requestedEdits) throw new Error('笔记草稿已修改，请重新获取反馈')
       await update(

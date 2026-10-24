@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Diagnosis, ProblemInput, ProblemRevision, Session } from '@shared/types'
 import './ReviseDialog.css'
-import { readingPresentation } from '@shared/reading-presentation'
+import { readingPresentation, analysisOf } from '@shared/reading-presentation'
 
 type FieldKey =
   | 'text'
@@ -69,14 +69,14 @@ function buildRows(
     {
       key: 'mainContradiction',
       label: generic ? '当前关键障碍' : '主要矛盾',
-      oldText: diagnosis?.mainContradiction ?? '',
-      newText: revision.diagnosis.mainContradiction
+      oldText: analysisOf(diagnosis).obstacle,
+      newText: analysisOf(revision.diagnosis).obstacle
     },
     {
       key: 'stage',
       label: generic ? '约束与待确认信息' : '所处阶段',
-      oldText: diagnosis?.stage ?? '',
-      newText: revision.diagnosis.stage
+      oldText: analysisOf(diagnosis).constraints,
+      newText: analysisOf(revision.diagnosis).constraints
     },
     {
       key: 'recommendations',
@@ -182,6 +182,19 @@ export function ReviseDialog({ session, onClose, onApply }: ReviseDialogProps) {
         tried: checked.has('tried') ? revision.problem.tried : baseProblem.tried
       }
       const nextDiagnosis: Diagnosis = {
+        _context: revision.diagnosis._context,
+        ...(session.data.book?.profile === 'generic'
+          ? {
+              analysis: {
+                obstacle: checked.has('mainContradiction')
+                  ? analysisOf(revision.diagnosis).obstacle
+                  : analysisOf(baseDiagnosis).obstacle,
+                constraints: checked.has('stage')
+                  ? analysisOf(revision.diagnosis).constraints
+                  : analysisOf(baseDiagnosis).constraints
+              }
+            }
+          : {}),
         restated: checked.has('restated') ? revision.diagnosis.restated : baseDiagnosis.restated,
         symptoms: checked.has('symptoms')
           ? [...revision.diagnosis.symptoms]

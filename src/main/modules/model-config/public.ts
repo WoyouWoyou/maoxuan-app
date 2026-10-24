@@ -1,4 +1,6 @@
 import type { Settings } from '@shared/types'
+import { settingsSchema } from '@shared/contracts/models'
+import { text, optional } from '@shared/contracts/validation'
 import type { ModelProfile } from '@shared/contracts/models'
 export interface ModelConfigRepository {
   forPurpose(purpose: string): Settings | null
@@ -20,6 +22,9 @@ export function listModels(): ModelProfile[] {
   return repository?.list() ?? []
 }
 export function saveModel(id: string | undefined, name: string, settings: Settings): ModelProfile {
+  settingsSchema(settings, 'settings')
+  optional(text)(id, 'configId')
+  text(name, 'name')
   if (!repository) throw new Error('模型配置尚未初始化')
   return repository.save(id, name, settings)
 }

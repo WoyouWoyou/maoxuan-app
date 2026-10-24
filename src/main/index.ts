@@ -1,10 +1,11 @@
 import path from 'path'
 import fs from 'node:fs'
 import { bootstrap } from './bootstrap'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, dialog } from 'electron'
 import { config as loadEnv } from 'dotenv'
 import { TRASH_RETENTION_DAYS } from '@shared/core'
-import { initDb, purgeExpiredTrash } from './adapters/sqlite/session-repository'
+import { openDatabase } from './adapters/sqlite/database'
+import { purgeExpiredTrash } from './modules/sessions/public'
 import { loadArticles } from './adapters/electron/builtin-library'
 import { registerIpc } from './ipc'
 
@@ -62,18 +63,24 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  bootstrap(initDb())
-  purgeTrash()
-  setInterval(purgeTrash, PURGE_INTERVAL_MS)
-  loadArticles()
-  registerIpc()
-  createWindow()
+app
+  .whenReady()
+  .then(async () => {
+    await bootstrap(openDatabase(path.join(app.getPath('userData'), 'maoxuan.db')))
+    purgeTrash()
+    setInterval(purgeTrash, PURGE_INTERVAL_MS)
+    loadArticles()
+    registerIpc()
+    createWindow()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
   })
-})
+  .catch((error: unknown) => {
+    dialog.showErrorBox('应用启动失败', error instanceof Error ? error.message : String(error))
+    app.quit()
+  })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

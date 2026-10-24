@@ -1,6 +1,14 @@
+import { useSessionMutations } from '@renderer/features/sessions/useSessionMutations'
 import { useCallback, useMemo, useRef, useState } from 'react'
-import type { Session, SessionPatch, StepKey, WbStepKey, WorkbenchData } from '@shared/types'
+import type {
+  Session,
+  SessionMetadataPatch,
+  StepKey,
+  WbStepKey,
+  WorkbenchData
+} from '@shared/types'
 import { WB_STEPS, emptyWorkbench } from '@shared/types'
+import type { WorkbenchCommand } from '@shared/contracts/workbench'
 import type { WbSourceArea } from '@shared/workbench'
 import { isAssumptionDraft, wbStepDone, wbStepUnlocked } from '@shared/workbench'
 import { ChatPanel } from '@renderer/components/ChatPanel'
@@ -21,7 +29,11 @@ const WB_CHAT_INTRO = {
   desc: '先分清事实、判断和愿望，再谈怎么打。说出新情况时，记得补进事实台账或复盘。'
 }
 
-const WB_CHAT_QUESTIONS = ['我现在最该先打哪一仗？', '哪条事实最需要我去核实？', '什么信号出现就该换路线？']
+const WB_CHAT_QUESTIONS = [
+  '我现在最该先打哪一仗？',
+  '哪条事实最需要我去核实？',
+  '什么信号出现就该换路线？'
+]
 
 function asWbStep(step: StepKey): WbStepKey {
   return ORDER.includes(step as WbStepKey) ? (step as WbStepKey) : 'wb_intake'
@@ -41,7 +53,7 @@ interface WbStepperProps {
 function WbStepper({ currentStep, viewStep, wb, onSelect }: WbStepperProps) {
   return (
     <div className="stepper">
-      {WB_STEPS.map(step => {
+      {WB_STEPS.map((step) => {
         const unlocked = wbStepUnlocked(wb, step.key)
         const done = wbStepDone(wb, step.key)
         const classes = ['stepper-item']
@@ -88,56 +100,63 @@ export function WorkbenchPage({ initial }: WorkbenchPageProps) {
 
   // 最新会话快照 + 串行写入队列：AI 调用期间用户的其他改动不会被旧数据覆盖
   const sessionRef = useRef<Session>(initial)
-  const queueRef = useRef<Promise<unknown>>(Promise.resolve())
 
   const applySession = useCallback((next: Session) => {
     sessionRef.current = next
     setSession(next)
   }, [])
 
-  const enqueue = useCallback(<T,>(task: () => Promise<T>): Promise<T> => {
-    const run = queueRef.current.then(task)
-    queueRef.current = run.then(
-      () => undefined,
-      () => undefined
-    )
-    return run
-  }, [])
-
+  const {
+    metadata,
+    workbench: writeWorkbench,
+    applyWorkbench
+  } = useSessionMutations(id, sessionRef, applySession)
   const commit = useCallback(
-    async (patch: SessionPatch, versionLabel?: string): Promise<Session> => {
+    async (patch: SessionMetadataPatch, versionLabel?: string): Promise<Session> => {
       setSaveError('')
-      return enqueue(async () => {
-        const updated = await window.api.sessions.update(id, patch, versionLabel)
-        applySession(updated)
-        window.dispatchEvent(new Event('sessions-changed'))
-        return updated
-      }).catch((e: unknown) => {
+      try {
+        return await metadata(patch, versionLabel)
+      } catch (e) {
         setSaveError(toMessage(e))
         throw e
-      })
+      }
     },
-    [applySession, enqueue, id]
+    [metadata]
   )
-
   const updateWb = useCallback(
     async (fn: (latest: WorkbenchData) => WorkbenchData, opts?: WbSaveOpts): Promise<void> => {
       setSaveError('')
-      await enqueue(async () => {
-        const data = sessionRef.current.data
-        const wb = data.workbench ?? emptyWorkbench()
-        const patch: SessionPatch = { data: { ...data, workbench: fn(wb) } }
-        if (opts?.step) patch.currentStep = opts.step
-        const updated = await window.api.sessions.update(id, patch, opts?.versionLabel)
-        applySession(updated)
-        window.dispatchEvent(new Event('sessions-changed'))
-      }).catch((e: unknown) => {
+      try {
+        await writeWorkbench(fn, opts)
+      } catch (e) {
         setSaveError(toMessage(e))
         throw e
-      })
+      }
     },
-    [applySession, enqueue, id]
+    [writeWorkbench]
   )
+  const submitWorkbench = useCallback(
+    async (commands: WorkbenchCommand[], opts?: WbSaveOpts): Promise<void> => {
+      setSaveError('')
+      try {
+        await applyWorkbench(commands, opts)
+      } catch (e) {
+        setSaveError(toMessage(e))
+        throw e
+      }
+    },
+    [applyWorkbench]
+  )
+
+  const reloadSession = useCallback(async (): Promise<void> => {
+    setSaveError('')
+    try {
+      const fresh = await window.api.sessions.get(id)
+      if (fresh && fresh.id === id) applySession(fresh)
+    } catch (e) {
+      setSaveError(toMessage(e))
+    }
+  }, [id, applySession])
 
   const goStep = useCallback(
     (step: WbStepKey) => {
@@ -176,13 +195,15 @@ export function WorkbenchPage({ initial }: WorkbenchPageProps) {
     await commit({ title: next }).catch(() => undefined)
   }
 
-  const currentMeta = WB_STEPS.find(s => s.key === asWbStep(session.currentStep))
+  const currentMeta = WB_STEPS.find((s) => s.key === asWbStep(session.currentStep))
   const assumptionDraft = wb.intake !== null && isAssumptionDraft(wb)
 
   const stepProps: WbStepProps = {
     session,
     wb,
     updateWb,
+    applyWorkbench: submitWorkbench,
+    reloadSession,
     goStep,
     openSource
   }
@@ -196,9 +217,9 @@ export function WorkbenchPage({ initial }: WorkbenchPageProps) {
               className="input sp-title-input"
               value={titleDraft}
               autoFocus
-              onChange={e => setTitleDraft(e.target.value)}
+              onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={() => void commitTitle()}
-              onKeyDown={e => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter') e.currentTarget.blur()
                 if (e.key === 'Escape') {
                   setTitleDraft(session.title)
@@ -221,7 +242,8 @@ export function WorkbenchPage({ initial }: WorkbenchPageProps) {
           )}
           <div className="sp-sub muted wbp-sub">
             <span>
-              毛选工作台 · 第 {currentMeta?.no ?? 1} 步 · {currentMeta?.name ?? ''} · 共 {session.versionNo} 个版本快照
+              毛选工作台 · 第 {currentMeta?.no ?? 1} 步 · {currentMeta?.name ?? ''} · 共{' '}
+              {session.versionNo} 个版本快照
             </span>
             {assumptionDraft ? (
               <span className="badge badge-red" title="追问未答完或没有已确认事实，结论依赖假设">
@@ -235,7 +257,7 @@ export function WorkbenchPage({ initial }: WorkbenchPageProps) {
           currentStep={asWbStep(session.currentStep)}
           viewStep={viewStep}
           wb={wb}
-          onSelect={step => {
+          onSelect={(step) => {
             if (!wbStepUnlocked(wb, step).ok) return
             setViewStep(step)
           }}
@@ -253,14 +275,23 @@ export function WorkbenchPage({ initial }: WorkbenchPageProps) {
 
       <aside className={collapsed ? 'sp-panel is-collapsed' : 'sp-panel'}>
         {collapsed ? (
-          <button type="button" className="sp-panel-toggle" title="展开右侧面板" onClick={() => setCollapsed(false)}>
+          <button
+            type="button"
+            className="sp-panel-toggle"
+            title="展开右侧面板"
+            onClick={() => setCollapsed(false)}
+          >
             <span className="sp-panel-toggle-text">参谋对话 · 版本历史</span>
           </button>
         ) : (
           <>
             <div className="sp-panel-head">
               <div className="sp-tabs">
-                <button type="button" className={panelTab === 'chat' ? 'is-on' : ''} onClick={() => setPanelTab('chat')}>
+                <button
+                  type="button"
+                  className={panelTab === 'chat' ? 'is-on' : ''}
+                  onClick={() => setPanelTab('chat')}
+                >
                   参谋对话
                 </button>
                 <button
@@ -271,7 +302,12 @@ export function WorkbenchPage({ initial }: WorkbenchPageProps) {
                   版本历史
                 </button>
               </div>
-              <button type="button" className="btn btn-ghost btn-sm" title="折叠" onClick={() => setCollapsed(true)}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                title="折叠"
+                onClick={() => setCollapsed(true)}
+              >
                 »
               </button>
             </div>
@@ -289,6 +325,7 @@ export function WorkbenchPage({ initial }: WorkbenchPageProps) {
                   sessionId={session.id}
                   currentData={session.data}
                   versionNo={session.versionNo}
+                  stateVersion={session.stateVersion ?? 0}
                   onRestored={handleRestored}
                 />
               )}

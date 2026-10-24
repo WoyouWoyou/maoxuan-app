@@ -8,7 +8,7 @@
   "scripts": {
     "extract": "python3 scripts/extract_epub.py",
     "codegen": "node scripts/ds-codegen.mjs",
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev --watch",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
@@ -16,15 +16,21 @@
     "dist:win": "electron-vite build && electron-builder --win nsis --x64 --publish never",
     "test": "node scripts/run-tests.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
+    "test:proxy": "npm run build && node scripts/smoke-proxy.mjs",
     "test:smoke": "npm run build && node scripts/smoke-multibook.mjs",
-    "verify": "npm run check:boundaries && npm test && npm run typecheck && npm run build"
+    "verify": "npm run check:boundaries && npm test && npm run typecheck && npm run build",
+    "audio:generate": "node scripts/generate-core-audio.mjs",
+    "audio:check": "node scripts/check-core-audio.mjs"
   },
   "dependencies": {
+    "@andresaya/edge-tts": "^1.9.1",
+    "@phosphor-icons/react": "^2.1.10",
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.0.0",
     "fast-xml-parser": "^5.11.2",
     "fflate": "^0.8.3",
-    "iconv-lite": "^0.7.3"
+    "iconv-lite": "^0.7.3",
+    "undici": "^8.12.3"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",
@@ -56,6 +62,14 @@
       {
         "from": "resources/articles.json",
         "to": "articles.json"
+      },
+      {
+        "from": "resources/core-audio/v1",
+        "to": "core-audio/v1",
+        "filter": [
+          "*.audio",
+          "manifest.json"
+        ]
       }
     ],
     "mac": {
@@ -77,6 +91,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "beforePack": "scripts/before-pack.cjs"
   }
 }

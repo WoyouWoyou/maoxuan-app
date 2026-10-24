@@ -1,5 +1,13 @@
+import { analysisOf } from '@shared/reading-presentation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { stepMeta, type Session, type SessionData, type StepKey, type Version, type VersionSummary } from '@shared/types'
+import {
+  stepMeta,
+  type Session,
+  type SessionData,
+  type StepKey,
+  type Version,
+  type VersionSummary
+} from '@shared/types'
 import { diffData, labelOfPath } from '../lib/diff'
 import './VersionPanel.css'
 
@@ -8,6 +16,7 @@ export interface VersionPanelProps {
   currentData: SessionData
   /** 变化时重新拉取版本列表 */
   versionNo: number
+  stateVersion: number
   onRestored: (s: Session) => void
 }
 
@@ -37,9 +46,11 @@ function Snapshot({ data }: { data: SessionData }) {
   const readingsText =
     data.readings.length === 0
       ? '（无）'
-      : data.readings.map((r) => `${r.title}${r.notesDone ? '（已写笔记）' : '（未写笔记）'}`).join('、')
+      : data.readings
+          .map((r) => `${r.title}${r.notesDone ? '（已写笔记）' : '（未写笔记）'}`)
+          .join('、')
   const mindsetText = data.mindset
-    ? `${data.mindset.mainContradiction}；${data.mindset.stage}；${data.mindset.firstStep}`
+    ? `${analysisOf(data.mindset).obstacle}；${analysisOf(data.mindset).constraints}；${data.mindset.firstStep}`
     : '（未生成）'
 
   return (
@@ -50,7 +61,9 @@ function Snapshot({ data }: { data: SessionData }) {
       </div>
       <div className="ver-snap-row">
         <span className="ver-snap-label">主要矛盾</span>
-        <span className="ver-snap-value">{data.diagnosis?.mainContradiction || '（未诊断）'}</span>
+        <span className="ver-snap-value">
+          {analysisOf(data.diagnosis).obstacle || '（未诊断）'}
+        </span>
       </div>
       <div className="ver-snap-row">
         <span className="ver-snap-label">已读篇目</span>
@@ -106,8 +119,12 @@ function DiffView({ oldData, newData }: { oldData: SessionData; newData: Session
                 <span className="ver-diff-after">{renderValue(d.after, `${d.path}:a`)}</span>
               </>
             )}
-            {d.kind === 'added' && <span className="ver-diff-after">{renderValue(d.after, `${d.path}:a`)}</span>}
-            {d.kind === 'removed' && <span className="ver-diff-before">{renderValue(d.before, `${d.path}:b`)}</span>}
+            {d.kind === 'added' && (
+              <span className="ver-diff-after">{renderValue(d.after, `${d.path}:a`)}</span>
+            )}
+            {d.kind === 'removed' && (
+              <span className="ver-diff-before">{renderValue(d.before, `${d.path}:b`)}</span>
+            )}
           </div>
         </div>
       ))}
@@ -116,7 +133,13 @@ function DiffView({ oldData, newData }: { oldData: SessionData; newData: Session
   )
 }
 
-export function VersionPanel({ sessionId, currentData, versionNo, onRestored }: VersionPanelProps) {
+export function VersionPanel({
+  sessionId,
+  currentData,
+  versionNo,
+  stateVersion,
+  onRestored
+}: VersionPanelProps) {
   const [versions, setVersions] = useState<VersionSummary[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -199,7 +222,7 @@ export function VersionPanel({ sessionId, currentData, versionNo, onRestored }: 
     setRestoring(true)
     setError('')
     try {
-      const session = await window.api.versions.restore(v.id)
+      const session = await window.api.versions.restore(v.id, stateVersion)
       setConfirmId(null)
       onRestored(session)
       window.dispatchEvent(new Event('sessions-changed'))
@@ -282,7 +305,9 @@ export function VersionPanel({ sessionId, currentData, versionNo, onRestored }: 
                     <div className="ver-restore">
                       {confirmId === v.id ? (
                         <div className="ver-confirm">
-                          <span className="muted">恢复后当前内容会被该版本覆盖，历史版本仍会保留。确定恢复？</span>
+                          <span className="muted">
+                            恢复后当前内容会被该版本覆盖，历史版本仍会保留。确定恢复？
+                          </span>
                           <div className="row">
                             <button
                               type="button"
@@ -303,7 +328,11 @@ export function VersionPanel({ sessionId, currentData, versionNo, onRestored }: 
                           </div>
                         </div>
                       ) : (
-                        <button type="button" className="btn btn-sm btn-ghost" onClick={() => setConfirmId(v.id)}>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => setConfirmId(v.id)}
+                        >
                           恢复到此版本
                         </button>
                       )}

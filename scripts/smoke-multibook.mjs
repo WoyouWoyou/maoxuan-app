@@ -15,7 +15,92 @@ const server = http.createServer(async (req, res) => {
     user = payload.messages.at(-1)?.content ?? '',
     system = payload.messages[0]?.content ?? ''
   let content = { ok: true }
-  if (system.includes('检索索引'))
+  if (system.includes('Phase 1 · 输入采集'))
+    content = {
+      facts: [{ id: 'F1', kind: 'fact', content: '已完成一次试点', confidence: 'confirmed' }],
+      missing: [],
+      questions: [],
+      mainline: '验证试点方法',
+      sideGoals: []
+    }
+  else if (system.includes('Agent A · 抓主要矛盾'))
+    content = {
+      all: ['信息不对称', '反馈不足'],
+      primary: '反馈不足',
+      mainAspect: '反馈缺失',
+      secondaryAspect: '已有试点',
+      why: 'F1说明缺少复盘',
+      turningConditions: ['获得反馈'],
+      focus: '访谈2位同事',
+      defer: ['全量推广'],
+      factRefs: ['F1'],
+      missingFacts: []
+    }
+  else if (system.includes('Agent B · 三条路线'))
+    content = {
+      routes: ['steady', 'breakthrough', 'defensive'].map((key, i) => ({
+        key,
+        judgment: '有试点基础',
+        policy: `路线${i}具体方针`,
+        result: '可能获得反馈',
+        triggers: ['获得反馈'],
+        risks: ['样本偏差'],
+        switchSignals: ['反馈变化']
+      })),
+      factRefs: ['F1'],
+      missingFacts: []
+    }
+  else if (system.includes('Agent C · 主客分析法'))
+    content = {
+      ...Object.fromEntries(
+        ['trend', 'resources', 'constraints', 'judgment', 'execution'].map((key) => [
+          key,
+          { score: 3, reason: 'F1提供试点依据' }
+        ])
+      ),
+      ready: '已有试点',
+      biggestGap: '反馈不足',
+      firstFix: '访谈2人',
+      ifNotFixed: '可能误判',
+      factRefs: ['F1'],
+      missingFacts: []
+    }
+  else if (system.includes('Phase 3 · 综合'))
+    content = {
+      primaryContradiction: '反馈不足',
+      route: 'steady',
+      routeReason: '先收集反馈',
+      biggestGap: '反馈不足',
+      firstBattle: '访谈2人',
+      notNow: ['全面推广'],
+      toInvestigate: ['试点反馈'],
+      conflictsFixed: [],
+      enhancements: []
+    }
+  else if (system.includes('Agent E · Red-team')) content = { failItems: [] }
+  else if (system.includes('Agent D · Action'))
+    content = {
+      actions: ['7d', '30d', '90d'].map((horizon) => ({
+        horizon,
+        action: '访谈2位同事',
+        purpose: '收集事实',
+        verify: '记录2份访谈',
+        standards: ['调查研究'],
+        kpi: '2份记录'
+      }))
+    }
+  else if (system.includes('当前任务】复盘纠偏'))
+    content = {
+      factDelta: ['已有2份访谈'],
+      judgmentDelta: [],
+      actionsDelta: [],
+      oldAssumptionsToFix: [],
+      summary: '完成第一次验证',
+      newFacts: [],
+      rediagnose: false,
+      rediagnoseReason: ''
+    }
+  else if (system.includes('检索索引'))
     content = { summary: '沟通：先倾听对方需要，再描述事实和具体请求。' }
   else if (system.includes('同义表达')) content = { terms: ['沟通', '倾听', '反馈'] }
   else if (user.includes('本书真实候选：')) {
@@ -24,8 +109,7 @@ const server = http.createServer(async (req, res) => {
     content = {
       restated: '希望改善与同事的沟通。',
       symptoms: ['没有听清诉求'],
-      mainContradiction: '先理解双方的需要',
-      stage: '需验证同事的反馈',
+      analysis: { obstacle: '先理解双方的需要', constraints: '需验证同事的反馈' },
       recommendations: [
         {
           articleId: c.id,
@@ -53,8 +137,7 @@ const server = http.createServer(async (req, res) => {
     content = { rereadArticleIds: [], advice: '比较实际沟通结果，继续验证是否听清对方的需要。' }
   else if (user.includes('记录：'))
     content = {
-      mainContradiction: '沟通有待验证',
-      stage: '已有一次尝试',
+      analysis: { obstacle: '沟通有待验证', constraints: '已有一次尝试' },
       firstStep: '再进行一次倾听练习'
     }
   if (payload.stream) {
@@ -159,7 +242,7 @@ try {
   const sessionId = session.id,
     chapter = chapters[0]
   const cross = await api(
-    `try{await window.api.reading.apply('${sessionId}',[{kind:'reading',value:{articleId:'Section0215',reflections:[]}}],0);return false}catch{return true}`
+    `try{await window.api.reading.apply('${sessionId}',[{kind:'startReading',value:{articleId:'Section0215',reflections:[]}}],0);return false}catch{return true}`
   )
   assert.equal(cross, true)
   const settings = await api(
@@ -203,7 +286,7 @@ try {
     feedback: null,
     notesDone: false
   }
-  await apply([{ kind: 'reading', value: reading }], '精读', 'relate')
+  await apply([{ kind: 'startReading', value: reading }], '精读', 'relate')
   assert.equal(session.data.readings[0].reflections[0].source.chapterId, chapter.id)
   const feedback = await api(
     `return await window.api.ai.reviewNotes('${sessionId}','${chapter.id}',${JSON.stringify(reading.notes)})`
@@ -211,9 +294,16 @@ try {
   assert.equal(feedback.passed, true)
   await apply(
     [
-      { kind: 'reading', value: { ...reading, feedback, notesDone: true } },
+      { kind: 'feedback', id: chapter.id, value: feedback },
       {
-        kind: 'action',
+        kind: 'readingStatus',
+        id: chapter.id,
+        focusQuestion: reading.focusQuestion,
+        readDone: true,
+        notesDone: true
+      },
+      {
+        kind: 'createAction',
         value: {
           id: 'action',
           text: reading.notes.action,
@@ -336,7 +426,9 @@ try {
   const screenshot = await cdp('Page.captureScreenshot', { format: 'png' })
   await fs.writeFile('output/qa/multibook-reading.png', Buffer.from(screenshot.data, 'base64'))
   const versions = await api(`return await window.api.versions.list('${sessionId}')`)
-  const restored = await api(`return await window.api.versions.restore('${versions.at(-1).id}')`)
+  const restored = await api(
+    `return await window.api.versions.restore('${versions.at(-1).id}',(await window.api.sessions.get('${sessionId}')).stateVersion)`
+  )
   assert.equal(restored.data.book.bookId, bookId)
   await api(`await window.api.library.hide('${bookId}',true)`)
   assert.equal(
@@ -347,6 +439,69 @@ try {
     (await api(`return await window.api.articles.get('${chapter.id}',${JSON.stringify(book)})`))
       .title,
     chapter.title
+  )
+  // Exercise workbench's real React command queue, parallel suggestions and atomic confirmation.
+  const project = await api(
+    "return await window.api.sessions.create('三个月内验证一次团队协作试点的方法','workbench')"
+  )
+  const form = {
+    ...project.data.workbench.form,
+    blockers: ['缺少试点反馈', '', ''],
+    knownFacts: '已完成一次试点'
+  }
+  await api(
+    `return await window.api.wb.apply('${project.id}',[{kind:'form',value:${JSON.stringify(form)}}],${project.stateVersion})`
+  )
+  await evaluate(`location.hash='/session/${project.id}'`)
+  await delay(500)
+  await clickText('整理事实台账')
+  let savedProject = await api(`return await window.api.sessions.get('${project.id}')`)
+  assert.equal(savedProject.data.workbench.intake.facts[0].id, 'F1')
+  assert.equal(savedProject.data.workbench.ledger.length, 1)
+  await clickText('进入三路诊断')
+  await clickText('一键三路诊断')
+  savedProject = await api(`return await window.api.sessions.get('${project.id}')`)
+  assert.ok(savedProject.data.workbench.diagnosis.contradiction)
+  assert.ok(savedProject.data.workbench.diagnosis.routes)
+  assert.ok(savedProject.data.workbench.diagnosis.objSubj)
+  await clickText('进入综合决策')
+  await clickText('生成综合决策')
+  await clickText('确认决策')
+  await clickText('生成 7 / 30 / 90 天候选策略')
+  savedProject = await api(`return await window.api.sessions.get('${project.id}')`)
+  assert.equal(savedProject.currentStep, 'wb_act')
+  assert.equal(savedProject.data.workbench.decision.confirmed, true)
+  assert.equal(savedProject.data.workbench.actions.length, 3)
+  // 模型生成只产生候选：不进入工作清单，也没有执行状态或阶段记录。
+  assert.ok(
+    savedProject.data.workbench.actions.every(
+      (a) => a.planningState === 'candidate' && a.status === 'todo' && a.progress.length === 0
+    )
+  )
+  await clickText('选择本组')
+  await clickText('加入待办')
+  let queuedActions = []
+  for (let i = 0; i < 20; i++) {
+    const current = await api(`return await window.api.sessions.get('${project.id}')`)
+    queuedActions = current.data.workbench.actions.filter((a) => a.planningState === 'queued')
+    if (queuedActions.length > 0) break
+    await delay(250)
+  }
+  assert.equal(queuedActions.length, 1)
+  assert.ok(queuedActions.every((a) => a.status === 'todo' && a.progress.length === 0))
+  savedProject = await api(`return await window.api.sessions.get('${project.id}')`)
+  assert.equal(
+    await evaluate(
+      "[...document.querySelectorAll('.sp-main .error-text')].map(e=>e.textContent).join('')"
+    ),
+    ''
+  )
+  // The specialized profile still generates and accepts a diagnosis against builtin sources.
+  const mao = await api(
+    "return await window.api.sessions.create('我想解决工作中同时推进太多事情导致没有重点的问题')"
+  )
+  await api(
+    `const d=await window.api.ai.diagnose('${mao.id}'); return await window.api.reading.apply('${mao.id}',[{kind:'diagnosis',value:d}],0,'毛选诊断','focus')`
   )
   console.log(
     JSON.stringify(
@@ -369,7 +524,10 @@ try {
           'seven original volumes, core shortcuts, collapse/expand, chapter navigation and search location',
           'manual four-step React command wiring',
           'history restore',
-          'hidden book source retention'
+          'hidden book source retention',
+          'workbench React four steps and parallel analysis',
+          'workbench candidate selection and batch enqueue',
+          'maoxuan profile diagnosis compatibility'
         ],
         testData: root
       },

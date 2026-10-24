@@ -3,7 +3,7 @@ import type { ArticleRecommendation, Diagnosis, ProblemInput, Reading } from '@s
 import type { StepProps } from './types'
 import './steps.css'
 import './StepProblem.css'
-import { readingPresentation } from '@shared/reading-presentation'
+import { readingPresentation, analysisOf } from '@shared/reading-presentation'
 
 type DiagField = 'restated' | 'mainContradiction' | 'stage'
 
@@ -237,6 +237,15 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
         if (!latest.diagnosis) return latest
         const diagnosisNext: Diagnosis = {
           ...latest.diagnosis,
+          ...(latest.book?.profile === 'generic'
+            ? {
+                analysis: {
+                  obstacle:
+                    field === 'mainContradiction' ? value : analysisOf(latest.diagnosis).obstacle,
+                  constraints: field === 'stage' ? value : analysisOf(latest.diagnosis).constraints
+                }
+              }
+            : {}),
           restated: field === 'restated' ? value : latest.diagnosis.restated,
           mainContradiction:
             field === 'mainContradiction' ? value : latest.diagnosis.mainContradiction,
@@ -346,14 +355,14 @@ export function StepProblem({ session, save, update, goStep, openReader, openRev
 
           <DiagEdit
             label={presentation.obstacle}
-            value={diagnosis.mainContradiction}
+            value={analysisOf(diagnosis).obstacle}
             strong
             onSave={(v) => saveDiagField('mainContradiction', v)}
           />
 
           <DiagEdit
             label={presentation.constraints}
-            value={diagnosis.stage}
+            value={analysisOf(diagnosis).constraints}
             onSave={(v) => saveDiagField('stage', v)}
           />
 

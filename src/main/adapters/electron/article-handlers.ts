@@ -5,7 +5,7 @@ import {
   getChapter as getArticle,
   searchChapters as searchArticles
 } from '../../modules/library/public'
-import { register, requireSession, requireArticle, requireWorkbench, toError } from './transport'
+import { register, toError } from './transport'
 export function registerArticleHandlers(): void {
   register<[BookScope | undefined], ReturnType<typeof listArticles>>('articles:list', (scope) =>
     listArticles(scope)

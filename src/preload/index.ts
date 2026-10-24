@@ -11,9 +11,20 @@ function subscribe<T>(channel: string, callback: (event: T) => void): () => void
 }
 
 const api: MaoxuanApi = {
+  actions: {
+    list: () => ipcRenderer.invoke('actions:list'),
+    create: (edit) => ipcRenderer.invoke('actions:create', edit),
+    edit: (id, edit, progress) => ipcRenderer.invoke('actions:edit', id, edit, progress),
+    classify: (refs, today) => ipcRenderer.invoke('actions:classify', refs, today)
+  },
+  speech: {
+    synthesize: (request) => ipcRenderer.invoke('speech:synthesize', request),
+    prefetch: (request) => ipcRenderer.invoke('speech:prefetch', request),
+    cancel: (id) => ipcRenderer.invoke('speech:cancel', id)
+  },
   reading: {
-    apply: (id, commands, version, label, step) =>
-      ipcRenderer.invoke('reading:apply', id, commands, version, label, step)
+    apply: (id, commands, version, label, step, mutationId = crypto.randomUUID()) =>
+      ipcRenderer.invoke('reading:apply', id, commands, version, label, step, mutationId)
   },
   library: {
     list: (hidden) => ipcRenderer.invoke('library:list', hidden),
@@ -51,7 +62,12 @@ const api: MaoxuanApi = {
     create: (problemText, mode, bookId) =>
       ipcRenderer.invoke('sessions:create', problemText, mode, bookId),
     update: (id, patch, versionLabel) =>
-      ipcRenderer.invoke('sessions:update', id, patch, versionLabel),
+      ipcRenderer.invoke(
+        'sessions:update',
+        id,
+        { ...patch, mutationId: patch.mutationId ?? crypto.randomUUID() },
+        versionLabel
+      ),
     remove: (id) => ipcRenderer.invoke('sessions:remove', id),
     archive: (id) => ipcRenderer.invoke('sessions:archive', id),
     unarchive: (id) => ipcRenderer.invoke('sessions:unarchive', id),
@@ -62,7 +78,8 @@ const api: MaoxuanApi = {
   versions: {
     list: (sessionId) => ipcRenderer.invoke('versions:list', sessionId),
     get: (versionId) => ipcRenderer.invoke('versions:get', versionId),
-    restore: (versionId) => ipcRenderer.invoke('versions:restore', versionId)
+    restore: (versionId, version, mutationId = crypto.randomUUID()) =>
+      ipcRenderer.invoke('versions:restore', versionId, version, mutationId)
   },
   chat: {
     list: (sessionId) => ipcRenderer.invoke('chat:list', sessionId),
@@ -85,6 +102,8 @@ const api: MaoxuanApi = {
     mindset: (sessionId) => ipcRenderer.invoke('ai:mindset', sessionId)
   },
   wb: {
+    apply: (id, commands, version, label, step, mutationId = crypto.randomUUID()) =>
+      ipcRenderer.invoke('wb:apply', id, commands, version, label, step, mutationId),
     intake: (sessionId) => ipcRenderer.invoke('wb:intake', sessionId),
     contradiction: (sessionId) => ipcRenderer.invoke('wb:contradiction', sessionId),
     routes: (sessionId) => ipcRenderer.invoke('wb:routes', sessionId),
@@ -95,6 +114,10 @@ const api: MaoxuanApi = {
     recap: (sessionId, input) => ipcRenderer.invoke('wb:recap', sessionId, input)
   },
   settings: {
+    getReader: () => ipcRenderer.invoke('settings:getReader'),
+    setReader: (preferences) => ipcRenderer.invoke('settings:setReader', preferences),
+    getProxy: () => ipcRenderer.invoke('settings:getProxy'),
+    setProxy: (settings) => ipcRenderer.invoke('settings:setProxy', settings),
     get: () => ipcRenderer.invoke('settings:get'),
     set: (settings) => ipcRenderer.invoke('settings:set', settings),
     test: () => ipcRenderer.invoke('settings:test')

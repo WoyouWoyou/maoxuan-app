@@ -4,7 +4,7 @@
 
 基于 Electron、React 和 SQLite 的桌面应用。支持导入 EPUB/TXT、为问题选择书籍，沿用问题输入 → 阅读原文与感受 → 联系自身 → 反复应用；保留毛选专用读法和毛选工作台。
 
-v0.3.0 新增书架、来源校验、后台索引、多模型配置与 Token 用量统计。完整说明见 [实施记录](docs/multi-book-implementation.md)。
+v0.3.0 新增书架、来源校验、后台索引、多模型配置与 Token 用量统计。完整说明见 [实施记录](docs/multi-book-implementation.md)。架构和开发约束见 [当前架构](ARCHITECTURE.md)。
 
 详细功能和截图见 [产品介绍](docs/介绍.md)。
 
@@ -22,7 +22,12 @@ npm run dev
 ```sh
 npm run verify
 npm run test:smoke
+npm run test:proxy
 ```
+
+## 网络代理
+
+在「设置 → 网络代理」填写地址（例如 `http://127.0.0.1:7890`），勾选「启用全局代理」并保存，即时应用于全部模型请求及应用内网络访问，重启后自动恢复。支持 HTTP、HTTPS、SOCKS5，暂不支持账号密码。代理不可用时请求报错，不会自动直连；关闭后恢复直连并保留地址。此设置适用于应用内，外部浏览器仍使用自身网络设置。
 
 ## 打包
 

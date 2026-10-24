@@ -10,15 +10,15 @@ import {
 } from '@shared/contracts/library'
 export function createLibraryRepository(handle: Database.Database) {
   const db = handle
-  function listBooks(includeHidden = false): Book[] {
+  function queryBooks(includeHidden = false, id?: string): Book[] {
     return (
       db
         .prepare(
           `SELECT b.*, COUNT(a.id) chapters, COALESCE(SUM(LENGTH(a.content)),0) characters,
     (SELECT COUNT(*) FROM chapter_index i JOIN articles c ON c.id=i.article_id WHERE c.revision_id=b.revision_id) AS indexed_count
-    FROM books b LEFT JOIN articles a ON a.revision_id=b.revision_id ${includeHidden ? '' : 'WHERE b.hidden=0'} GROUP BY b.id ORDER BY b.created_at`
+    FROM books b LEFT JOIN articles a ON a.revision_id=b.revision_id ${id !== undefined ? 'WHERE b.id=?' : includeHidden ? '' : 'WHERE b.hidden=0'} GROUP BY b.id ORDER BY b.created_at`
         )
-        .all() as any[]
+        .all(...(id !== undefined ? [id] : [])) as any[]
     ).map((b) => ({
       bookId: b.id,
       revisionId: b.revision_id,
@@ -33,8 +33,9 @@ export function createLibraryRepository(handle: Database.Database) {
       indexed: b.indexed_count
     }))
   }
+  const listBooks = (includeHidden = false): Book[] => queryBooks(includeHidden)
   function requireBook(id = BUILTIN_BOOK_ID): Book {
-    const book = listBooks(true).find((b) => b.bookId === id)
+    const book = queryBooks(true, id)[0]
     if (!book) throw new Error('书籍不存在')
     return book
   }
@@ -43,9 +44,9 @@ export function createLibraryRepository(handle: Database.Database) {
     return (
       db
         .prepare(
-          'SELECT id,title,volume,is_core,core_order,LENGTH(content) length,book_id,revision_id FROM articles WHERE revision_id=? ORDER BY ord'
+          'SELECT id,title,volume,is_core,core_order,LENGTH(content) length,book_id,revision_id FROM articles WHERE book_id=? AND revision_id=? ORDER BY ord'
         )
-        .all(book.revisionId) as any[]
+        .all(book.bookId, book.revisionId) as any[]
     ).map((r) => ({
       id: r.id,
       title: r.title,
@@ -89,10 +90,11 @@ export function createLibraryRepository(handle: Database.Database) {
           .prepare(
             `SELECT a.id,a.title,a.volume,snippet(articles_fts,1,'【','】','…',24) snippet
         FROM articles_fts JOIN articles a ON a.rowid=articles_fts.rowid
-        WHERE articles_fts MATCH ? AND a.revision_id=? ORDER BY bm25(articles_fts) LIMIT ?`
+        WHERE articles_fts MATCH ? AND a.book_id=? AND a.revision_id=? ORDER BY bm25(articles_fts) LIMIT ?`
           )
           .all(
             '"' + q.replace(/"/g, '""') + '"',
+            book.bookId,
             book.revisionId,
             Math.max(1, Math.min(200, limit))
           ) as SearchHit[]
@@ -105,9 +107,15 @@ export function createLibraryRepository(handle: Database.Database) {
     return (
       db
         .prepare(
-          "SELECT id,title,volume,content FROM articles WHERE revision_id=? AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\') ORDER BY ord LIMIT ?"
+          "SELECT id,title,volume,content FROM articles WHERE book_id=? AND revision_id=? AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\') ORDER BY ord LIMIT ?"
         )
-        .all(book.revisionId, pattern, pattern, Math.max(1, Math.min(200, limit))) as any[]
+        .all(
+          book.bookId,
+          book.revisionId,
+          pattern,
+          pattern,
+          Math.max(1, Math.min(200, limit))
+        ) as any[]
     ).map((r) => {
       const i = Math.max(0, r.content.indexOf(q))
       return {
@@ -170,7 +178,6 @@ export function createLibraryRepository(handle: Database.Database) {
         .prepare('SELECT id,content FROM articles WHERE book_id=?')
         .all(BUILTIN_BOOK_ID) as any[])
         writeParagraphs(a.id, a.content)
-      db.prepare("INSERT INTO articles_fts(articles_fts) VALUES('rebuild')").run()
     })()
   }
   function importBook(parsed: ParsedBook, title: string, author: string): Book {
@@ -204,7 +211,6 @@ export function createLibraryRepository(handle: Database.Database) {
         insert.run(chapterId, c.title, c.path || '正文', c.content, i, id, revision, c.source)
         writeParagraphs(chapterId, c.content)
       })
-      db.prepare("INSERT INTO articles_fts(articles_fts) VALUES('rebuild')").run()
     })()
     return requireBook(id)
   }

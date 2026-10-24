@@ -1,6 +1,12 @@
 import type { SessionData } from '@shared/types'
 
-const IGNORED_FIELDS = new Set(['generatedAt', 'createdAt', 'startedAt'])
+const IGNORED_FIELDS = new Set([
+  'generatedAt',
+  'createdAt',
+  'startedAt',
+  '_context',
+  'schemaVersion'
+])
 
 interface Seg {
   key: string
@@ -156,7 +162,44 @@ const LABEL_TEMPLATES: Record<string, string> = {
   mindset: '心法',
   'mindset.mainContradiction': '心法·主要矛盾',
   'mindset.stage': '心法·所处阶段',
-  'mindset.firstStep': '心法·第一步'
+  'mindset.firstStep': '心法·第一步',
+
+  workbench: '工作台',
+  'workbench.form.projectName': '工作台·项目名',
+  'workbench.form.objective': '工作台·主目标',
+  'workbench.form.timeScale': '工作台·时间尺度',
+  'workbench.form.stage': '工作台·当前阶段',
+  'workbench.form.knownFacts': '工作台·已知事实',
+  'workbench.intake': '工作台·事实台账',
+  'workbench.intake.mainline': '工作台·主线',
+  'workbench.intake.facts': '工作台·事实',
+  'workbench.intake.questions': '工作台·追问',
+  'workbench.diagnosis': '工作台·三路诊断',
+  'workbench.diagnosis.contradiction': '工作台·主要矛盾分析',
+  'workbench.diagnosis.routes': '工作台·三条路线',
+  'workbench.diagnosis.objSubj': '工作台·主客分析',
+  'workbench.decision': '工作台·综合决策',
+  'workbench.decision.route': '工作台·推荐路线',
+  'workbench.decision.firstBattle': '工作台·先打哪一仗',
+  'workbench.decision.confirmed': '工作台·决策已确认',
+  'workbench.actions': '工作台行动',
+  'workbench.actions[n]': '工作台行动 {1}',
+  'workbench.actions[n].action': '工作台行动 {1} · 动作',
+  'workbench.actions[n].horizon': '工作台行动 {1} · 周期',
+  'workbench.actions[n].planningState': '工作台行动 {1} · 待办纳入状态',
+  'workbench.actions[n].status': '工作台行动 {1} · 执行状态',
+  'workbench.actions[n].purpose': '工作台行动 {1} · 目的',
+  'workbench.actions[n].verify': '工作台行动 {1} · 验证',
+  'workbench.actions[n].kpi': '工作台行动 {1} · 与 KPI 的关系',
+  'workbench.actions[n].standards': '工作台行动 {1} · 执行标准',
+  'workbench.actions[n].quadrant': '工作台行动 {1} · 象限',
+  'workbench.actions[n].dueDate': '工作台行动 {1} · 截止日',
+  'workbench.actions[n].progress': '工作台行动 {1} · 阶段进展',
+  'workbench.actions[n].progress[n]': '工作台行动 {1} · 第 {2} 阶段',
+  'workbench.actions[n].progress[n].text': '工作台行动 {1} · 第 {2} 阶段 · 内容',
+  'workbench.ledger': '工作台·项目台账',
+  'workbench.ledger[n]': '工作台·台账 {1}',
+  'workbench.ledger[n].summary': '工作台·台账 {1} · 摘要'
 }
 
 /** 把扁平路径翻译成中文可读标签；未知路径原样返回。 */

@@ -42,5 +42,8 @@ export const importBook: LibraryRepository['importBook'] = (...a) => repository.
 export const hideBook: LibraryRepository['hideBook'] = (...a) => repository.hideBook(...a)
 export const titleMap: LibraryRepository['titleMap'] = (...a) => repository.titleMap(...a)
 export function scopeOf(data: { book?: BookScope }): BookScope {
-  return data.book ?? { bookId: BUILTIN_BOOK_ID, revisionId: BUILTIN_REVISION_ID }
+  return {
+    bookId: data.book?.bookId ?? BUILTIN_BOOK_ID,
+    revisionId: data.book?.revisionId ?? BUILTIN_REVISION_ID
+  }
 }

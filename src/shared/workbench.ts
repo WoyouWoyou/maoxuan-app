@@ -1,5 +1,4 @@
 import type {
-  WbAction,
   WbCheck,
   WbHorizon,
   WbObjSubj,
@@ -40,12 +39,27 @@ export function routeName(key: WbRouteKey | string): string {
 
 export type WbObjSubjKey = 'trend' | 'resources' | 'constraints' | 'judgment' | 'execution'
 
-export const WB_OBJSUBJ: { key: WbObjSubjKey; group: '客观' | '主观'; name: string; desc: string }[] = [
+export const WB_OBJSUBJ: {
+  key: WbObjSubjKey
+  group: '客观' | '主观'
+  name: string
+  desc: string
+}[] = [
   { key: 'trend', group: '客观', name: '趋势', desc: '大势是否顺风' },
   { key: 'resources', group: '客观', name: '资源', desc: '钱、人、时间、渠道、品牌、技术' },
-  { key: 'constraints', group: '客观', name: '约束', desc: '政策、竞争、时点、组织、认知惯性（分越高 = 约束越可控）' },
+  {
+    key: 'constraints',
+    group: '客观',
+    name: '约束',
+    desc: '政策、竞争、时点、组织、认知惯性（分越高 = 约束越可控）'
+  },
   { key: 'judgment', group: '主观', name: '判断', desc: '看清主要矛盾、阶段和路线的能力' },
-  { key: 'execution', group: '主观', name: '组织执行', desc: '调动人、拆动作、盯结果、复盘纠偏的能力' }
+  {
+    key: 'execution',
+    group: '主观',
+    name: '组织执行',
+    desc: '调动人、拆动作、盯结果、复盘纠偏的能力'
+  }
 ]
 
 export const WB_HORIZONS: { key: WbHorizon; name: string; hint: string }[] = [
@@ -56,15 +70,35 @@ export const WB_HORIZONS: { key: WbHorizon; name: string; hint: string }[] = [
 
 /** 毛选执行标准：每条行动至少挂 1 个，写法提示用于提示词与界面说明。 */
 export const WB_STANDARDS: { name: string; when: string; hint: string }[] = [
-  { name: '实事求是', when: '需要从概念回到真实指标、真实约束时', hint: '写清事实、指标、约束，不从愿望出发' },
-  { name: '抓主要矛盾', when: '需要聚焦少数关键战点时', hint: '说明为什么先做这件事、其他事为何后置' },
-  { name: '调查研究', when: '需要补一手信息、摸清现状时', hint: '写清调研对象、样本、要验证的问题' },
-  { name: '群众路线', when: '需要吸收一线反馈形成方案时', hint: '写清如何从一线收集，再如何集中提炼' },
+  {
+    name: '实事求是',
+    when: '需要从概念回到真实指标、真实约束时',
+    hint: '写清事实、指标、约束，不从愿望出发'
+  },
+  {
+    name: '抓主要矛盾',
+    when: '需要聚焦少数关键战点时',
+    hint: '说明为什么先做这件事、其他事为何后置'
+  },
+  {
+    name: '调查研究',
+    when: '需要补一手信息、摸清现状时',
+    hint: '写清调研对象、样本、要验证的问题'
+  },
+  {
+    name: '群众路线',
+    when: '需要吸收一线反馈形成方案时',
+    hint: '写清如何从一线收集，再如何集中提炼'
+  },
   { name: '统一战线', when: '需要拉通多方资源时', hint: '写清要团结哪些人，他们为什么会支持' },
   { name: '试点推进', when: '需要先做样板再复制时', hint: '写清为什么先小范围试点' },
   { name: '集中兵力', when: '资源有限、不能多线作战时', hint: '写清为什么只打 1 到 2 个点' },
   { name: '复盘纠偏', when: '需要按阶段校正路线时', hint: '写清复盘频率、复盘输出和修正动作' },
-  { name: '不打无准备之仗', when: '需要前置扫雷和准备时', hint: '写清前置依赖、放行条件和风险清单' },
+  {
+    name: '不打无准备之仗',
+    when: '需要前置扫雷和准备时',
+    hint: '写清前置依赖、放行条件和风险清单'
+  },
   { name: '从个别到一般', when: '首战后准备复制时', hint: '写清如何把个案沉淀成方法' },
   { name: '星星之火可以燎原', when: '单点突破可撬动全局时', hint: '写清这个样板为什么值得先点燃' }
 ]
@@ -72,7 +106,13 @@ export const WB_STANDARDS: { name: string; when: string; hint: string }[] = [
 export const WB_STANDARD_NAMES = WB_STANDARDS.map((s) => s.name)
 
 /** 可选增强模块：只能增强主流程，不得替代三大核心模块；最多启用 2 个。 */
-export const WB_ENHANCEMENTS: { key: string; name: string; when: string; output: string; triggers: RegExp }[] = [
+export const WB_ENHANCEMENTS: {
+  key: string
+  name: string
+  when: string
+  output: string
+  triggers: RegExp
+}[] = [
   {
     key: 'practice',
     name: '实践认识循环',
@@ -145,9 +185,27 @@ export function enhancementName(key: string): string {
 export type WbSourceArea = 'intake' | 'contradiction' | 'routes' | 'objSubj' | 'act'
 
 /** 各模块对应的原文依据；quote 已核对为原文中的连续子串，用 paragraphs.findIndex(p => p.includes(quote)) 定位。 */
-export const WB_SOURCES: { area: WbSourceArea; articleId: string; title: string; quote: string; use: string }[] = [
-  { area: 'intake', articleId: 'Section0205', title: '反对本本主义', quote: '没有调查，没有发言权', use: '先调查，后判断' },
-  { area: 'intake', articleId: 'Section0205', title: '反对本本主义', quote: '调查就是解决问题', use: '缺的事实，靠调查补' },
+export const WB_SOURCES: {
+  area: WbSourceArea
+  articleId: string
+  title: string
+  quote: string
+  use: string
+}[] = [
+  {
+    area: 'intake',
+    articleId: 'Section0205',
+    title: '反对本本主义',
+    quote: '没有调查，没有发言权',
+    use: '先调查，后判断'
+  },
+  {
+    area: 'intake',
+    articleId: 'Section0205',
+    title: '反对本本主义',
+    quote: '调查就是解决问题',
+    use: '缺的事实，靠调查补'
+  },
   {
     area: 'contradiction',
     articleId: 'Section0216',
@@ -190,7 +248,13 @@ export const WB_SOURCES: { area: WbSourceArea; articleId: string; title: string;
     quote: '就是共产党组织的有力量和它的政策的不错误',
     use: '主观条件：组织与判断'
   },
-  { area: 'act', articleId: 'Section0215', title: '实践论', quote: '实践、认识、再实践、再认识', use: '做了再改，改了再做' },
+  {
+    area: 'act',
+    articleId: 'Section0215',
+    title: '实践论',
+    quote: '实践、认识、再实践、再认识',
+    use: '做了再改，改了再做'
+  },
   {
     area: 'act',
     articleId: 'Section0413',
@@ -202,18 +266,24 @@ export const WB_SOURCES: { area: WbSourceArea; articleId: string; title: string;
 
 /* ------------------------------ 步骤门槛 ------------------------------ */
 
-export function wbStepUnlocked(wb: WorkbenchData, step: WbStepKey): { ok: boolean; reason: string } {
+export function wbStepUnlocked(
+  wb: WorkbenchData,
+  step: WbStepKey
+): { ok: boolean; reason: string } {
   switch (step) {
     case 'wb_intake':
       return { ok: true, reason: '' }
     case 'wb_diagnose':
-      if (wb.form.objective.trim().length < 6) return { ok: false, reason: '先写清楚主目标（至少 6 字）' }
-      if (!wb.form.blockers.some((b) => b.trim())) return { ok: false, reason: '至少写 1 个当前最卡的问题' }
+      if (wb.form.objective.trim().length < 6)
+        return { ok: false, reason: '先写清楚主目标（至少 6 字）' }
+      if (!wb.form.blockers.some((b) => b.trim()))
+        return { ok: false, reason: '至少写 1 个当前最卡的问题' }
       if (!wb.intake) return { ok: false, reason: '先让 AI 整理事实台账' }
       return { ok: true, reason: '' }
     case 'wb_decide': {
       const d = wb.diagnosis
-      if (!d.contradiction || !d.routes || !d.objSubj) return { ok: false, reason: '三路诊断都完成后才能综合' }
+      if (!d.contradiction || !d.routes || !d.objSubj)
+        return { ok: false, reason: '三路诊断都完成后才能综合' }
       return { ok: true, reason: '' }
     }
     case 'wb_act':
@@ -231,13 +301,17 @@ export function wbStepDone(wb: WorkbenchData, step: WbStepKey): boolean {
     case 'wb_decide':
       return Boolean(wb.decision?.confirmed)
     case 'wb_act':
-      return wb.actions.some((a) => a.status === 'done') || wb.ledger.some((e) => e.inputType !== 'new')
+      return (
+        wb.actions.some((a) => a.planningState === 'queued' && a.status === 'done') ||
+        wb.ledger.some((e) => e.inputType !== 'new')
+      )
   }
 }
 
 /** 追问里用户没回答、且台账没有任何 confirmed 事实时，结论只能是“假设版”。 */
 export function isAssumptionDraft(wb: WorkbenchData): boolean {
-  const confirmed = wb.intake?.facts.some((f) => f.kind === 'fact' && f.confidence === 'confirmed') ?? false
+  const confirmed =
+    wb.intake?.facts.some((f) => f.kind === 'fact' && f.confidence === 'confirmed') ?? false
   const unanswered = wb.intake?.questions.some((q) => !q.answer.trim()) ?? false
   return !confirmed || unanswered
 }
@@ -264,78 +338,253 @@ export function ruleChecksDecision(wb: WorkbenchData): WbCheck[] {
   const out: WbCheck[] = []
   const facts = wb.intake?.facts ?? []
   const confirmed = facts.filter((f) => f.kind === 'fact' && f.confidence === 'confirmed').length
-  out.push(rule('facts', 'F-1', confirmed > 0, confirmed > 0 ? `事实台账有 ${confirmed} 条已确认事实` : '没有任何已确认事实，所有判断都只是假设版'))
+  out.push(
+    rule(
+      'facts',
+      'F-1',
+      confirmed > 0,
+      confirmed > 0
+        ? `事实台账有 ${confirmed} 条已确认事实`
+        : '没有任何已确认事实，所有判断都只是假设版'
+    )
+  )
   const unanswered = wb.intake?.questions.filter((q) => !q.answer.trim()).length ?? 0
-  out.push(rule('facts', 'F-2', unanswered === 0, unanswered === 0 ? '追问已全部回答' : `还有 ${unanswered} 个追问没回答，判断依赖补充事实`))
+  out.push(
+    rule(
+      'facts',
+      'F-2',
+      unanswered === 0,
+      unanswered === 0 ? '追问已全部回答' : `还有 ${unanswered} 个追问没回答，判断依赖补充事实`
+    )
+  )
 
   const c = wb.diagnosis.contradiction
   if (c) {
-    out.push(rule('contradiction', 'C-1', c.all.length >= 2, c.all.length >= 2 ? '已列出全部矛盾' : '没列全部矛盾就直接给了主要矛盾'))
+    out.push(
+      rule(
+        'contradiction',
+        'C-1',
+        c.all.length >= 2,
+        c.all.length >= 2 ? '已列出全部矛盾' : '没列全部矛盾就直接给了主要矛盾'
+      )
+    )
     const objective = wb.form.objective.trim()
     const parrot = filled(objective) && c.primary.trim() === objective
-    out.push(rule('contradiction', 'C-2', filled(c.primary) && !parrot, parrot ? '主要矛盾只是复述了主目标' : filled(c.primary) ? '主要矛盾已给出' : '缺主要矛盾'))
-    out.push(rule('contradiction', 'C-3', filled(c.why), filled(c.why) ? '说明了为什么是主要矛盾' : '没有说明为什么它是当前主要矛盾'))
-    out.push(rule('contradiction', 'C-4', c.defer.length >= 1, c.defer.length >= 1 ? '写了暂时不碰的事' : '没有写“暂时不碰”'))
-    out.push(rule('contradiction', 'C-5', c.factRefs.length >= 1, c.factRefs.length >= 1 ? `主要矛盾引用了 ${c.factRefs.join('、')}` : '主要矛盾没有引用任何事实'))
+    out.push(
+      rule(
+        'contradiction',
+        'C-2',
+        filled(c.primary) && !parrot,
+        parrot ? '主要矛盾只是复述了主目标' : filled(c.primary) ? '主要矛盾已给出' : '缺主要矛盾'
+      )
+    )
+    out.push(
+      rule(
+        'contradiction',
+        'C-3',
+        filled(c.why),
+        filled(c.why) ? '说明了为什么是主要矛盾' : '没有说明为什么它是当前主要矛盾'
+      )
+    )
+    out.push(
+      rule(
+        'contradiction',
+        'C-4',
+        c.defer.length >= 1,
+        c.defer.length >= 1 ? '写了暂时不碰的事' : '没有写“暂时不碰”'
+      )
+    )
+    out.push(
+      rule(
+        'contradiction',
+        'C-5',
+        c.factRefs.length >= 1,
+        c.factRefs.length >= 1
+          ? `主要矛盾引用了 ${c.factRefs.join('、')}`
+          : '主要矛盾没有引用任何事实'
+      )
+    )
   }
 
   const r = wb.diagnosis.routes
   if (r) {
     const keys = new Set(r.routes.map((x) => x.key))
-    out.push(rule('routes', 'R-1', keys.size === 3, keys.size === 3 ? '三条路线齐全' : '路线少于三条'))
+    out.push(
+      rule('routes', 'R-1', keys.size === 3, keys.size === 3 ? '三条路线齐全' : '路线少于三条')
+    )
     r.routes.forEach((x) => {
       const ok = x.triggers.length > 0 && x.risks.length > 0 && x.switchSignals.length > 0
-      out.push(rule('routes', `R-2-${x.key}`, ok, ok ? `${routeName(x.key)}：触发条件、风险、切换信号齐全` : `${routeName(x.key)}：缺触发条件、主要风险或切换信号`))
+      out.push(
+        rule(
+          'routes',
+          `R-2-${x.key}`,
+          ok,
+          ok
+            ? `${routeName(x.key)}：触发条件、风险、切换信号齐全`
+            : `${routeName(x.key)}：缺触发条件、主要风险或切换信号`
+        )
+      )
       const bold = OVERCONFIDENT.test(x.result)
-      out.push(rule('routes', `R-3-${x.key}`, !bold, bold ? `${routeName(x.key)}：把可能结果写成了确定事实` : `${routeName(x.key)}：结果写成了条件判断`))
+      out.push(
+        rule(
+          'routes',
+          `R-3-${x.key}`,
+          !bold,
+          bold
+            ? `${routeName(x.key)}：把可能结果写成了确定事实`
+            : `${routeName(x.key)}：结果写成了条件判断`
+        )
+      )
     })
     const policies = r.routes.map((x) => x.policy.trim()).filter(Boolean)
     const distinct = new Set(policies).size === policies.length
-    out.push(rule('routes', 'R-4', distinct, distinct ? '三条路线方针有实质差异' : '有路线方针完全相同，只是换词'))
+    out.push(
+      rule(
+        'routes',
+        'R-4',
+        distinct,
+        distinct ? '三条路线方针有实质差异' : '有路线方针完全相同，只是换词'
+      )
+    )
   }
 
   const o = wb.diagnosis.objSubj
   if (o) {
     const all = [o.trend, o.resources, o.constraints, o.judgment, o.execution]
     const ok = all.every(scoreOk)
-    out.push(rule('objSubj', 'O-1', ok, ok ? '客观 3 + 主观 2 都有分数和理由' : '有项目缺分数或缺理由'))
-    out.push(rule('objSubj', 'O-2', filled(o.constraints.reason), filled(o.constraints.reason) ? '写了约束' : '忽略了约束'))
+    out.push(
+      rule('objSubj', 'O-1', ok, ok ? '客观 3 + 主观 2 都有分数和理由' : '有项目缺分数或缺理由')
+    )
+    out.push(
+      rule(
+        'objSubj',
+        'O-2',
+        filled(o.constraints.reason),
+        filled(o.constraints.reason) ? '写了约束' : '忽略了约束'
+      )
+    )
     const gap = filled(o.biggestGap) && filled(o.firstFix)
-    out.push(rule('objSubj', 'O-3', gap, gap ? '指出了最大缺口和补法' : '没有指出最大缺口或没把缺口转成补法'))
+    out.push(
+      rule(
+        'objSubj',
+        'O-3',
+        gap,
+        gap ? '指出了最大缺口和补法' : '没有指出最大缺口或没把缺口转成补法'
+      )
+    )
   }
 
   const d = wb.decision
   if (d) {
-    out.push(rule('decision', 'D-1', filled(d.primaryContradiction) && filled(d.firstBattle), filled(d.firstBattle) ? '写了先打哪一仗' : '没写先打哪一仗'))
-    out.push(rule('decision', 'D-2', d.notNow.length >= 1, d.notNow.length >= 1 ? '写了哪些事暂时不碰' : '没写哪些事暂时不碰'))
+    out.push(
+      rule(
+        'decision',
+        'D-1',
+        filled(d.primaryContradiction) && filled(d.firstBattle),
+        filled(d.firstBattle) ? '写了先打哪一仗' : '没写先打哪一仗'
+      )
+    )
+    out.push(
+      rule(
+        'decision',
+        'D-2',
+        d.notNow.length >= 1,
+        d.notNow.length >= 1 ? '写了哪些事暂时不碰' : '没写哪些事暂时不碰'
+      )
+    )
     if (o) {
       const weak = o.resources.score <= 2 && d.route === 'breakthrough'
-      out.push(rule('decision', 'D-3', !weak, weak ? `资源只有 ${o.resources.score} 分，却推荐主动突破线：先说明兵力从哪来，或改路线` : '推荐路线与资源条件匹配'))
+      out.push(
+        rule(
+          'decision',
+          'D-3',
+          !weak,
+          weak
+            ? `资源只有 ${o.resources.score} 分，却推荐主动突破线：先说明兵力从哪来，或改路线`
+            : '推荐路线与资源条件匹配'
+        )
+      )
     }
   }
   return out
 }
 
-/** 第四步行动的硬规则。 */
-export function ruleChecksActions(actions: WbAction[]): WbCheck[] {
+/** 候选池覆盖：7 / 30 / 90 天是否都有备选。只回答“有没有想到”，不衡量执行量。 */
+export function ruleChecksCandidatePool(wb: WorkbenchData): WbCheck[] {
+  const pool = wb.actions.filter((a) => a.status !== 'dropped')
+  return WB_HORIZONS.map((h) => {
+    const n = pool.filter((a) => a.horizon === h.key).length
+    return rule(
+      'actions',
+      `A-1-${h.key}`,
+      n > 0,
+      n > 0 ? `${h.name}：${n} 条候选 / 已纳入` : `${h.name}：还没有`
+    )
+  })
+}
+
+/** 候选内容质量：字段是否齐全、动作是否具体、执行标准是否在清单里。 */
+export function ruleChecksActionContent(wb: WorkbenchData): WbCheck[] {
   const out: WbCheck[] = []
-  const live = actions.filter((a) => a.status !== 'dropped')
-  for (const h of WB_HORIZONS) {
-    const n = live.filter((a) => a.horizon === h.key).length
-    out.push(rule('actions', `A-1-${h.key}`, n > 0, n > 0 ? `${h.name}：${n} 条` : `${h.name}：还没有`))
-  }
+  const live = wb.actions.filter((a) => a.status !== 'dropped')
   live.forEach((a, i) => {
     const label = `第 ${i + 1} 条「${a.action.slice(0, 16) || '未命名'}」`
-    const complete = filled(a.action) && filled(a.purpose) && filled(a.verify) && filled(a.kpi) && a.standards.length > 0
-    out.push(rule('actions', `A-2-${a.id}`, complete, complete ? `${label}字段齐全` : `${label}缺动作 / 目的 / 验证 / 执行标准 / KPI 关系`))
+    const complete =
+      filled(a.action) &&
+      filled(a.purpose) &&
+      filled(a.verify) &&
+      filled(a.kpi) &&
+      a.standards.length > 0
+    out.push(
+      rule(
+        'actions',
+        `A-2-${a.id}`,
+        complete,
+        complete ? `${label}字段齐全` : `${label}缺动作 / 目的 / 验证 / 执行标准 / KPI 关系`
+      )
+    )
     const vague = EMPTY_WORDS.test(a.action) && !/\d/.test(a.action)
-    out.push(rule('actions', `A-3-${a.id}`, !vague, vague ? `${label}是空话：换成具体对象、数量、时限` : `${label}动作具体`))
+    out.push(
+      rule(
+        'actions',
+        `A-3-${a.id}`,
+        !vague,
+        vague ? `${label}是空话：换成具体对象、数量、时限` : `${label}动作具体`
+      )
+    )
     const unknown = a.standards.filter((s) => !WB_STANDARD_NAMES.includes(s))
-    if (unknown.length) out.push(rule('actions', `A-4-${a.id}`, false, `${label}的执行标准不在清单里：${unknown.join('、')}`))
+    if (unknown.length)
+      out.push(
+        rule('actions', `A-4-${a.id}`, false, `${label}的执行标准不在清单里：${unknown.join('、')}`)
+      )
   })
-  const n7 = live.filter((a) => a.horizon === '7d').length
-  out.push(rule('actions', 'A-5', n7 <= 5, n7 <= 5 ? '7 天动作不超过 5 条，兵力集中' : `7 天动作有 ${n7} 条，多线作战了，砍到 5 条以内`))
   return out
+}
+
+/** 执行组合集中度：只有“已加入待办且未完成”的 7 天动作才占当前兵力。 */
+export function ruleChecksExecutionLoad(wb: WorkbenchData): WbCheck[] {
+  const active = wb.actions.filter(
+    (a) => a.planningState === 'queued' && a.status === 'todo' && a.horizon === '7d'
+  ).length
+  return [
+    rule(
+      'actions',
+      'A-5',
+      active <= 5,
+      active <= 5
+        ? `7 天待办 ${active} 条，兵力集中`
+        : `7 天待办 ${active} 条，多线作战了，先从候选里砍到 5 条以内`
+    )
+  ]
+}
+
+/** 第四步行动的硬规则：候选池覆盖 + 内容质量 + 执行组合集中度。只读，不改数据。 */
+export function ruleChecksActions(wb: WorkbenchData): WbCheck[] {
+  return [
+    ...ruleChecksCandidatePool(wb),
+    ...ruleChecksActionContent(wb),
+    ...ruleChecksExecutionLoad(wb)
+  ]
 }
 
 /** 重新检查后，沿用用户对同 id 同内容检查项的“已知晓”标记。 */

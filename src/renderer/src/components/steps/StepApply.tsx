@@ -1,4 +1,4 @@
-import { readingPresentation } from '@shared/reading-presentation'
+import { readingPresentation, analysisOf } from '@shared/reading-presentation'
 import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { ActionItem, ActionProgress, ActionStatus, Reading, SessionData } from '@shared/types'
@@ -215,7 +215,11 @@ export function StepApply({ session, save, update, openReader }: StepProps) {
   }
 
   const mindsetAnswers = data.mindset
-    ? [data.mindset.mainContradiction, data.mindset.stage, data.mindset.firstStep]
+    ? [
+        analysisOf(data.mindset).obstacle,
+        analysisOf(data.mindset).constraints,
+        data.mindset.firstStep
+      ]
     : []
   const reviews = [...data.reviews].reverse()
   const t = today()

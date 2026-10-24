@@ -1,6 +1,6 @@
-import type { ModelTransportPort } from '../../modules/model-runtime/transport'
-import { RequestError } from '../../modules/model-runtime/transport'
-import { normalizeUsage } from '../../modules/model-runtime/usage'
+import type { ModelTransportPort } from '../../modules/model-runtime/public'
+import { RequestError } from '../../modules/model-runtime/public'
+import { normalizeUsage } from '../../modules/model-runtime/public'
 export const chatCompletionsTransport: ModelTransportPort = {
   async send(settings, request, signal, onText, onUsage) {
     const endpoint = `${(settings.baseUrl || 'https://api.deepseek.com/v1').replace(/\/+$/, '')}/chat/completions`

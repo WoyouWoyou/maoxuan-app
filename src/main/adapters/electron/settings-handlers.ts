@@ -1,8 +1,20 @@
 import type { Settings } from '@shared/types'
-import { publicSettings, setSettings, getSettings } from '../sqlite/session-repository'
+import {
+  getReaderPreferences,
+  setReaderPreferences,
+  publicSettings,
+  setSettings,
+  getSettings,
+  getProxySettings,
+  setProxySettings
+} from '../../modules/settings/public'
 import { testConnection } from '../../modules/model-runtime/public'
-import { register, requireSession, requireArticle, requireWorkbench, toError } from './transport'
+import { register, toError } from './transport'
 export function registerSettingsHandlers(): void {
+  register('settings:getReader', getReaderPreferences)
+  register('settings:setReader', setReaderPreferences)
+  register('settings:getProxy', () => getProxySettings())
+  register('settings:setProxy', setProxySettings)
   register<[], Settings>('settings:get', () => publicSettings())
   register<[Settings], Settings>('settings:set', (settings) => setSettings(settings))
   register<[], { ok: boolean; message: string }>('settings:test', () => {

@@ -33,3 +33,19 @@ export function readingPresentation(data: SessionData) {
     ]
   }
 }
+
+/** Historical generic aliases are interpreted only at this compatibility boundary. */
+export function analysisOf(
+  value:
+    | {
+        analysis?: { obstacle: string; constraints: string }
+        mainContradiction: string
+        stage: string
+      }
+    | null
+    | undefined
+) {
+  return (
+    value?.analysis ?? { obstacle: value?.mainContradiction ?? '', constraints: value?.stage ?? '' }
+  )
+}

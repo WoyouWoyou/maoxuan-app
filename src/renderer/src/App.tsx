@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom'
+import { ActionsPage } from './pages/ActionsPage'
 import { Sidebar } from './components/Sidebar'
 import { HomePage } from './pages/HomePage'
 import { LibraryPage } from './pages/LibraryPage'
@@ -16,6 +17,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/session/:id" element={<SessionPage />} />
+            <Route path="/actions" element={<ActionsPage />} />
             <Route path="/library" element={<LibraryPage />} />
             <Route path="/library/:articleId" element={<LibraryArticlePage />} />
             <Route path="/settings" element={<SettingsPage />} />

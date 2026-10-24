@@ -144,7 +144,7 @@ function normalizeProblem(raw: unknown, fallback: ProblemInput): ProblemInput {
   }
 }
 
-/** 根据右侧讨论重写第一步；只返回建议，写库由渲染进程确认后调用 sessions.update 完成。 */
+/** 根据右侧讨论重写第一步；只返回建议，写库由用户确认后通过 reading.apply 命令完成。 */
 export async function reviseProblem(
   s: Settings,
   data: SessionData,

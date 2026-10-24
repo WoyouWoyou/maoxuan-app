@@ -1,3 +1,9 @@
+import type { ActionEdit } from './actions'
+import type { ActionItem } from './types'
+import type { ActionReference, ClassificationResult } from './contracts/action-planning'
+import type { ReaderPreferences, SpeechRequest } from './contracts/reader'
+import type { ProxySettings } from './contracts/proxy'
+import type { WorkbenchCommand } from './contracts/workbench'
 import type { ModelProfile } from './contracts/models'
 import type { ReadingCommand } from './contracts/reading'
 import type { StepKey } from './types'
@@ -38,13 +44,26 @@ import type {
 
 /** Exposed by preload as `window.api`. Every method maps 1:1 to an ipcMain.handle channel named `${group}:${method}`. */
 export interface MaoxuanApi {
+  actions: {
+    list(): Promise<ActionItem[]>
+    create(edit: ActionEdit): Promise<ActionItem>
+    edit(id: string, edit: ActionEdit, progress?: string): Promise<ActionItem>
+    classify(refs: ActionReference[], today: string): Promise<ClassificationResult>
+  }
+  speech: {
+    synthesize(request: SpeechRequest): Promise<Uint8Array>
+    prefetch(request: SpeechRequest): Promise<void>
+    cancel(id: string): Promise<void>
+  }
+
   reading: {
     apply(
       id: string,
       commands: ReadingCommand[],
       expectedStateVersion: number,
       label?: string,
-      step?: StepKey
+      step?: StepKey,
+      mutationId?: string
     ): Promise<Session>
   }
   library: {
@@ -101,7 +120,7 @@ export interface MaoxuanApi {
     list(sessionId: string): Promise<VersionSummary[]>
     get(versionId: string): Promise<Version | null>
     /** Non-destructive: copies the old snapshot into the session and records a new version labelled `恢复自 vN`. */
-    restore(versionId: string): Promise<Session>
+    restore(versionId: string, expectedStateVersion: number, mutationId?: string): Promise<Session>
   }
   chat: {
     list(sessionId: string): Promise<ChatMessage[]>
@@ -129,10 +148,18 @@ export interface MaoxuanApi {
     mindset(sessionId: string): Promise<Mindset>
   }
   /**
-   * 毛选工作台。全部只读会话、不写库：渲染进程先保存最新数据，再调用，拿到结果后自己用 sessions.update 写回。
+   * 毛选工作台。生成接口返回待确认建议；内容变更统一通过 wb.apply 命令写入。
    * 会话不是 workbench 模式时抛错。
    */
   wb: {
+    apply(
+      id: string,
+      commands: WorkbenchCommand[],
+      expectedStateVersion: number,
+      label?: string,
+      step?: StepKey,
+      mutationId?: string
+    ): Promise<Session>
     /** 整理 form + 已回答的追问 + 现有事实台账，输出新的 WbIntake（事实 id 延续旧台账）。 */
     intake(sessionId: string): Promise<WbIntake>
     contradiction(sessionId: string): Promise<WbContradiction>
@@ -147,6 +174,11 @@ export interface MaoxuanApi {
     recap(sessionId: string, input: WbRecapInput): Promise<WbRecapResult>
   }
   settings: {
+    getReader(): Promise<ReaderPreferences>
+    setReader(preferences: ReaderPreferences): Promise<ReaderPreferences>
+
+    getProxy(): Promise<ProxySettings>
+    setProxy(settings: ProxySettings): Promise<ProxySettings>
     get(): Promise<Settings>
     set(s: Settings): Promise<Settings>
     test(): Promise<{ ok: boolean; message: string }>

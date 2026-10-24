@@ -1,19 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { SquaresFour } from '@phosphor-icons/react'
+import { useActionHub } from '../features/actions/context'
+import { useCallback, useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import {
-  MODE_META,
-  stepMeta,
-  type SessionMode,
-  type SessionSummary,
-  type StepKey
-} from '@shared/types'
+import { stepMeta, type SessionMode, type SessionSummary, type StepKey } from '@shared/types'
 import { CloseSessionDialog } from './CloseSessionDialog'
 import './Sidebar.css'
-import { useBooks } from '../features/library/useBooks'
+import { NewSessionDialog } from './NewSessionDialog'
 
-const MIN_PROBLEM_LEN = 10
 const COLLAPSE_KEY = 'maoxuan.sidebarCollapsed'
-const MODES: SessionMode[] = ['reading', 'workbench']
 
 function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
@@ -47,20 +41,17 @@ function readCollapsed(): boolean {
 }
 
 export function Sidebar() {
-  const books = useBooks()
+  const { tasks: actionTasks } = useActionHub()
+  const pendingActions = actionTasks.filter((task) => task.status === 'todo').length
   const [bookId, setBookId] = useState('maoxuan')
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [mode, setMode] = useState<SessionMode>('reading')
-  const [problemText, setProblemText] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
   const [closing, setClosing] = useState<SessionSummary | null>(null)
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed)
 
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -104,7 +95,6 @@ export function Sidebar() {
 
   const openNew = useCallback(() => {
     persistCollapsed(false)
-    setCreateError(null)
     setCreating(true)
   }, [persistCollapsed])
 
@@ -121,44 +111,12 @@ export function Sidebar() {
     return () => window.removeEventListener('open-new-session', handler)
   }, [openNew])
 
-  useEffect(() => {
-    if (creating && !collapsed) textareaRef.current?.focus()
-  }, [creating, collapsed])
-
-  function cancelCreate() {
-    setCreating(false)
-    setProblemText('')
-    setCreateError(null)
-    setMode('reading')
-  }
-
-  async function submitCreate() {
-    const text = problemText.trim()
-    if (busy || text.length < MIN_PROBLEM_LEN) return
-    setBusy(true)
-    setCreateError(null)
-    try {
-      const session = await window.api.sessions.create(text, mode, bookId)
-      setProblemText('')
-      setCreating(false)
-      setMode('reading')
-      window.dispatchEvent(new Event('sessions-changed'))
-      navigate(`/session/${session.id}`)
-    } catch (e) {
-      setCreateError(errText(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   function handleClosed(_action: 'trash' | 'archive') {
     const target = closing
     setClosing(null)
     if (target && target.id === activeId) navigate('/')
     window.dispatchEvent(new Event('sessions-changed'))
   }
-
-  const canSubmit = problemText.trim().length >= MIN_PROBLEM_LEN && !busy
 
   if (collapsed) {
     return (
@@ -173,7 +131,7 @@ export function Sidebar() {
           </button>
           <button
             className="btn btn-ghost btn-sm sb-rail-btn"
-            title="我有一个头疼的问题"
+            title="新增一个头疼的问题"
             onClick={openNew}
           >
             ＋
@@ -181,6 +139,16 @@ export function Sidebar() {
 
           <span className="spacer" />
 
+          <NavLink
+            to="/actions"
+            className={({ isActive }) =>
+              `btn btn-ghost btn-sm sb-rail-btn${isActive ? ' active' : ''}`
+            }
+            title="四象限工作法"
+            aria-label="四象限工作法"
+          >
+            <SquaresFour size={18} />
+          </NavLink>
           <button
             className={
               onLibrary
@@ -226,79 +194,9 @@ export function Sidebar() {
           </button>
         </div>
 
-        {creating ? (
-          <div className="sb-new-box">
-            <div className="sb-mode-row">
-              {MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={m === mode ? 'sb-mode-opt is-on' : 'sb-mode-opt'}
-                  disabled={busy}
-                  onClick={() => setMode(m)}
-                >
-                  <span className="sb-mode-name">{MODE_META[m].name}</span>
-                  <span className="sb-mode-desc">{MODE_META[m].desc}</span>
-                </button>
-              ))}
-            </div>
-
-            {mode === 'reading' && (
-              <label className="field">
-                选择书籍
-                <select
-                  className="input"
-                  value={bookId}
-                  onChange={(e) => setBookId(e.target.value)}
-                >
-                  {books.map((b) => (
-                    <option key={b.bookId} value={b.bookId}>
-                      {b.title}
-                    </option>
-                  ))}
-                </select>
-                <button className="btn btn-ghost btn-sm" onClick={() => navigate('/library')}>
-                  导入其他书籍
-                </button>
-              </label>
-            )}
-            <textarea
-              ref={textareaRef}
-              className="textarea sb-new-input"
-              placeholder={
-                mode === 'workbench'
-                  ? '写出这个项目的主目标（至少 10 字），例如：三个月内把 AI 客服从试点推到全公司'
-                  : '写出你最近最头疼的那一件事（至少 10 字）'
-              }
-              value={problemText}
-              onChange={(e) => setProblemText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') cancelCreate()
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void submitCreate()
-              }}
-            />
-            <div className="sb-new-actions">
-              <span className="sb-count muted">{problemText.trim().length}/10 字</span>
-              <span className="spacer" />
-              <button className="btn btn-sm btn-ghost" onClick={cancelCreate} disabled={busy}>
-                取消
-              </button>
-              <button
-                className="btn btn-sm btn-primary"
-                onClick={() => void submitCreate()}
-                disabled={!canSubmit}
-              >
-                {busy ? <span className="spinner" /> : null}
-                {mode === 'workbench' ? '建立项目' : '开始'}
-              </button>
-            </div>
-            {createError ? <div className="error-text">{createError}</div> : null}
-          </div>
-        ) : (
-          <button className="btn btn-primary sb-new" onClick={() => setCreating(true)}>
-            ＋ 我有一个头疼的问题
-          </button>
-        )}
+        <button className="btn btn-primary sb-new" onClick={openNew}>
+          ＋ 新增一个头疼的问题
+        </button>
       </div>
 
       <div className="sb-list scroll">
@@ -349,6 +247,14 @@ export function Sidebar() {
 
       <nav className="sb-foot">
         <NavLink
+          className={({ isActive }) => `sb-nav sb-actions-nav${isActive ? ' active' : ''}`}
+          to="/actions"
+        >
+          <SquaresFour size={18} weight="duotone" />
+          四象限工作法
+          {pendingActions > 0 && <span className="sb-actions-count">{pendingActions}</span>}
+        </NavLink>
+        <NavLink
           className={({ isActive }) => (isActive ? 'sb-nav active' : 'sb-nav')}
           to="/library"
         >
@@ -361,6 +267,28 @@ export function Sidebar() {
           设置
         </NavLink>
       </nav>
+
+      {creating ? (
+        <NewSessionDialog
+          initialMode={mode}
+          initialBookId={bookId}
+          onClose={() => {
+            setCreating(false)
+            setMode('reading')
+          }}
+          onCreated={(id) => {
+            setCreating(false)
+            setMode('reading')
+            window.dispatchEvent(new Event('sessions-changed'))
+            navigate(`/session/${id}`)
+          }}
+          onImport={() => {
+            setCreating(false)
+            setMode('reading')
+            navigate('/library')
+          }}
+        />
+      ) : null}
 
       {closing ? (
         <CloseSessionDialog
