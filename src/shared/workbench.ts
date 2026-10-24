@@ -573,7 +573,7 @@ export function ruleChecksExecutionLoad(wb: WorkbenchData): WbCheck[] {
       active <= 5,
       active <= 5
         ? `7 天待办 ${active} 条，兵力集中`
-        : `7 天待办 ${active} 条，多线作战了，先从候选里砍到 5 条以内`
+        : `7 天待办 ${active} 条，多线作战了：把暂不执行的待办移回候选，优先保留 5 条以内；已有进展的行动不能直接移回。`
     )
   ]
 }

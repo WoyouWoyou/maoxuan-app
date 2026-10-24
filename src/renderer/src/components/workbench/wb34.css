@@ -866,6 +866,15 @@
   color: var(--muted);
 }
 
+/* 未保存编辑拦阻原因：按钮禁用时把“为什么点不了”直接写出来。 */
+.wbx-selectbar-hint {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--red);
+}
+
 .wbx-selectbar .btn {
   flex-shrink: 0;
 }

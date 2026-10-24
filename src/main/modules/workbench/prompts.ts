@@ -1,4 +1,4 @@
-import type { WbCheck, WbRecapInput, WorkbenchData } from '@shared/types'
+import type { WbAction, WbCheck, WbRecapInput, WorkbenchData } from '@shared/types'
 import { WB_ENHANCEMENTS, WB_OBJSUBJ, WB_ROUTES, WB_STANDARDS, routeName } from '@shared/workbench'
 
 export const WB_RULES = `你是「毛选工作台」的分析员：把《毛选》工作法变成一条稳定的项目决策流水线，而不是复读毛选。
@@ -358,6 +358,44 @@ export const WB_REDTEAM_SYSTEM = `${WB_RULES}
 输出 JSON：
 {"failItems":[{"area":"decision","message":""}]}`
 
+type WbAuditState = 'candidate' | 'todo' | 'done' | 'dropped'
+
+const AUDIT_STATE_LABEL: Record<WbAuditState, string> = {
+  candidate: '候选策略',
+  todo: '待办',
+  done: '已完成',
+  dropped: '已放弃'
+}
+
+/** 候选不进入执行状态判断；已纳入的行动按 todo / done / dropped 区分执行结果。 */
+function auditState(a: WbAction): WbAuditState {
+  return a.planningState === 'candidate' ? 'candidate' : a.status
+}
+
+/** 行动审核输入：按执行状态分区，保证 todo / done / dropped 的变化一定改变提示词。 */
+function auditActionsBlock(wb: WorkbenchData): string {
+  const rows: Record<WbAuditState, string[]> = { candidate: [], todo: [], done: [], dropped: [] }
+  for (const a of wb.actions) {
+    const state = auditState(a)
+    rows[state].push(
+      `- [${a.horizon}｜${AUDIT_STATE_LABEL[state]}] 动作：${a.action}｜目的：${a.purpose}｜验证：${a.verify}｜执行标准：${a.standards.join('、')}｜KPI：${a.kpi}`
+    )
+  }
+  const section = (title: string, items: string[]): string =>
+    `${title}\n${items.join('\n') || '（无）'}`
+  return [
+    '行动状态：候选策略 = 用户还没选中，不算执行承诺；待办 = 已承诺执行且尚未完成，只有待办计入多线作战；已完成 = 已经做完；已放弃 = 用户明确不再做。',
+    '',
+    section('【候选策略 · 尚未承诺执行，仅供参考】', rows.candidate),
+    '',
+    section('【当前待办 · 已承诺执行且未完成，多线作战只看这里】', rows.todo),
+    '',
+    section('【已完成记录 · 已经做完，不计入当前执行负担】', rows.done),
+    '',
+    section('【已放弃记录 · 用户明确不再做，不计入执行负担】', rows.dropped)
+  ].join('\n')
+}
+
 export function buildWbRedteamUser(wb: WorkbenchData, scope: 'decision' | 'actions'): string {
   const lines = [
     diagnoseContext(wb),
@@ -375,18 +413,12 @@ export function buildWbRedteamUser(wb: WorkbenchData, scope: 'decision' | 'actio
     decisionBlock(wb)
   ]
   if (scope === 'actions') {
-    const detail = wb.actions
-      .filter((a) => a.status !== 'dropped')
-      .map(
-        (a) =>
-          `- [${a.horizon}｜${a.planningState === 'queued' ? '已加入待办' : '候选策略'}] 动作：${a.action}｜目的：${a.purpose}｜验证：${a.verify}｜执行标准：${a.standards.join('、')}｜KPI：${a.kpi}`
-      )
     lines.push(
       '',
       '【待审核的行动】',
-      detail.join('\n') || '（无）',
+      auditActionsBlock(wb),
       '',
-      '注意：候选策略尚未被用户选中，不算执行承诺；多线作战的判断只针对已加入待办且未完成的行动。'
+      '注意：多线作战只统计【当前待办】里的行动；候选策略、已完成、已放弃都不算执行负担，不要把它们算进执行集中度。'
     )
   }
   lines.push(

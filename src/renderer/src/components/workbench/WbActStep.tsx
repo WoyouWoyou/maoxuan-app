@@ -19,6 +19,10 @@ import {
   routeName
 } from '@shared/workbench'
 import { useActionSelection } from '@renderer/features/workbench-actions/useActionSelection'
+import {
+  UNSAVED_EDIT_NOTICE,
+  actionDraftDirty
+} from '@renderer/features/workbench-actions/pendingEdit'
 import { ActionProgressLog } from '../ActionProgressLog'
 import { WbActionCandidateCard } from './WbActionCandidateCard'
 import { WbActionSelectionBar } from './WbActionSelectionBar'
@@ -237,6 +241,15 @@ export function WbActStep({
   // 候选与已加入待办各自独立，互不影响；复盘用的 picked 仍是单独的新事实勾选。
   const candidateSelection = useActionSelection(session.id, selectableCandidateIds)
   const queuedSelection = useActionSelection(session.id, returnableIds)
+
+  // 批量提交只带行动 ID，不带文本。编辑未保存时提交会把旧文本纳入待办，
+  // 所以批量加入 / 移回在提交前统一拦住，工具栏同时给出原因（不能只禁用 checkbox：
+  // 已勾选的条目仍在选择集合里）。
+  const editedAction = editingId ? (wb.actions.find((a) => a.id === editingId) ?? null) : null
+  const unsavedEditReason =
+    editedAction && actionDraftDirty(draft, editedAction) ? UNSAVED_EDIT_NOTICE : ''
+  const enqueueBlockedReason = candidateSelection.count > 0 ? unsavedEditReason : ''
+  const returnBatchBlockedReason = queuedSelection.count > 0 ? unsavedEditReason : ''
 
   const actionChecks = [
     ...mergeWaived(wb.actionChecks, ruleChecksActions(wb)),
@@ -492,6 +505,12 @@ export function WbActStep({
 
   function doEnqueue() {
     if (busy !== null) return
+    // 提交函数内再保护一次：按钮禁用可能被绕过，旧文本不能被静默纳入待办。
+    if (unsavedEditReason) {
+      setEnqueueFailure(null)
+      setEnqueueOutcome({ tone: 'warn', text: unsavedEditReason })
+      return
+    }
     const ids = [...candidateSelection.selectedIds]
     if (ids.length === 0) return
     const intent: BatchIntent = {
@@ -507,6 +526,11 @@ export function WbActStep({
 
   function retryEnqueue() {
     if (busy !== null || !enqueueFailure) return
+    if (unsavedEditReason) {
+      setEnqueueFailure(null)
+      setEnqueueOutcome({ tone: 'warn', text: unsavedEditReason })
+      return
+    }
     const { commands, mutationId, count, clearOnSuccess } = enqueueFailure
     setEnqueueFailure(null)
     void submitBatch('enqueue', { commands, mutationId, count, clearOnSuccess })
@@ -514,6 +538,11 @@ export function WbActStep({
 
   function doReturn(ids: string[], clearOnSuccess: boolean) {
     if (busy !== null || ids.length === 0) return
+    if (unsavedEditReason) {
+      setReturnFailure(null)
+      setReturnOutcome({ tone: 'warn', text: unsavedEditReason })
+      return
+    }
     const intent: BatchIntent = {
       commands: [{ kind: 'returnActionsToCandidates', ids: [...ids] }],
       mutationId: crypto.randomUUID(),
@@ -527,6 +556,11 @@ export function WbActStep({
 
   function retryReturn() {
     if (busy !== null || !returnFailure) return
+    if (unsavedEditReason) {
+      setReturnFailure(null)
+      setReturnOutcome({ tone: 'warn', text: unsavedEditReason })
+      return
+    }
     const { commands, mutationId, count, clearOnSuccess } = returnFailure
     setReturnFailure(null)
     void submitBatch('return', { commands, mutationId, count, clearOnSuccess })
@@ -813,6 +847,7 @@ export function WbActStep({
           count={candidateSelection.count}
           busy={busy !== null}
           actionLabel="加入待办"
+          blockedReason={enqueueBlockedReason}
           onAction={doEnqueue}
           onClear={candidateSelection.clear}
           notice={
@@ -991,6 +1026,7 @@ export function WbActStep({
           count={queuedSelection.count}
           busy={busy !== null}
           actionLabel="移回候选"
+          blockedReason={returnBatchBlockedReason}
           onAction={() => doReturn([...queuedSelection.selectedIds], true)}
           onClear={queuedSelection.clear}
           notice={

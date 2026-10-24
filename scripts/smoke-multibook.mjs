@@ -157,19 +157,25 @@ const server = http.createServer(async (req, res) => {
 })
 await new Promise((r) => server.listen(0, '127.0.0.1', r))
 const modelPort = server.address().port
-const app = spawn(require('electron'), ['.', '--remote-debugging-port=9433'], {
-  env: { ...process.env, MAOXUAN_USER_DATA: root, MAOXUAN_TEST: '1', ELECTRON_RENDERER_URL: '' },
-  stdio: ['ignore', 'pipe', 'pipe']
-})
+const launchApp = () =>
+  spawn(require('electron'), ['.', '--remote-debugging-port=9433'], {
+    env: { ...process.env, MAOXUAN_USER_DATA: root, MAOXUAN_TEST: '1', ELECTRON_RENDERER_URL: '' },
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
 let logs = ''
-app.stderr.on('data', (b) => {
-  logs += b
-})
-app.stdout.on('data', (b) => {
-  logs += b
-})
+const collectLogs = (proc) => {
+  proc.stderr.on('data', (b) => {
+    logs += b
+  })
+  proc.stdout.on('data', (b) => {
+    logs += b
+  })
+}
+let app = launchApp()
+collectLogs(app)
 let socket
-try {
+/** 连接调试端口；重启后复用同一套连接逻辑验证持久化。 */
+const connect = async () => {
   let targets
   for (let i = 0; i < 80; i++) {
     try {
@@ -180,27 +186,33 @@ try {
   }
   const page = targets?.find((t) => t.type === 'page')
   if (!page) throw new Error('Electron did not start: ' + logs)
-  socket = new WebSocket(page.webSocketDebuggerUrl)
+  const ws = new WebSocket(page.webSocketDebuggerUrl)
   await new Promise((r, j) => {
-    socket.onopen = r
-    socket.onerror = j
+    ws.onopen = r
+    ws.onerror = j
   })
   let sequence = 0
-  const pending = new Map()
-  socket.onmessage = (event) => {
+  const pendingCalls = new Map()
+  ws.onmessage = (event) => {
     const msg = JSON.parse(event.data)
     if (msg.id) {
-      const p = pending.get(msg.id)
-      pending.delete(msg.id)
+      const p = pendingCalls.get(msg.id)
+      pendingCalls.delete(msg.id)
       msg.error ? p?.reject(new Error(msg.error.message)) : p?.resolve(msg.result)
     }
   }
-  const cdp = (method, params = {}) =>
+  const send = (method, params = {}) =>
     new Promise((resolve, reject) => {
       const id = ++sequence
-      pending.set(id, { resolve, reject })
-      socket.send(JSON.stringify({ id, method, params }))
+      pendingCalls.set(id, { resolve, reject })
+      ws.send(JSON.stringify({ id, method, params }))
     })
+  return { socket: ws, cdp: send }
+}
+try {
+  const first = await connect()
+  socket = first.socket
+  const cdp = first.cdp
   const evaluate = async (expression) => {
     const r = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
     if (r.exceptionDetails)
@@ -478,24 +490,300 @@ try {
       (a) => a.planningState === 'candidate' && a.status === 'todo' && a.progress.length === 0
     )
   )
-  await clickText('选择本组')
-  await clickText('加入待办')
-  let queuedActions = []
-  for (let i = 0; i < 20; i++) {
-    const current = await api(`return await window.api.sessions.get('${project.id}')`)
-    queuedActions = current.data.workbench.actions.filter((a) => a.planningState === 'queued')
-    if (queuedActions.length > 0) break
+  // 生成候选不写工作清单：稍等侧栏计数稳定后取基线。
+  await delay(600)
+  const sidebarPending = async () =>
+    Number(
+      (await evaluate("document.querySelector('.sb-actions-count')?.textContent?.trim() ?? '0'")) ||
+        0
+    )
+  const pendingBaseline = await sidebarPending()
+  const readProject = () => api(`return await window.api.sessions.get('${project.id}')`)
+  const workbenchActions = async () => (await readProject()).data.workbench.actions
+  const queuedActionsOf = async () =>
+    (await workbenchActions()).filter((a) => a.planningState === 'queued')
+  const waitFor = async (check, label, tries = 60) => {
+    for (let i = 0; i < tries; i++) {
+      const value = await check()
+      if (value) return value
+      await delay(125)
+    }
+    throw new Error('Timed out waiting for ' + label)
+  }
+  const laneExpr = (section, laneName) =>
+    `[...document.querySelectorAll(${JSON.stringify(
+      section + ' .wbx-lane'
+    )})].find((l) => l.querySelector('.wbx-lane-name')?.textContent?.trim() === ${JSON.stringify(
+      laneName
+    )})`
+  const clickInLane = async (section, laneName, text) => {
+    const clicked = await evaluate(`(() => {
+      const lane = ${laneExpr(section, laneName)}
+      if (!lane) return false
+      const btn = [...lane.querySelectorAll('button')].find((b) => b.innerText.includes(${JSON.stringify(
+        text
+      )}))
+      if (!btn) return false
+      btn.click()
+      return true
+    })()`)
+    assert.equal(clicked, true, `Missing ${text} button in ${laneName}`)
+    await delay(300)
+  }
+  const checkCandidate = async (laneName) => {
+    const ok = await evaluate(`(() => {
+      const lane = ${laneExpr('.wbx-actions', laneName)}
+      const box = lane?.querySelector('.wbx-candidate input[type=checkbox]')
+      if (!box) return false
+      box.click()
+      return true
+    })()`)
+    assert.equal(ok, true, 'Missing candidate checkbox in ' + laneName)
+    await delay(200)
+  }
+  const candidateCards = '.wbx-actions .wbx-candidate'
+  const openCandidateEditor = async (laneName) => {
+    const ok = await evaluate(`(() => {
+      const lane = ${laneExpr('.wbx-actions', laneName)}
+      const btn = lane?.querySelector('.wbx-candidate button')
+      if (!btn) return false
+      btn.click()
+      return true
+    })()`)
+    assert.equal(ok, true, 'Missing candidate edit button in ' + laneName)
     await delay(250)
   }
-  assert.equal(queuedActions.length, 1)
-  assert.ok(queuedActions.every((a) => a.status === 'todo' && a.progress.length === 0))
-  savedProject = await api(`return await window.api.sessions.get('${project.id}')`)
+  const typeCandidateAction = async (text) => {
+    const ok = await evaluate(`(() => {
+      const t = document.querySelector('${candidateCards} textarea')
+      if (!t) return false
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(t, ${JSON.stringify(
+        text
+      )})
+      t.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    })()`)
+    assert.equal(ok, true, 'Missing candidate draft textarea')
+    await delay(200)
+  }
+  const enqueueButton = "document.querySelector('.wbx-actions .wbx-selectbar .btn-primary')"
+  const selectbarText = async () =>
+    (
+      await evaluate("document.querySelector('.wbx-actions .wbx-selectbar')?.innerText ?? ''")
+    ).replace(/\s+/g, ' ')
+  const enqueueDisabled = () => evaluate(`${enqueueButton}.disabled`)
+  const clickEnqueue = async () => {
+    await evaluate(`(() => { const b = ${enqueueButton}; if (b) b.click(); return true })()`)
+    await delay(300)
+  }
+  const formTextareas = () =>
+    evaluate("document.querySelectorAll('.wbx-actions .wbx-form textarea').length")
+  const pageErrors = () =>
+    evaluate(
+      "[...document.querySelectorAll('.sp-main .error-text')].map((e) => e.textContent).join('')"
+    )
+
+  // ---- P2-1 回归：勾选 → 编辑 → 修改未保存，批量加入不得静默推送旧文本 ----
+  await checkCandidate('7 天动作')
+  assert.equal(await enqueueDisabled(), false)
+  await openCandidateEditor('7 天动作')
+  await typeCandidateAction('只访谈1位同事（人工筛选后缩减）')
+  assert.match(await selectbarText(), /请先保存或取消编辑/)
+  assert.equal(await enqueueDisabled(), true, '编辑未保存时加入待办必须禁用')
+  assert.equal((await queuedActionsOf()).length, 0, '编辑未保存时不能推送任何旧文本')
+
+  // 编辑期间“选择本组”仍只改临时选择，不能因此重新放开加入。
+  await clickInLane('.wbx-actions', '30 天动作', '选择本组')
+  assert.match(await selectbarText(), /已选 2 条/)
+  assert.equal(await enqueueDisabled(), true)
+  // 未保存时不会出现“成功反馈 + 查看工作清单”的离开入口。
   assert.equal(
     await evaluate(
-      "[...document.querySelectorAll('.sp-main .error-text')].map(e=>e.textContent).join('')"
+      "[...document.querySelectorAll('.wbx-actions button')].some((b) => b.innerText.includes('查看工作清单'))"
     ),
-    ''
+    false,
+    '编辑未保存时不应出现查看工作清单入口'
   )
+  // 直接触发被禁用的按钮（模拟误触）也不会提交。
+  await clickEnqueue()
+  await delay(300)
+  assert.equal((await queuedActionsOf()).length, 0)
+  // 取消编辑：草稿丢弃，库里的行动文本保持原样；选择保留，加入恢复可用。
+  await evaluate(
+    "document.querySelector('.wbx-actions .wbx-candidate .wbx-form-actions .btn-ghost').click()"
+  )
+  await delay(250)
+  assert.equal((await workbenchActions())[0].action, '访谈2位同事')
+  assert.equal(await enqueueDisabled(), false)
+
+  // 编辑中直接离开页面：草稿丢弃但不写库；回来没有旧文本被静默纳入。
+  await openCandidateEditor('7 天动作')
+  await typeCandidateAction('只访谈1位同事（人工筛选后缩减）')
+  assert.equal(await enqueueDisabled(), true)
+  await evaluate("location.hash='/actions'")
+  await delay(500)
+  await evaluate(`location.hash='/session/${project.id}'`)
+  await delay(700)
+  const afterLeave = await workbenchActions()
+  assert.equal(afterLeave.filter((a) => a.planningState === 'queued').length, 0)
+  assert.equal(afterLeave[0].action, '访谈2位同事')
+  assert.equal(await formTextareas(), 0, '离开再回来不应残留编辑表单')
+  assert.match(await selectbarText(), /已选 0 条/)
+
+  // ---- 保存后加入使用新文本；跨周期一次选择 2 条 ----
+  await openCandidateEditor('7 天动作')
+  await typeCandidateAction('只访谈1位同事（人工筛选后缩减）')
+  await evaluate(
+    "document.querySelector('.wbx-actions .wbx-candidate .wbx-form-actions .btn-primary').click()"
+  )
+  await waitFor(
+    async () => (await workbenchActions())[0].action === '只访谈1位同事（人工筛选后缩减）',
+    'saved candidate edit'
+  )
+  assert.equal((await workbenchActions())[0].planningState, 'candidate')
+  assert.equal(await formTextareas(), 0, '保存后编辑表单应关闭')
+
+  await checkCandidate('7 天动作')
+  await checkCandidate('30 天动作')
+  assert.match(await selectbarText(), /已选 2 条/)
+  assert.equal(await enqueueDisabled(), false)
+  // 双击提交不重复：第二次命令对已纳入的行动是无变化。
+  await evaluate(`(() => { const b = ${enqueueButton}; b.click(); b.click(); return true })()`)
+  const queuedTwo = await waitFor(async () => {
+    const q = await queuedActionsOf()
+    return q.length === 2 ? q : null
+  }, 'queued two actions')
+  const queuedTexts = queuedTwo.map((a) => a.action)
+  assert.ok(queuedTexts.includes('只访谈1位同事（人工筛选后缩减）'), queuedTexts.join('|'))
+  assert.ok(queuedTexts.includes('访谈2位同事'), queuedTexts.join('|'))
+  assert.ok(
+    queuedTwo.every((a) => a.status === 'todo' && (a.progress ?? []).length === 0),
+    '加入待办不能自动带上执行状态或阶段记录'
+  )
+  assert.match(
+    await evaluate("document.querySelector('.wbx-actions .wbx-feedback')?.innerText ?? ''"),
+    /已加入 2 条/
+  )
+  assert.equal(await evaluate("document.querySelectorAll('.wbx-queued .wbx-action').length"), 2)
+  await waitFor(async () => (await sidebarPending()) === pendingBaseline + 2, 'sidebar count +2')
+  // 工作清单里核对条目：同一行动只有一条，且显示保存后的文本。
+  await evaluate("document.querySelector('.wbx-actions .wbx-feedback button').click()")
+  await delay(700)
+  assert.match(await evaluate('location.hash'), /#\/actions/)
+  await clickText('Todo 清单')
+  const listRows = () =>
+    evaluate("[...document.querySelectorAll('.action-row')].map((el) => el.innerText)")
+  const rows = await waitFor(async () => {
+    const all = await listRows()
+    return all.some((t) => t.includes('只访谈1位同事（人工筛选后缩减）')) ? all : null
+  }, 'work list rows')
+  const rowsWith = (needle) => rows.filter((t) => t.includes(needle)).length
+  assert.equal(rowsWith('只访谈1位同事（人工筛选后缩减）'), 1, '保存后的新文本应出现在清单')
+  assert.equal(rowsWith('访谈2位同事'), 1, '已加入待办的行动不能出现副本')
+  assert.equal(await sidebarPending(), pendingBaseline + 2)
+
+  // ---- 撤回（移回候选）后清单与侧栏计数下降 ----
+  await evaluate(`location.hash='/session/${project.id}'`)
+  await delay(700)
+  await evaluate(
+    `document.querySelector('[aria-label="移回候选：只访谈1位同事（人工筛选后缩减）"]').click()`
+  )
+  await waitFor(async () => {
+    const q = await queuedActionsOf()
+    return q.length === 1 && q[0].action === '访谈2位同事' ? q : null
+  }, 'return to candidates')
+  const returned = (await workbenchActions()).find(
+    (a) => a.action === '只访谈1位同事（人工筛选后缩减）'
+  )
+  assert.equal(returned.planningState, 'candidate')
+  await evaluate("location.hash='/actions'")
+  await delay(700)
+  await waitFor(async () => (await sidebarPending()) === pendingBaseline + 1, 'sidebar count +1')
+  await clickText('Todo 清单')
+  const afterReturnRows = await listRows()
+  assert.equal(
+    afterReturnRows.filter((t) => t.includes('只访谈1位同事（人工筛选后缩减）')).length,
+    0,
+    '移回候选的行动必须从清单消失'
+  )
+  assert.equal(afterReturnRows.filter((t) => t.includes('访谈2位同事')).length, 1)
+
+  // ---- 窄窗口与键盘可达性：批量操作栏可见、不被遮挡，checkbox 可用空格切换 ----
+  await evaluate(`location.hash='/session/${project.id}'`)
+  await delay(700)
+  // 窗口最小宽度是 1100（BrowserWindow.minWidth），窄窗验收按支持范围的最窄值测。
+  await cdp('Emulation.setDeviceMetricsOverride', {
+    width: 1100,
+    height: 720,
+    deviceScaleFactor: 1,
+    mobile: false
+  })
+  await delay(300)
+  await evaluate(
+    "document.querySelector('.wbx-actions .wbx-selectbar').scrollIntoView({block:'end'})"
+  )
+  await delay(200)
+  const narrowLayout = await evaluate(`(() => {
+    const bar = document.querySelector('.wbx-actions .wbx-selectbar')
+    if (!bar) return { bar: false }
+    const r = bar.getBoundingClientRect()
+    const btn = bar.querySelector('.btn-primary')
+    const br = btn.getBoundingClientRect()
+    const hit = document.elementFromPoint(br.left + br.width / 2, br.top + br.height / 2)
+    return {
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      bar: { top: Math.round(r.top), bottom: Math.round(r.bottom), w: Math.round(r.width) },
+      btn: { top: Math.round(br.top), bottom: Math.round(br.bottom), w: Math.round(br.width) },
+      hit: hit === btn || btn.contains(hit)
+    }
+  })()`)
+  assert.equal(
+    narrowLayout.bar !== false &&
+      narrowLayout.bar.w > 0 &&
+      narrowLayout.bar.top >= 0 &&
+      narrowLayout.bar.bottom <= narrowLayout.vh + 1 &&
+      narrowLayout.btn.top >= 0 &&
+      narrowLayout.btn.bottom <= narrowLayout.vh + 1 &&
+      narrowLayout.hit,
+    true,
+    '窄窗口下批量操作栏应可见且不被遮挡：' + JSON.stringify(narrowLayout)
+  )
+  const checkboxAria = await evaluate(
+    "document.querySelector('.wbx-actions .wbx-candidate input[type=checkbox]').getAttribute('aria-label')"
+  )
+  assert.match(String(checkboxAria), /选择候选策略/)
+  await evaluate(
+    "document.querySelector('.wbx-actions .wbx-candidate input[type=checkbox]').focus()"
+  )
+  await cdp('Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key: ' ',
+    code: 'Space',
+    windowsVirtualKeyCode: 32,
+    nativeVirtualKeyCode: 32
+  })
+  await cdp('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key: ' ',
+    code: 'Space',
+    windowsVirtualKeyCode: 32,
+    nativeVirtualKeyCode: 32
+  })
+  await delay(250)
+  assert.equal(
+    await evaluate(
+      "document.querySelector('.wbx-actions .wbx-candidate input[type=checkbox]').checked"
+    ),
+    true,
+    '空格应能切换候选勾选'
+  )
+  await cdp('Emulation.clearDeviceMetricsOverride')
+  await evaluate("document.querySelector('.wbx-actions .wbx-selectbar .btn-ghost')?.click()")
+  await delay(200)
+  assert.equal(await pageErrors(), '')
+  savedProject = await readProject()
+
   // The specialized profile still generates and accepts a diagnosis against builtin sources.
   const mao = await api(
     "return await window.api.sessions.create('我想解决工作中同时推进太多事情导致没有重点的问题')"
@@ -503,6 +791,62 @@ try {
   await api(
     `const d=await window.api.ai.diagnose('${mao.id}'); return await window.api.reading.apply('${mao.id}',[{kind:'diagnosis',value:d}],0,'毛选诊断','focus')`
   )
+  // ---- 重启持久化：同一 userData 再启动一次，纳入状态与整理结果仍在 ----
+  const beforeRestart = await readProject()
+  const queuedBeforeRestart = beforeRestart.data.workbench.actions.filter(
+    (a) => a.planningState === 'queued'
+  )
+  socket.close()
+  app.kill('SIGTERM')
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, 5000)
+    app.once('exit', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+  })
+  app = launchApp()
+  collectLogs(app)
+  const reconnect = await connect()
+  socket = reconnect.socket
+  const evaluateAfter = async (expression) => {
+    const r = await reconnect.cdp('Runtime.evaluate', {
+      expression,
+      awaitPromise: true,
+      returnByValue: true
+    })
+    if (r.exceptionDetails)
+      throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text)
+    return r.result.value
+  }
+  const apiAfter = (expr) => evaluateAfter(`(async()=>{${expr}})()`)
+  await delay(900)
+  const afterRestart = await apiAfter(`return await window.api.sessions.get('${project.id}')`)
+  const queuedAfterRestart = afterRestart.data.workbench.actions.filter(
+    (a) => a.planningState === 'queued'
+  )
+  assert.equal(queuedAfterRestart.length, queuedBeforeRestart.length)
+  assert.equal(queuedAfterRestart.length, 1)
+  assert.equal(queuedAfterRestart[0].action, '访谈2位同事')
+  assert.equal(
+    afterRestart.data.workbench.actions.filter((a) => a.planningState === 'candidate').length,
+    2
+  )
+  // 重启后页面靠持久化数据渲染，不是内存里的旧状态。
+  await evaluateAfter(`location.hash='/session/${project.id}'`)
+  let sidebarAfterRestart = null
+  for (let i = 0; i < 40; i++) {
+    await delay(150)
+    sidebarAfterRestart = await evaluateAfter(
+      "document.querySelector('.sb-actions-count')?.textContent?.trim()"
+    )
+    if (sidebarAfterRestart === String(pendingBaseline + 1)) break
+  }
+  const restartedBody = await evaluateAfter('document.body.innerText')
+  assert.match(restartedBody, /访谈2位同事/)
+  assert.match(restartedBody, /只访谈1位同事（人工筛选后缩减）/)
+  assert.equal(sidebarAfterRestart, String(pendingBaseline + 1))
+
   console.log(
     JSON.stringify(
       {
@@ -526,7 +870,14 @@ try {
           'history restore',
           'hidden book source retention',
           'workbench React four steps and parallel analysis',
-          'workbench candidate selection and batch enqueue',
+          'workbench generated actions stay candidates',
+          'workbench unsaved candidate edit blocks batch enqueue and does not push stale text',
+          'workbench cancel/leave discards draft without writing the database',
+          'workbench cross-cycle selection enqueues exactly 2 with saved text, no duplicates on double submit',
+          'workbench work list entries, no task copies and sidebar count match',
+          'workbench returning to candidates removes the task and lowers the sidebar count',
+          'workbench narrow-window selection bar visible/unoccluded and keyboard checkbox toggle',
+          'workbench queued state survives app restart and renders from persisted data',
           'maoxuan profile diagnosis compatibility'
         ],
         testData: root
