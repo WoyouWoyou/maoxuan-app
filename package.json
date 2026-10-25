@@ -1,7 +1,7 @@
 {
   "name": "maoxuan-app",
   "productName": "毛选实用工具箱",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "带着问题读《毛选》：明确问题、聚焦核心、联系自身、反复应用",
   "main": "./out/main/index.js",
   "private": true,
