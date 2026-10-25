@@ -77,8 +77,11 @@ export function checkBoundaries(project = process.cwd()) {
     }
     visit(source)
     for (const { specifier, typeOnly } of imports) {
-      const target = ts.resolveModuleName(specifier, file, options, ts.sys).resolvedModule
+      const resolved = ts.resolveModuleName(specifier, file, options, ts.sys).resolvedModule
         ?.resolvedFileName
+      // TypeScript returns slash-separated paths on Windows too; match the native
+      // paths produced by walk() before containment checks and graph traversal.
+      const target = resolved && path.normalize(resolved)
       const local = target && target.startsWith(root + path.sep),
         to = local ? rel(target) : '',
         dependency = local ? moduleOf(target) : undefined
