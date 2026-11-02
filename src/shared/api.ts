@@ -55,10 +55,7 @@ import type {
 /** Exposed by preload as `window.api`. Every method maps 1:1 to an ipcMain.handle channel named `${group}:${method}`. */
 export interface MaoxuanApi {
   sync: {
-    exchange?(
-      pairing: string,
-      choices?: Record<string, 'local' | 'remote'>
-    ): Promise<{
+    exchange?(pairing: string): Promise<{
       count: number
       conflicts: {
         key: string

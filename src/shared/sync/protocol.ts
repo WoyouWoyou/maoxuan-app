@@ -12,11 +12,11 @@ export type SyncDocument =
   | { id: string; kind: 'folder'; value: JournalFolder }
   | { id: string; kind: 'action'; value: import('../types').ActionItem }
 export interface SyncRequest {
-  protocol: 1
+  protocol: 2
   changes: { document: SyncDocument; base: string | null }[]
 }
 export interface SyncReply {
-  protocol: 1
+  protocol: 2
   documents: SyncDocument[]
   conflicts: string[]
 }
@@ -134,13 +134,44 @@ export function validateDocument(d: SyncDocument): void {
   } else throw Error('未知同步实体')
 }
 export const documentKey = (d: SyncDocument) => `${d.kind}:${d.id}`
-/** No timestamp ordering; divergent edits stay on both devices until explicitly resolved. */
+/** A deterministic user-editable copy; retries preserve identity instead of multiplying copies. */
+export function conflictCopy(
+  document: SyncDocument,
+  hash: (v: unknown) => string,
+  salt = ''
+): SyncDocument {
+  const d = structuredClone(document)
+  const id = 'sync-conflict:' + hash({ document, salt })
+  d.id = id
+  if (d.kind === 'session') {
+    d.value.session.id = id
+    d.value.session.title += '（同步冲突副本）'
+    d.value.versions = d.value.versions.map((v) => ({
+      ...v,
+      id: 'sync-conflict:' + hash({ owner: id, version: v.id }),
+      sessionId: id
+    }))
+    d.value.messages = d.value.messages.map((m) => ({
+      ...m,
+      id: 'sync-conflict:' + hash({ owner: id, message: m.id }),
+      sessionId: id
+    }))
+  } else {
+    d.value.id = id
+    if (d.kind === 'note') d.value.title += '（同步冲突副本）'
+    if (d.kind === 'action') d.value.text += '（同步冲突副本）'
+    if (d.kind === 'folder') d.value.name += '（同步冲突副本）'
+  }
+  return d
+}
+/** Never choose a winning timestamp: the PC original and an incoming conflict copy both survive. */
+
 export function reconcile(
   current: SyncDocument[],
   request: SyncRequest,
   hash: (v: unknown) => string
 ): SyncReply {
-  if (request?.protocol !== 1 || !Array.isArray(request.changes) || request.changes.length > 10000)
+  if (request?.protocol !== 2 || !Array.isArray(request.changes) || request.changes.length > 10000)
     throw Error('不支持的同步协议')
   const docs = new Map(current.map((d) => [documentKey(d), d]))
   const conflicts: string[] = []
@@ -165,7 +196,13 @@ export function reconcile(
       continue
     }
     if (prior ? hash(prior) === base : base === null) docs.set(key, d)
-    else conflicts.push(key)
+    else {
+      let copy = conflictCopy(d, hash)
+      while (docs.has(documentKey(copy)) && hash(docs.get(documentKey(copy))) !== hash(copy))
+        copy = conflictCopy(d, hash, hash(docs.get(documentKey(copy))))
+      docs.set(documentKey(copy), copy)
+      conflicts.push(key)
+    }
   }
-  return { protocol: 1, documents: [...docs.values()], conflicts }
+  return { protocol: 2, documents: [...docs.values()], conflicts }
 }

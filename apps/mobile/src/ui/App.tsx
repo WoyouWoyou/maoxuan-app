@@ -62,6 +62,7 @@ function MobileApp({
     [error, setError] = useState(''),
     [create, setCreate] = useState(false),
     [mode, setMode] = useState<SessionMode>('reading')
+  const [syncBusy, setSyncBusy] = useState(false)
   const [query, setQuery] = useState(''),
     [volume, setVolume] = useState('全部'),
     [article, setArticle] = useState<Article>(),
@@ -386,7 +387,12 @@ function MobileApp({
                   )}
                   {tab === 'profile' && (
                     <>
-                      <DeviceSyncPanel mobile onSynced={() => void reload()} />
+                      <DeviceSyncPanel
+                        mobile
+                        disabled={busy}
+                        onBusyChange={setSyncBusy}
+                        onSynced={() => void reload()}
+                      />
                       <div className="page-heading">
                         <div>
                           <div className="eyebrow">YOUR READING COACH</div>
@@ -490,6 +496,7 @@ function MobileApp({
                         <input
                           type="file"
                           aria-label="恢复备份"
+                          disabled={busy || syncBusy}
                           accept=".json"
                           onChange={(e) => {
                             const file = e.target.files?.[0]

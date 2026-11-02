@@ -66,6 +66,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > apps/mobile/artifacts/package-info.txt
           printf 'commit=%s\nrun=%s\nvariant=debug\n' "$BUILD_SHA" "$BUILD_NUMBER" > apps/mobile/artifacts/build-info.txt
+          cp -R apps/mobile/android/app/build/test-results/testDebugUnitTest apps/mobile/artifacts/native-tests
           cd apps/mobile/artifacts
           sha256sum ./*.apk > SHA256SUMS.txt
       - name: Upload APK and checksum

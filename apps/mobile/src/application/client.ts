@@ -142,7 +142,15 @@ export function createAppClient(store: AtomicStore, builtins: Article[]) {
     },
     async restoreBackup(text: string) {
       const { entities, history } = await this.inspectBackup(text)
-      // A local restore deliberately discards old transport state. Pairing is not implemented.
+      // Restoring local content starts a fresh reconciliation. Keep conflict copies, but
+      // never reuse a baseline from the old dataset to overwrite another device.
+      for (const e of entities)
+        if (
+          e.id.startsWith('desktop:sync:') &&
+          e.kind === 'desktop' &&
+          e.payload.type === 'settings'
+        )
+          e.payload.value = { ...e.payload.value, baseline: {}, lastSync: '' }
       await store.restore({ entities, history, outbox: [] } satisfies Snapshot)
     }
   }

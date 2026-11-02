@@ -117,7 +117,7 @@ export function createLanSync(
         status = {
           running: true,
           pairing: [
-            JSON.stringify({ protocol: 1, url: `https://${ip}:${port}/sync`, fingerprint, token })
+            JSON.stringify({ protocol: 2, url: `https://${ip}:${port}/sync`, fingerprint, token })
           ]
         }
         return structuredClone(status)

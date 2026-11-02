@@ -132,3 +132,31 @@ describe('backup restore', () => {
     expect(s.history).toHaveLength(1)
   })
 })
+
+it('backup restore resets sync baselines while preserving conflict recovery copies', async () => {
+  const { store, client } = await setup()
+  const entity = {
+    ...newMeta(),
+    id: 'desktop:sync:peer',
+    kind: 'desktop' as const,
+    payload: {
+      type: 'settings' as const,
+      value: {
+        baseline: { 'note:original': 'old-hash' },
+        conflicts: [{ key: 'note:original', remote: { markdown: '保留冲突原文' } }],
+        lastSync: 'old'
+      }
+    }
+  }
+  await store.commit({ entity, expectedVersion: 0, operationId: crypto.randomUUID() })
+  const backup = await client.exportBackup()
+  await client.restoreBackup(backup)
+  const restored = (await store.snapshot()).entities.find((e) => e.id === entity.id)
+  expect(
+    restored?.kind === 'desktop' && restored.payload.type === 'settings' && restored.payload.value
+  ).toMatchObject({
+    baseline: {},
+    conflicts: [{ remote: { markdown: '保留冲突原文' } }],
+    lastSync: ''
+  })
+})

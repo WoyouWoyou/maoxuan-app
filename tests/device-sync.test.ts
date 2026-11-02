@@ -27,7 +27,7 @@ const note = (id: string, text: string): SyncDocument => ({
     attachments: []
   }
 })
-it('SQLite PC and independent phone merge both directions, retain conflicts, resolve with CAS, and retry lost replies', async () => {
+it('SQLite PC and independent phone merge both directions, retain editable conflict copies with CAS, and retry lost replies', async () => {
   const db = openDatabase(':memory:')
   try {
     const repo = createSyncRepository(db),
@@ -59,8 +59,11 @@ it('SQLite PC and independent phone merge both directions, retain conflicts, res
     expect(conflict.conflicts).toHaveLength(1)
     expect(conflict.conflicts[0].local.value).toMatchObject({ markdown: '手机并发' })
     expect(conflict.conflicts[0].remote.value).toMatchObject({ markdown: '电脑并发' })
-    await exchangeSnapshot(store, 'pc', round, { 'note:pc': 'local' })
-    expect(repo.read().find((d) => d.id === 'pc')!.value).toMatchObject({ markdown: '手机并发' })
+    expect((await exchangeSnapshot(store, 'pc', round)).conflicts).toHaveLength(0)
+    expect(repo.read().find((d) => d.id === 'pc')!.value).toMatchObject({ markdown: '电脑并发' })
+    expect(repo.read().find((d) => d.id.startsWith('sync-conflict:'))!.value).toMatchObject({
+      markdown: '手机并发'
+    })
     await edit('回执中断')
     await expect(
       exchangeSnapshot(store, 'pc', async (body) => {
@@ -69,7 +72,7 @@ it('SQLite PC and independent phone merge both directions, retain conflicts, res
       })
     ).rejects.toThrow('断线')
     expect((await exchangeSnapshot(store, 'pc', round)).conflicts).toHaveLength(0)
-    expect(repo.read().filter((d) => d.kind === 'note')).toHaveLength(1)
+    expect(repo.read().filter((d) => d.kind === 'note')).toHaveLength(2)
     const before = await store.snapshot()
     await expect(
       store.batch([
@@ -113,7 +116,7 @@ it('HTTPS requires the paired token, rejects malformed payload, and revokes endp
     expect((await post(pair.token, '{}')).code).toBe(400)
     const result = await post(
       pair.token,
-      JSON.stringify({ protocol: 1, changes: [{ document: note('new', 'HTTPS文本'), base: null }] })
+      JSON.stringify({ protocol: 2, changes: [{ document: note('new', 'HTTPS文本'), base: null }] })
     )
     expect(result.code).toBe(200)
     expect(JSON.parse(result.body).documents).toHaveLength(1)
@@ -222,9 +225,12 @@ it('session histories, standalone todos, different notes and soft-delete conflic
     })
     repo.transaction(() => repo.apply([note('A', '电脑同时编辑')]))
     expect((await exchangeSnapshot(store, 'pc', round)).conflicts).toHaveLength(1)
+    expect((await exchangeSnapshot(store, 'pc', round)).conflicts).toHaveLength(0)
     expect(
-      (await exchangeSnapshot(store, 'pc', round, { 'note:A': 'remote' })).conflicts
-    ).toHaveLength(0)
+      repo
+        .read()
+        .some((d) => d.kind === 'note' && d.id.startsWith('sync-conflict:') && d.value.deleted)
+    ).toBe(true)
   } finally {
     db.close()
   }
@@ -293,19 +299,94 @@ it('conflicting session branches preserve both histories with independent local 
     expect(
       reconcile(
         repo.read(),
-        { protocol: 1, changes: [{ document: phone, base: hash(common) }] },
+        { protocol: 2, changes: [{ document: phone, base: hash(common) }] },
         hash
       ).conflicts
     ).toHaveLength(1)
-    repo.transaction(() => repo.apply([phone]))
-    const result = repo.read()[0]
-    if (result.kind !== 'session') throw Error()
-    expect(result.value.versions.map((v) => v.id).sort()).toEqual(['pc-v2', 'phone-v2', 'v1'])
-    expect(new Set(result.value.versions.map((v) => v.versionNo)).size).toBe(3)
+    const reply = reconcile(
+      repo.read(),
+      { protocol: 2, changes: [{ document: phone, base: hash(common) }] },
+      hash
+    )
+    repo.transaction(() => repo.apply(reply.documents))
+    const result = repo.read().filter((d) => d.kind === 'session')
+    expect(result).toHaveLength(2)
+    expect(result.find((d) => d.id === 'branches')!.value).toMatchObject({
+      session: { data: { problem: { text: 'pc-v2' } } }
+    })
+    const copy = result.find((d) => d.id.startsWith('sync-conflict:'))!
+    expect(copy.value).toMatchObject({ session: { data: { problem: { text: 'phone-v2' } } } })
+    if (copy.kind !== 'session') throw Error()
+    expect(copy.value.versions).toHaveLength(2)
     expect(
-      reconcile(repo.read(), { protocol: 1, changes: [{ document: phone, base: hash(pc) }] }, hash)
-        .conflicts
-    ).toHaveLength(0)
+      copy.value.versions.every((v) => v.sessionId === copy.id && v.id.startsWith('sync-conflict:'))
+    ).toBe(true)
+    const retry = reconcile(
+      repo.read(),
+      { protocol: 2, changes: [{ document: phone, base: hash(common) }] },
+      hash
+    )
+    expect(retry.documents.map((d) => d.id).sort()).toEqual(result.map((d) => d.id).sort())
+  } finally {
+    db.close()
+  }
+})
+
+it('folder and todo conflicts create stable editable copies without overwriting either input', () => {
+  const db = openDatabase(':memory:')
+  try {
+    const repo = createSyncRepository(db)
+    const folder: SyncDocument = {
+      kind: 'folder',
+      id: 'folder',
+      value: { id: 'folder', name: '电脑目录', parentId: null, archived: false, deleted: false }
+    }
+    const action: SyncDocument = {
+      kind: 'action',
+      id: 'todo',
+      value: {
+        id: 'todo',
+        text: '电脑待办',
+        status: 'todo',
+        progress: [],
+        result: '',
+        fromArticleId: null,
+        dueDate: '',
+        createdAt: '2026-01-01T00:00:00Z'
+      }
+    }
+    repo.transaction(() => repo.apply([folder, action]))
+    const phoneFolder = structuredClone(folder)
+    phoneFolder.value.name = '手机目录'
+    const phoneAction = structuredClone(action)
+    phoneAction.value.text = '手机待办'
+    const request = {
+      protocol: 2 as const,
+      changes: [
+        { document: phoneFolder, base: null },
+        { document: phoneAction, base: null }
+      ]
+    }
+    const reply = reconcile(repo.read(), request, hash)
+    repo.transaction(() => repo.apply(reply.documents))
+    expect(repo.read()).toHaveLength(4)
+    expect(repo.read().find((d) => d.kind === 'folder' && d.id === 'folder')!.value).toMatchObject({
+      name: '电脑目录'
+    })
+    expect(repo.read().find((d) => d.kind === 'action' && d.id === 'todo')!.value).toMatchObject({
+      text: '电脑待办'
+    })
+    expect(
+      repo.read().some((d) => d.kind === 'folder' && d.value.name === '手机目录（同步冲突副本）')
+    ).toBe(true)
+    expect(
+      repo.read().some((d) => d.kind === 'action' && d.value.text === '手机待办（同步冲突副本）')
+    ).toBe(true)
+    expect(
+      reconcile(repo.read(), request, hash)
+        .documents.map((d) => d.id)
+        .sort()
+    ).toEqual(reply.documents.map((d) => d.id).sort())
   } finally {
     db.close()
   }

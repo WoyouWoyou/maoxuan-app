@@ -1052,9 +1052,9 @@ export async function createDesktopApi(
           throw Error('请在电脑端开启同步')
         },
         stop: async () => ({ running: false, pairing: [] }),
-        exchange: (pairing: string, choices?: Record<string, 'local' | 'remote'>) =>
+        exchange: (pairing: string) =>
           exclusive(async () => {
-            const result = await synchronize(store, pairing, choices)
+            const result = await synchronize(store, pairing)
             await load()
             return result
           })

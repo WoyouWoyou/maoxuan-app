@@ -10,10 +10,14 @@ const text = (d: SyncDocument) =>
         : JSON.stringify(d.value.session.data, null, 2)
 export function DeviceSyncPanel({
   mobile = false,
-  onSynced
+  onSynced,
+  disabled = false,
+  onBusyChange
 }: {
   mobile?: boolean
   onSynced?: () => void
+  disabled?: boolean
+  onBusyChange?: (busy: boolean) => void
 }) {
   const [status, setStatus] = useState<SyncStatus>({ running: false, pairing: [] }),
     [pairing, setPairing] = useState(''),
@@ -21,9 +25,8 @@ export function DeviceSyncPanel({
     [error, setError] = useState(''),
     [message, setMessage] = useState('')
   const [conflicts, setConflicts] = useState<
-      { key: string; local: SyncDocument; remote: SyncDocument }[]
-    >([]),
-    [choices, setChoices] = useState<Record<string, 'local' | 'remote'>>({})
+    { key: string; local: SyncDocument; remote: SyncDocument }[]
+  >([])
   useEffect(() => {
     if (!mobile)
       void window.api.sync
@@ -32,8 +35,9 @@ export function DeviceSyncPanel({
         .catch((e) => setError(String(e)))
   }, [mobile])
   async function run(job: () => Promise<void>) {
-    if (busy) return
+    if (busy || disabled) return
     setBusy(true)
+    onBusyChange?.(true)
     setError('')
     try {
       await job()
@@ -41,6 +45,7 @@ export function DeviceSyncPanel({
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
+      onBusyChange?.(false)
     }
   }
   return (
@@ -65,14 +70,15 @@ export function DeviceSyncPanel({
           </label>
           <button
             className="btn btn-primary"
-            disabled={busy || !pairing.trim()}
+            disabled={busy || disabled || !pairing.trim()}
             onClick={() =>
               void run(async () => {
                 if (!window.api.sync.exchange) throw Error('需要更新移动端')
-                const result = await window.api.sync.exchange(pairing, choices)
+                const result = await window.api.sync.exchange(pairing)
                 setConflicts(result.conflicts)
-                setChoices({})
-                setMessage(`本轮核对 ${result.count} 项，${result.conflicts.length} 项冲突待处理`)
+                setMessage(
+                  `本轮核对 ${result.count} 项，${result.conflicts.length} 项冲突已保留两份`
+                )
                 window.dispatchEvent(new Event('sessions-changed'))
                 onSynced?.()
               })
@@ -82,8 +88,19 @@ export function DeviceSyncPanel({
           </button>
           {conflicts.map((c) => (
             <details key={c.key}>
-              <summary>冲突：{c.key}</summary>
-              <p>双方内容均已保留。选择后点「立即同步」提交；电脑再有修改时会重新提示。</p>
+              <summary>
+                已保留两份：
+                {c.local.kind === 'session'
+                  ? c.local.value.session.title
+                  : c.local.kind === 'note'
+                    ? c.local.value.title
+                    : c.local.kind === 'action'
+                      ? c.local.value.text
+                      : c.local.value.name}
+              </summary>
+              <p>
+                已生成可编辑的「同步冲突副本」。请到记录、问题或待办中自行编辑、合并或删除，后续同步不会替你选择。
+              </p>
               <h3>手机版本</h3>
               <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 180, overflow: 'auto' }}>
                 {text(c.local)}
@@ -92,24 +109,6 @@ export function DeviceSyncPanel({
               <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 180, overflow: 'auto' }}>
                 {text(c.remote)}
               </pre>
-              <label>
-                <input
-                  type="radio"
-                  name={c.key}
-                  checked={choices[c.key] === 'local'}
-                  onChange={() => setChoices({ ...choices, [c.key]: 'local' })}
-                />
-                采用手机版本
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name={c.key}
-                  checked={choices[c.key] === 'remote'}
-                  onChange={() => setChoices({ ...choices, [c.key]: 'remote' })}
-                />
-                采用电脑版本
-              </label>
             </details>
           ))}
         </>
@@ -117,7 +116,7 @@ export function DeviceSyncPanel({
         <>
           <button
             className="btn btn-primary"
-            disabled={busy}
+            disabled={busy || disabled}
             onClick={() =>
               void run(async () => {
                 setStatus(await (status.running ? window.api.sync.stop() : window.api.sync.start()))

@@ -3,6 +3,7 @@ import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils'
 import {
   canonical,
+  conflictCopy,
   documentKey,
   validateDocument,
   type SyncDocument,
@@ -24,16 +25,12 @@ export interface SyncResult {
   count: number
   conflicts: { key: string; local: SyncDocument; remote: SyncDocument }[]
 }
-export async function synchronize(
-  store: AtomicStore,
-  pairing: string,
-  choices: Record<string, 'local' | 'remote'> = {}
-): Promise<SyncResult> {
+export async function synchronize(store: AtomicStore, pairing: string): Promise<SyncResult> {
   if (Capacitor.getPlatform() !== 'android')
     throw Error('请在 Android APK 中连接电脑；浏览器不支持电脑证书固定')
   const pair = JSON.parse(pairing)
   if (
-    pair.protocol !== 1 ||
+    pair.protocol !== 2 ||
     !/^https:\/\//.test(pair.url) ||
     !/^([a-f0-9]{64})$/.test(pair.fingerprint) ||
     !/^([a-f0-9]{64})$/.test(pair.token)
@@ -42,15 +39,13 @@ export async function synchronize(
   return exchangeSnapshot(
     store,
     pair.fingerprint,
-    async (body) => (await native.exchange({ ...pair, body })).body,
-    choices
+    async (body) => (await native.exchange({ ...pair, body })).body
   )
 }
 export async function exchangeSnapshot(
   store: AtomicStore,
   peer: string,
-  exchange: (body: string) => Promise<string>,
-  choices: Record<string, 'local' | 'remote'> = {}
+  exchange: (body: string) => Promise<string>
 ): Promise<SyncResult> {
   const snapshot = await store.snapshot()
   const entities = snapshot.entities
@@ -85,27 +80,14 @@ export async function exchangeSnapshot(
   const meta =
     prior?.kind === 'desktop' && prior.payload.type === 'settings' ? prior.payload.value : {}
   const baseline = (meta.baseline ?? {}) as Record<string, string>
-  const oldConflicts = (meta.conflicts ?? []) as SyncResult['conflicts']
   const requested = docs
-    .map((d) => {
-      const key = documentKey(d),
-        conflict = oldConflicts.find((c) => c.key === key)
-      if (conflict && choices[key])
-        return {
-          document: choices[key] === 'remote' ? conflict.remote : d,
-          base: hash(conflict.remote)
-        }
-      return { document: d, base: baseline[key] ?? null }
-    })
-    .filter((c) => {
-      const key = documentKey(c.document)
-      return choices[key] || hash(c.document) !== baseline[key]
-    })
+    .map((document) => ({ document, base: baseline[documentKey(document)] ?? null }))
+    .filter((c) => hash(c.document) !== baseline[documentKey(c.document)])
   const reply = JSON.parse(
-    await exchange(JSON.stringify({ protocol: 1, changes: requested }))
+    await exchange(JSON.stringify({ protocol: 2, changes: requested }))
   ) as SyncReply
   if (
-    reply.protocol !== 1 ||
+    reply.protocol !== 2 ||
     !Array.isArray(reply.documents) ||
     reply.documents.length > 10000 ||
     !Array.isArray(reply.conflicts)
@@ -119,6 +101,26 @@ export async function exchangeSnapshot(
     seen.add(key)
   }
   const localMap = new Map(docs.map((d) => [documentKey(d), d]))
+  for (const key of reply.conflicts) {
+    const original = localMap.get(key)
+    if (!original) throw Error('无效冲突回执')
+    validateDocument(original)
+    let expected = conflictCopy(original, hash)
+    let preserved = false
+    const visited = new Set<string>()
+    for (let n = 0; n <= reply.documents.length; n++) {
+      if (visited.has(expected.id)) break
+      visited.add(expected.id)
+      const copy = reply.documents.find((d) => documentKey(d) === documentKey(expected))
+      if (!copy) break
+      if (canonical(copy) === canonical(expected)) {
+        preserved = true
+        break
+      }
+      expected = conflictCopy(original, hash, hash(copy))
+    }
+    if (!preserved) throw Error('电脑未提供完整冲突副本，本机数据保持不变')
+  }
   const conflicts: SyncResult['conflicts'] = []
   const commits: Commit[] = []
   const save = (id: string, payload: DesktopPayload) => {
@@ -135,7 +137,6 @@ export async function exchangeSnapshot(
     if (reply.conflicts.includes(key)) {
       const local = localMap.get(key)
       if (local) conflicts.push({ key, local, remote: d })
-      continue
     }
     baseline[key] = hash(d)
     if (localMap.has(key) && hash(localMap.get(key)) === hash(d)) continue

@@ -58,7 +58,7 @@ export function mobileMarch(
     if (p.type === 'journal')
       service.observe(
         p.value.notes
-          .filter((n) => n.completedAt)
+          .filter((n) => n.completedAt && !n.id.startsWith('sync-conflict:'))
           .map((n) => ({
             id: `journal:${n.id}:completed`,
             kind: 'journal',
