@@ -1,0 +1,51 @@
+{
+  "name": "@maoxuan/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "npm run resources && tsc --noEmit && vite build && node scripts/offline.mjs",
+    "resources": "node scripts/prepare-resources.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "verify": "npm test && npm run build",
+    "native:sync": "npm run build && cap sync",
+    "android": "cap open android",
+    "ios": "cap open ios",
+    "test:e2e": "playwright test",
+    "test:offline": "playwright test -c playwright.offline.config.ts"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
+    "@capacitor-community/sqlite": "8.1.1",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/share": "8.0.3",
+    "@noble/hashes": "1.8.0",
+    "@phosphor-icons/react": "2.1.10",
+    "fflate": "0.8.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "react-router-dom": "7.18.5",
+    "vditor": "4.0.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0",
+    "@playwright/test": "1.64.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "@vitejs/plugin-react": "5.2.0",
+    "fake-indexeddb": "6.2.4",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "5.0.5"
+  },
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  }
+}

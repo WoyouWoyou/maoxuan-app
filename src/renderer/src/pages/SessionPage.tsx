@@ -23,6 +23,7 @@ import { StepRelate } from '@renderer/components/steps/StepRelate'
 import { stepUnlocked } from '@renderer/components/steps/types'
 import { WorkbenchPage } from './WorkbenchPage'
 import './SessionPage.css'
+import { ArrowLeft, DotsThree } from '@phosphor-icons/react'
 import { readingCommands } from '@shared/contracts/reading'
 import { readingPresentation } from '@shared/reading-presentation'
 
@@ -51,7 +52,11 @@ function makeReading(articleId: string, title: string, focusQuestion = ''): Read
   }
 }
 
-export function SessionPage() {
+export function SessionPage({
+  mobileReading = false,
+  onBack
+}: { mobileReading?: boolean; onBack?: () => void } = {}) {
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false)
   const params = useParams<{ id: string }>()
   const id = params.id ?? ''
   const navigate = useNavigate()
@@ -318,43 +323,86 @@ export function SessionPage() {
   }
 
   return (
-    <div className="sp-root">
+    <div
+      className={`sp-root ${mobileReading && viewStep === 'focus' ? 'mobile-focus-session' : ''} ${mobilePanelOpen ? 'mobile-panel-open' : ''}`}
+    >
       <div className="sp-main">
-        <header className="sp-header">
-          {renaming ? (
-            <input
-              className="input sp-title-input"
-              value={titleDraft}
-              autoFocus
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={() => void commitTitle()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur()
-                if (e.key === 'Escape') {
+        {mobileReading && viewStep === 'focus' ? (
+          <header className="focus-session-header">
+            <div>
+              <button aria-label="我的问题" onClick={onBack}>
+                <ArrowLeft size={23} />
+              </button>
+              <h1>
+                {session.data.readings.find((r) => r.articleId === focusArticleId)?.title ??
+                  '聚焦核心'}
+              </h1>
+              <details>
+                <summary aria-label="更多阅读操作">
+                  <DotsThree size={25} />
+                </summary>
+                <div>
+                  <button
+                    onClick={() => {
+                      setMobilePanelOpen(true)
+                      setCollapsed(false)
+                      setPanelTab('chat')
+                    }}
+                  >
+                    教练对话
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMobilePanelOpen(true)
+                      setCollapsed(false)
+                      setPanelTab('version')
+                    }}
+                  >
+                    版本历史
+                  </button>
+                  <button onClick={() => goStep('problem')}>回到问题</button>
+                </div>
+              </details>
+            </div>
+            <p>{session.data.problem.text}</p>
+          </header>
+        ) : (
+          <header className="sp-header">
+            {renaming ? (
+              <input
+                className="input sp-title-input"
+                value={titleDraft}
+                autoFocus
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => void commitTitle()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                  if (e.key === 'Escape') {
+                    setTitleDraft(session.title)
+                    setRenaming(false)
+                  }
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="sp-title"
+                title="点击重命名"
+                onClick={() => {
                   setTitleDraft(session.title)
-                  setRenaming(false)
-                }
-              }}
-            />
-          ) : (
-            <button
-              type="button"
-              className="sp-title"
-              title="点击重命名"
-              onClick={() => {
-                setTitleDraft(session.title)
-                setRenaming(true)
-              }}
-            >
-              {session.title}
-            </button>
-          )}
-          <div className="sp-sub muted">
-            《{session.data.book?.title ?? '毛泽东选集'}》 · 当前进度：第{' '}
-            {STEPS.find((s) => s.key === session.currentStep)?.no ?? 1} 步 · {currentStepName} · 共{' '}
-            {session.versionNo} 个版本快照
-          </div>
-        </header>
+                  setRenaming(true)
+                }}
+              >
+                {session.title}
+              </button>
+            )}
+            <div className="sp-sub muted">
+              《{session.data.book?.title ?? '毛泽东选集'}》 · 当前进度：第{' '}
+              {STEPS.find((s) => s.key === session.currentStep)?.no ?? 1} 步 · {currentStepName} ·
+              共 {session.versionNo} 个版本快照
+            </div>
+          </header>
+        )}
 
         <Stepper
           currentStep={session.currentStep}
@@ -367,14 +415,23 @@ export function SessionPage() {
 
         <div className="sp-step">
           {viewStep === 'problem' && <StepProblem {...stepProps} />}
-          {viewStep === 'focus' && <StepFocus {...stepProps} />}
+          {viewStep === 'focus' && <StepFocus {...stepProps} mobile={mobileReading} />}
           {viewStep === 'relate' && <StepRelate {...stepProps} />}
           {viewStep === 'apply' && <StepApply {...stepProps} />}
         </div>
 
-        {session.data.book?.profile !== 'generic' && <DontsTicker />}
+        {session.data.book?.profile !== 'generic' && !(mobileReading && viewStep === 'focus') && (
+          <DontsTicker />
+        )}
       </div>
 
+      {mobileReading && viewStep === 'focus' && mobilePanelOpen && (
+        <button
+          className="focus-coach-dismiss"
+          onClick={() => setMobilePanelOpen(false)}
+          aria-label="关闭教练与历史面板"
+        />
+      )}
       <aside className={collapsed ? 'sp-panel is-collapsed' : 'sp-panel'}>
         {collapsed ? (
           <button
@@ -388,6 +445,11 @@ export function SessionPage() {
         ) : (
           <>
             <div className="sp-panel-head">
+              {mobileReading && viewStep === 'focus' && (
+                <button className="btn btn-ghost" onClick={() => setMobilePanelOpen(false)}>
+                  返回阅读
+                </button>
+              )}
               <div className="sp-tabs">
                 <button
                   type="button"

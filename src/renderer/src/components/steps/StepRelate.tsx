@@ -34,6 +34,8 @@ export function StepRelate({
   update
 }: StepProps) {
   const edits = useRef(0)
+  const confirmDialog = useRef<HTMLDialogElement>(null)
+  const saveInFlight = useRef(false)
   const data = session.data
   const presentation = readingPresentation(data)
   const readReadings = data.readings.filter((r) => r.readDone)
@@ -44,16 +46,20 @@ export function StepRelate({
   const [selectedId, setSelectedId] = useState(preferred)
   const [notes, setNotes] = useState<ThreeNotes>(EMPTY_NOTES)
   const [busy, setBusy] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [drafted, setDrafted] = useState(false)
   const [err, setErr] = useState('')
-  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   const selected: Reading | null =
     readReadings.find((r) => r.articleId === selectedId) ?? readReadings[0] ?? null
 
   useEffect(() => {
+    edits.current++
+    setDrafted(false)
+    setErr('')
     const target = readReadings.find((r) => r.articleId === selectedId) ?? readReadings[0]
     setNotes(target ? target.notes : EMPTY_NOTES)
-    setSaved(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
 
@@ -61,6 +67,13 @@ export function StepRelate({
     if (selected && selected.articleId !== focusArticleId) setFocusArticleId(selected.articleId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.articleId])
+
+  useEffect(
+    () => () => {
+      edits.current++
+    },
+    [session.id]
+  )
 
   if (!selected) {
     return (
@@ -79,6 +92,28 @@ export function StepRelate({
     .slice()
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
+  const working = busy || generating || saving
+  const hasReflections = reflections.some((r) => r.text.trim())
+
+  async function fillFromNotes() {
+    if (!selected || working || !hasReflections) return
+    const requestedEdits = edits.current
+    setGenerating(true)
+    setErr('')
+    try {
+      const result = await window.api.ai.draftNotes(session.id, selected.articleId)
+      if (edits.current !== requestedEdits)
+        throw new Error('笔记草稿已修改，未覆盖当前内容，请重新辅助填写')
+      edits.current++
+      setNotes(result)
+      setDrafted(true)
+    } catch (e) {
+      setErr(toMessage(e))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   function setField(key: keyof ThreeNotes, value: string) {
     edits.current++
     setNotes((prev) => {
@@ -86,12 +121,11 @@ export function StepRelate({
       next[key] = value
       return next
     })
-    setSaved(false)
   }
 
   async function review() {
     const current = selected
-    if (!current || !filled || busy) return
+    if (!current || !filled || working) return
     const articleId = current.articleId
     const title = current.title
     const requestedEdits = edits.current
@@ -122,7 +156,10 @@ export function StepRelate({
 
   async function saveNotes() {
     const current = selected
-    if (!current || !filled || busy) return
+    if (!current || !filled || working || saveInFlight.current) return
+    saveInFlight.current = true
+    setSaving(true)
+    setErr('')
     const articleId = current.articleId
     const title = current.title
     const actionText = notes.action.trim()
@@ -136,22 +173,31 @@ export function StepRelate({
       progress: [],
       createdAt: new Date().toISOString()
     }
-    await update(
-      (latest) => {
-        const exists = latest.actions.some(
-          (a) => a.fromArticleId === articleId && a.text.trim() === actionText
-        )
-        return {
-          ...latest,
-          readings: latest.readings.map((r) =>
-            r.articleId === articleId ? { ...r, notes, notesDone: true } : r
-          ),
-          actions: exists ? latest.actions : [...latest.actions, newAction]
-        }
-      },
-      { versionLabel: `第三步：《${title}》3 条笔记`, step: 'apply' }
-    )
-    setSaved(true)
+    try {
+      await update(
+        (latest) => {
+          const exists = latest.actions.some(
+            (a) => a.fromArticleId === articleId && a.text.trim() === actionText
+          )
+          return {
+            ...latest,
+            readings: latest.readings.map((r) =>
+              r.articleId === articleId ? { ...r, notes, notesDone: true } : r
+            ),
+            actions: exists ? latest.actions : [...latest.actions, newAction]
+          }
+        },
+        { versionLabel: `第三步：《${title}》3 条笔记`, step: 'apply' }
+      )
+      confirmDialog.current?.close()
+      goStep('apply')
+    } catch (e) {
+      confirmDialog.current?.close()
+      setErr(toMessage(e))
+    } finally {
+      saveInFlight.current = false
+      setSaving(false)
+    }
   }
 
   return (
@@ -172,6 +218,7 @@ export function StepRelate({
                 key={r.articleId}
                 type="button"
                 className={`rp-item${isOn ? ' is-on' : ''}`}
+                disabled={working}
                 onClick={() => {
                   setSelectedId(r.articleId)
                   setFocusArticleId(r.articleId)
@@ -229,7 +276,9 @@ export function StepRelate({
           </div>
         )}
 
-        <div className="muted relate-tip">先看自己的感悟，再写下面 3 条。</div>
+        <div className="muted relate-tip">
+          先看自己的感悟，再写下面 3 条；也可以根据笔记 AI 辅助填写。
+        </div>
       </div>
 
       {!presentation.generic && <NoteExampleCard articleId={selected.articleId} />}
@@ -245,6 +294,7 @@ export function StepRelate({
               className="textarea"
               rows={2}
               value={notes[field.key]}
+              disabled={saving}
               placeholder={
                 presentation.generic
                   ? field.guide
@@ -259,8 +309,17 @@ export function StepRelate({
       <div className="step-actions-bar">
         <button
           type="button"
+          className="btn btn-ghost"
+          disabled={!hasReflections || working}
+          onClick={() => void fillFromNotes()}
+        >
+          {generating && <span className="spinner" />}
+          {generating ? '正在根据笔记整理…' : '根据笔记 AI 辅助填写'}
+        </button>
+        <button
+          type="button"
           className="btn btn-primary"
-          disabled={!filled || busy}
+          disabled={!filled || working}
           onClick={() => void review()}
         >
           {busy && <span className="spinner" />} 请教员批改
@@ -268,28 +327,60 @@ export function StepRelate({
         <button
           type="button"
           className="btn btn-ghost"
-          disabled={!filled || busy}
-          onClick={() => void saveNotes()}
+          disabled={!filled || working}
+          onClick={() => {
+            if (drafted) confirmDialog.current?.showModal()
+            else void saveNotes()
+          }}
         >
-          保存笔记
+          {saving ? '正在保存…' : '保存笔记后进入行动'}
         </button>
         {!filled && <span className="muted">可以先回顾原文和自己的感受，再写一个小的尝试</span>}
         {err && <span className="error-text">{err}</span>}
-        {saved && (
-          <span className="ok-text">
-            已加入行动清单
-            <button
-              type="button"
-              className="btn btn-sm btn-primary"
-              onClick={() => goStep('apply')}
-            >
-              去干 1 件事 →
-            </button>
-          </span>
-        )}
       </div>
 
-      {!feedback && <div className="muted relate-tip">写完先请教员批改，再看要不要改。</div>}
+      <dialog
+        ref={confirmDialog}
+        className="relate-save-dialog"
+        aria-labelledby="relate-save-title"
+        aria-describedby="relate-save-description"
+        onCancel={(event) => {
+          if (saving) event.preventDefault()
+        }}
+      >
+        <h2 id="relate-save-title">确认 AI 辅助笔记</h2>
+        <p id="relate-save-description">
+          这三条内容经过 AI 辅助填写。请确认它们符合你的真实想法，且具体行动是你愿意执行的。
+          确认后将保存笔记，并把第 3 条加入行动清单，进入行动页。
+        </p>
+        <div className="step-actions-bar">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={saving}
+            onClick={() => confirmDialog.current?.close()}
+            autoFocus
+          >
+            返回修改
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={saving}
+            onClick={() => void saveNotes()}
+          >
+            {saving ? '正在保存…' : '确认保存并进入行动'}
+          </button>
+        </div>
+      </dialog>
+
+      <div className="muted relate-tip" role="status">
+        {!hasReflections
+          ? '先在第二步记下阅读感悟，就可以根据笔记 AI 辅助填写。'
+          : drafted
+            ? '已根据你的笔记填写三个框。请核对并修改，再请教员批改或保存笔记。'
+            : 'AI 会根据本篇笔记重新填写上面三个框，请核对后再批改或保存。'}
+      </div>
 
       {feedback && (
         <div className="card relate-feedback">
@@ -341,7 +432,9 @@ export function StepRelate({
       )}
 
       {feedback && feedback.passed && !selected.notesDone && (
-        <div className="muted relate-tip">批改通过。点“保存笔记”，第 3 条会自动进入行动清单。</div>
+        <div className="muted relate-tip">
+          批改通过。点“保存笔记后进入行动”，第 3 条会自动加入行动清单并进入行动页。
+        </div>
       )}
     </div>
   )

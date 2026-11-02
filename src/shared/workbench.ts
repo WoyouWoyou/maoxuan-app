@@ -9,6 +9,24 @@ import type {
   WorkbenchData
 } from './types'
 
+/** 默认不自动采用旧项目的三份结果，用户确认后才进入分析。 */
+export function selectedMethods(wb: WorkbenchData) {
+  return [...new Set(wb.form.diagnosisMethods ?? [])]
+}
+
+/** 综合、检查和后续行动只读取用户选定的方法，保留其余历史结果。 */
+export function selectedWorkbench(wb: WorkbenchData): WorkbenchData {
+  const methods = selectedMethods(wb)
+  return {
+    ...wb,
+    diagnosis: {
+      contradiction: methods.includes('contradiction') ? wb.diagnosis.contradiction : null,
+      routes: methods.includes('routes') ? wb.diagnosis.routes : null,
+      objSubj: methods.includes('objSubj') ? wb.diagnosis.objSubj : null
+    }
+  }
+}
+
 export const WB_TIME_SCALES: { key: WbTimeScale; hint: string }[] = [
   { key: '7天', hint: '快速动作' },
   { key: '30天', hint: '阶段启动' },
@@ -281,9 +299,10 @@ export function wbStepUnlocked(
       if (!wb.intake) return { ok: false, reason: '先让 AI 整理事实台账' }
       return { ok: true, reason: '' }
     case 'wb_decide': {
-      const d = wb.diagnosis
-      if (!d.contradiction || !d.routes || !d.objSubj)
-        return { ok: false, reason: '三路诊断都完成后才能综合' }
+      const methods = selectedMethods(wb)
+      if (!methods.length) return { ok: false, reason: '先确认一种诊断方法' }
+      if (methods.some((key) => !wb.diagnosis[key]))
+        return { ok: false, reason: '先完成选定方法的诊断' }
       return { ok: true, reason: '' }
     }
     case 'wb_act':
@@ -297,7 +316,7 @@ export function wbStepDone(wb: WorkbenchData, step: WbStepKey): boolean {
     case 'wb_intake':
       return wb.intake !== null
     case 'wb_diagnose':
-      return Boolean(wb.diagnosis.contradiction && wb.diagnosis.routes && wb.diagnosis.objSubj)
+      return wbStepUnlocked(wb, 'wb_decide').ok
     case 'wb_decide':
       return Boolean(wb.decision?.confirmed)
     case 'wb_act':
@@ -335,6 +354,7 @@ function scoreOk(s: WbObjSubj['trend']): boolean {
 
 /** 第三步决策的硬规则：覆盖事实、三模块与决策本身。只返回检查结果，不改数据。 */
 export function ruleChecksDecision(wb: WorkbenchData): WbCheck[] {
+  wb = selectedWorkbench(wb)
   const out: WbCheck[] = []
   const facts = wb.intake?.facts ?? []
   const confirmed = facts.filter((f) => f.kind === 'fact' && f.confidence === 'confirmed').length

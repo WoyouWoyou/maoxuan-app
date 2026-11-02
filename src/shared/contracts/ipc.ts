@@ -1,3 +1,5 @@
+import { featurePreferencesSchema } from './features'
+import { journalBytesSchema, journalCommandSchema } from './journal'
 import { actionEditSchema } from './action-planning'
 import { readerPreferencesSchema, speechRequestSchema } from './reader'
 import { proxySettingsSchema } from './proxy'
@@ -109,10 +111,21 @@ const scope = opt(o({ bookId: s, revisionId: s }, true)),
     'wb_act'
   )
 const channels: Record<string, Schema> = {
+  'journal:list': tuple(),
+  'journal:apply': tuple(journalCommandSchema),
+  'journal:attach': tuple(s, s, s, journalBytesSchema),
+  'journal:media': tuple(s),
+  'journal:import': tuple(n(s)),
+  'journal:export': tuple(n(s), opt(s)),
+  'march:get': tuple(),
+  'march:plant': tuple(s, s),
+  'march:collect': tuple(s),
   'actions:list': tuple(),
   'actions:create': tuple(actionEditSchema),
   'actions:edit': tuple(s, actionEditSchema, opt(s)),
   'actions:classify': tuple(array(o({ sessionId: s, actionId: s }), 200), s),
+  'settings:getFeatures': tuple(),
+  'settings:setFeatures': tuple(featurePreferencesSchema),
   'settings:setReader': tuple(readerPreferencesSchema),
   'speech:synthesize': tuple(speechRequestSchema),
   'speech:prefetch': tuple(speechRequestSchema),
@@ -151,8 +164,13 @@ const channels: Record<string, Schema> = {
   'settings:setProxy': tuple(proxySettingsSchema),
   'chat:send': tuple(s, s, opt(n(s))),
   'ai:findPassages': tuple(s, s),
+  'ai:draftNotes': tuple(s, s),
   'ai:reviewNotes': tuple(s, s, notesSchema),
   'ai:reviewSituation': tuple(s, s),
+  'wb:decide': tuple(
+    s,
+    opt(o({ route: oneOf('steady', 'breakthrough', 'defensive'), primaryContradiction: s }))
+  ),
   'wb:recap': tuple(s, o({ progress: s, factChanges: s, judgmentsToFix: s }))
 }
 for (const channel of [
@@ -192,7 +210,6 @@ for (const channel of [
   'wb:contradiction',
   'wb:routes',
   'wb:objSubj',
-  'wb:decide',
   'wb:recheck',
   'wb:actions'
 ])

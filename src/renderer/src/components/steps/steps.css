@@ -693,3 +693,34 @@
   border-top: 1px dashed var(--line);
   padding-top: 10px;
 }
+
+.relate-save-dialog {
+  width: min(520px, calc(100vw - 48px));
+  max-height: calc(100dvh - 64px);
+  margin: auto;
+  padding: 28px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 24px 64px rgba(43, 43, 43, 0.24);
+}
+
+.relate-save-dialog::backdrop {
+  background: rgba(43, 40, 34, 0.48);
+}
+
+.relate-save-dialog h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.relate-save-dialog p {
+  margin: 0 0 24px;
+  line-height: 1.8;
+}
+
+.relate-save-dialog .step-actions-bar {
+  justify-content: flex-end;
+}

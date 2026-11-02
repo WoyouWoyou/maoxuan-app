@@ -50,7 +50,7 @@ export function ReaderPreferencesFields() {
             value={p.provider}
             onChange={(e) => update({ provider: e.target.value as 'edge' | 'system' })}
           >
-            <option value="edge">Edge 在线语音</option>
+            <option value="edge">Edge 语音（优先离线音频）</option>
             <option value="system">系统语音</option>
           </select>
         </label>
@@ -94,7 +94,7 @@ export function ReaderPreferencesFields() {
         </label>
         <p className="reader-option-hint">
           {p.provider === 'edge'
-            ? '联网合成，正文发送至微软语音服务。免密钥的非官方接入，服务可能变化。'
+            ? '核心五篇内置云健与晓晓完整音频，可离线播放。其他篇目或音色需联网合成，正文发送至微软语音服务。'
             : '可用声音取决于当前系统，缺少中文声音时请使用 Edge。'}
         </p>
       </div>

@@ -1,0 +1,76 @@
+name: Build Android test APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['codex/android-apk-**']
+    paths:
+      - '.github/workflows/build-android.yml'
+      - 'apps/mobile/**'
+      - 'src/shared/**'
+      - 'src/renderer/**'
+      - 'src/preload/index.d.ts'
+      - 'resources/articles.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install mobile dependencies
+        run: |
+          npm ci --prefix apps/mobile
+          # Shared renderer sources resolve the same mobile dependencies.
+          # No Electron install scripts or desktop native modules are needed.
+          ln -s apps/mobile/node_modules node_modules
+      - name: Test and build bundled web app
+        run: npm run verify --prefix apps/mobile
+      - name: Sync Android plugins and bundled assets
+        working-directory: apps/mobile
+        run: npx cap sync android
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Assemble installable debug APK
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+      - name: Verify APK signature and package artifacts
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p apps/mobile/artifacts
+          apk="apps/mobile/artifacts/maoxuan-mobile-0.1.0-test-${BUILD_NUMBER}.apk"
+          cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > apps/mobile/artifacts/package-info.txt
+          printf 'commit=%s\nrun=%s\nvariant=debug\n' "$BUILD_SHA" "$BUILD_NUMBER" > apps/mobile/artifacts/build-info.txt
+          cd apps/mobile/artifacts
+          sha256sum ./*.apk > SHA256SUMS.txt
+      - name: Upload APK and checksum
+        uses: actions/upload-artifact@v7
+        with:
+          name: maoxuan-android-test-apk
+          path: apps/mobile/artifacts/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

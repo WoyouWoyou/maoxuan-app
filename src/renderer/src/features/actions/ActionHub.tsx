@@ -21,16 +21,17 @@ export function ActionHubProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     const request = ++sequence.current
     try {
-      const [active, archived, independent] = await Promise.all([
+      const [active, independent] = await Promise.all([
         window.api.sessions.list(),
-        window.api.sessions.listArchived(),
         window.api.actions.list()
       ])
-      const ids = [...new Set([...active, ...archived].map((s) => s.id))]
+      const ids = [...new Set(active.map((s) => s.id))]
       const loaded = await Promise.all(ids.map((id) => window.api.sessions.get(id)))
       if (sequence.current === request) {
         setStandalone(independent)
-        setSessions(loaded.filter((s): s is Session => !!s && !s.deletedAt))
+        setSessions(
+          loaded.filter((s): s is Session => !!s && !s.deletedAt && s.status === 'active')
+        )
         setError('')
       }
     } catch (e) {

@@ -119,6 +119,7 @@ const fact = o({
 })
 export const intakeSchema = o({
   ...ai,
+  recommendation: opt(o({ method: oneOf('contradiction', 'routes', 'objSubj'), reason: s })),
   facts: array(fact),
   missing: strings,
   questions: array(o({ id: s, question: s, why: s, answer: s })),
@@ -231,6 +232,7 @@ export const ledgerSchema = o({
   summary: s
 })
 export const formSchema = o({
+  diagnosisMethods: opt(array(oneOf('contradiction', 'routes', 'objSubj'))),
   projectName: s,
   objective: s,
   timeScale: oneOf('', '7天', '30天', '90天', '1年', '5年'),

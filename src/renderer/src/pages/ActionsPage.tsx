@@ -876,12 +876,13 @@ function AddActionDialog({
             disabled={busy}
           >
             <option value="">默认</option>
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {sourceName(s.mode)} · {s.title}
-                {s.status === 'archived' ? '（已归档）' : ''}
-              </option>
-            ))}
+            {sessions
+              .filter((s) => s.status === 'active' && !s.deletedAt)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {sourceName(s.mode)} · {s.title}
+                </option>
+              ))}
           </select>
         </label>
         <div className="action-add-columns">

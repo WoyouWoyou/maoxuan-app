@@ -1,6 +1,12 @@
 import { useState } from 'react'
-import type { WbCheck, WbRouteKey } from '@shared/types'
-import { WB_ROUTES, blockingChecks, enhancementName, routeName } from '@shared/workbench'
+import type { WbCheck, WbDecision, WbRouteKey } from '@shared/types'
+import {
+  WB_ROUTES,
+  blockingChecks,
+  enhancementName,
+  routeName,
+  selectedMethods
+} from '@shared/workbench'
 import type { WbStepProps } from './types'
 import { toMessage } from './types'
 import './wb34.css'
@@ -15,18 +21,19 @@ export interface MetaItem {
 export function metaList(raw: unknown): MetaItem[] {
   if (Array.isArray(raw)) {
     return raw
-      .map(item => {
+      .map((item) => {
         if (typeof item === 'string') return { key: item, name: item, hint: '' }
         const o = (item ?? {}) as { key?: string; name?: string; hint?: string }
         return { key: o.key ?? o.name ?? '', name: o.name ?? o.key ?? '', hint: o.hint ?? '' }
       })
-      .filter(m => m.key)
+      .filter((m) => m.key)
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw as Record<string, string | { name?: string; hint?: string }>).map(([key, value]) =>
-      typeof value === 'string'
-        ? { key, name: value, hint: '' }
-        : { key, name: value?.name ?? key, hint: value?.hint ?? '' }
+    return Object.entries(raw as Record<string, string | { name?: string; hint?: string }>).map(
+      ([key, value]) =>
+        typeof value === 'string'
+          ? { key, name: value, hint: '' }
+          : { key, name: value?.name ?? key, hint: value?.hint ?? '' }
     )
   }
   return []
@@ -34,7 +41,7 @@ export function metaList(raw: unknown): MetaItem[] {
 
 const ROUTE_ITEMS = metaList(WB_ROUTES)
 
-type BusyKind = 'gen' | 'recheck' | 'fix' | 'save'
+type BusyKind = 'gen' | 'recheck' | 'fix' | 'save' | 'route'
 
 interface DecisionDraft {
   route: WbRouteKey
@@ -49,7 +56,7 @@ interface DecisionDraft {
 function splitLines(text: string): string[] {
   return text
     .split('\n')
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean)
 }
 
@@ -62,9 +69,9 @@ export interface ChecksPanelProps {
 
 /** 检查结果面板：未通过项可逐条“已知晓，保留”，通过项收起。 */
 export function ChecksPanel({ title, checks, onWaive, busy = false }: ChecksPanelProps) {
-  const failed = checks.filter(c => !c.passed && !c.waived)
-  const waived = checks.filter(c => !c.passed && c.waived)
-  const passed = checks.filter(c => c.passed)
+  const failed = checks.filter((c) => !c.passed && !c.waived)
+  const waived = checks.filter((c) => !c.passed && c.waived)
+  const passed = checks.filter((c) => c.passed)
 
   return (
     <div className="wbx-checks">
@@ -76,13 +83,22 @@ export function ChecksPanel({ title, checks, onWaive, busy = false }: ChecksPane
         </span>
       </div>
 
-      {failed.length === 0 && waived.length === 0 && <div className="muted wbx-checks-ok">没有未通过项。</div>}
+      {failed.length === 0 && waived.length === 0 && (
+        <div className="muted wbx-checks-ok">没有未通过项。</div>
+      )}
 
-      {failed.map(c => (
+      {failed.map((c) => (
         <div className="wbx-check-fail" key={c.id}>
-          <span className={c.source === 'ai' ? 'badge badge-red' : 'badge'}>{c.source === 'rule' ? '硬规则' : '红队'}</span>
+          <span className={c.source === 'ai' ? 'badge badge-red' : 'badge'}>
+            {c.source === 'rule' ? '硬规则' : '红队'}
+          </span>
           <span className="wbx-check-msg">{c.message}</span>
-          <button type="button" className="btn btn-sm btn-ghost" disabled={busy} onClick={() => onWaive(c.id)}>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            disabled={busy}
+            onClick={() => onWaive(c.id)}
+          >
             已知晓，保留
           </button>
         </div>
@@ -90,7 +106,7 @@ export function ChecksPanel({ title, checks, onWaive, busy = false }: ChecksPane
 
       {waived.length > 0 && (
         <ul className="wbx-check-waived">
-          {waived.map(c => (
+          {waived.map((c) => (
             <li key={c.id}>
               <span className="wbx-waived-tag">已知晓</span>
               <span className="wbx-check-msg">{c.message}</span>
@@ -103,7 +119,7 @@ export function ChecksPanel({ title, checks, onWaive, busy = false }: ChecksPane
         <details className="wbx-check-passed">
           <summary>通过 {passed.length} 项</summary>
           <ul>
-            {passed.map(c => (
+            {passed.map((c) => (
               <li key={c.id}>✓ {c.message}</li>
             ))}
           </ul>
@@ -131,7 +147,7 @@ function EditField({
         className="textarea"
         rows={rows}
         value={value}
-        onChange={e => {
+        onChange={(e) => {
           onChange(e.target.value)
         }}
       />
@@ -145,14 +161,18 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
   const [err, setErr] = useState('')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<DecisionDraft | null>(null)
+  const [routePreview, setRoutePreview] = useState<WbDecision | null>(null)
   const [stale, setStale] = useState(false)
 
   const blocking = decision ? blockingChecks(decision.checks) : []
-  const otherRoutes = (wb.diagnosis.routes?.routes ?? []).filter(r => r.key !== decision?.route)
+  const otherRoutes = (
+    selectedMethods(wb).includes('routes') ? (wb.diagnosis.routes?.routes ?? []) : []
+  ).filter((r) => r.key !== decision?.route)
   const missing: string[] = []
-  if (!wb.diagnosis.contradiction) missing.push('主要矛盾')
-  if (!wb.diagnosis.routes) missing.push('三条路线')
-  if (!wb.diagnosis.objSubj) missing.push('主客分析')
+  if (!selectedMethods(wb).length) missing.push('尚未确认方法')
+  for (const key of selectedMethods(wb))
+    if (!wb.diagnosis[key])
+      missing.push({ contradiction: '主要矛盾', routes: '三条路线', objSubj: '主客分析' }[key])
 
   async function run(kind: BusyKind, fn: () => Promise<void>) {
     setBusy(kind)
@@ -167,14 +187,14 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
   }
 
   async function flush() {
-    await updateWb(l => ({ ...l }))
+    await updateWb((l) => ({ ...l }))
   }
 
   async function generate() {
     await run('gen', async () => {
       await flush()
       const res = await window.api.wb.decide(session.id)
-      await updateWb(l => ({ ...l, decision: res }), { versionLabel: '第三步：综合决策' })
+      await updateWb((l) => ({ ...l, decision: res }), { versionLabel: '第三步：综合决策' })
       setStale(false)
     })
   }
@@ -183,7 +203,7 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
     await run('recheck', async () => {
       await flush()
       const checks = await window.api.wb.recheck(session.id)
-      await updateWb(l => (l.decision ? { ...l, decision: { ...l.decision, checks } } : l))
+      await updateWb((l) => (l.decision ? { ...l, decision: { ...l.decision, checks } } : l))
       setStale(false)
     })
   }
@@ -191,15 +211,21 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
   async function fixByChecks() {
     await run('fix', async () => {
       const res = await window.api.wb.decide(session.id)
-      await updateWb(l => ({ ...l, decision: res }), { versionLabel: '第三步：按检查意见修复' })
+      await updateWb((l) => ({ ...l, decision: res }), { versionLabel: '第三步：按检查意见修复' })
       setStale(false)
     })
   }
 
   async function waive(id: string) {
-    await updateWb(l =>
+    await updateWb((l) =>
       l.decision
-        ? { ...l, decision: { ...l.decision, checks: l.decision.checks.map(c => (c.id === id ? { ...c, waived: true } : c)) } }
+        ? {
+            ...l,
+            decision: {
+              ...l.decision,
+              checks: l.decision.checks.map((c) => (c.id === id ? { ...c, waived: true } : c))
+            }
+          }
         : l
     )
   }
@@ -207,7 +233,7 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
   async function confirmDecision() {
     await run('save', async () => {
       await updateWb(
-        l => (l.decision ? { ...l, decision: { ...l.decision, confirmed: true } } : l),
+        (l) => (l.decision ? { ...l, decision: { ...l.decision, confirmed: true } } : l),
         { versionLabel: '第三步：确认决策', step: 'wb_act' }
       )
       goStep('wb_act')
@@ -216,12 +242,15 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
 
   async function unconfirm() {
     await run('save', async () => {
-      await updateWb(l => (l.decision ? { ...l, decision: { ...l.decision, confirmed: false } } : l))
+      await updateWb((l) =>
+        l.decision ? { ...l, decision: { ...l.decision, confirmed: false } } : l
+      )
     })
   }
 
   function startEdit() {
     if (!decision) return
+    setRoutePreview(null)
     setDraft({
       route: decision.route,
       routeReason: decision.routeReason,
@@ -232,6 +261,28 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
       toInvestigate: decision.toInvestigate.join('\n')
     })
     setEditing(true)
+  }
+
+  async function changeRoute(route: WbRouteKey) {
+    if (!draft || busy !== null) return
+    const current = draft
+    await run('route', async () => {
+      await flush()
+      const res = await window.api.wb.decide(session.id, {
+        route,
+        primaryContradiction: current.primaryContradiction
+      })
+      setRoutePreview(res)
+      setDraft({
+        route: res.route,
+        primaryContradiction: res.primaryContradiction,
+        routeReason: res.routeReason,
+        biggestGap: res.biggestGap,
+        firstBattle: res.firstBattle,
+        notNow: res.notNow.join('\n'),
+        toInvestigate: res.toInvestigate.join('\n')
+      })
+    })
   }
 
   async function saveEdit() {
@@ -247,11 +298,24 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
     }
     await run('save', async () => {
       await updateWb(
-        l => (l.decision ? { ...l, decision: { ...l.decision, ...patch, edited: true, confirmed: false } } : l),
+        (l) =>
+          l.decision
+            ? {
+                ...l,
+                decision: {
+                  ...l.decision,
+                  ...(routePreview ?? {}),
+                  ...patch,
+                  edited: true,
+                  confirmed: false
+                }
+              }
+            : l,
         { versionLabel: '第三步：修改决策' }
       )
       setEditing(false)
       setDraft(null)
+      setRoutePreview(null)
       setStale(true)
     })
   }
@@ -273,11 +337,20 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
         <section className="card wbx-intro">
           <div className="card-title">综合决策</div>
           <p className="wbx-intro-text">
-            把三路诊断合成一份决策：主要矛盾、推荐路线、最大缺口、先打哪一仗、哪些事暂时不碰。生成后会自动跑硬规则 +
-            红队检查，未通过项要先修。
+            把选定方法的诊断提炼成一份决策：主要矛盾、推荐路线、最大缺口、先打哪一仗、哪些事暂时不碰。生成后会自动跑硬规则
+            + 红队检查，未通过项要先修。
           </p>
-          {missing.length > 0 && <div className="muted wbx-note">三路诊断还缺：{missing.join('、')}。先回第二步补齐，结论才靠得住。</div>}
-          <button type="button" className="btn btn-primary" disabled={busy !== null} onClick={() => void generate()}>
+          {missing.length > 0 && (
+            <div className="muted wbx-note">
+              所选诊断还缺：{missing.join('、')}。先回第二步补齐，结论才靠得住。
+            </div>
+          )}
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={busy !== null}
+            onClick={() => void generate()}
+          >
             {busy === 'gen' && <span className="spinner" />} 生成综合决策
           </button>
         </section>
@@ -288,72 +361,94 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
             {decision.edited && <span className="badge">已手改</span>}
             <span className="spacer" />
             {!editing && (
-              <button type="button" className="btn btn-sm btn-ghost" disabled={busy !== null} onClick={startEdit}>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                disabled={busy !== null}
+                onClick={startEdit}
+              >
                 编辑
               </button>
             )}
           </div>
 
           {editing && draft ? (
-            <div className="wbx-edit">
+            <fieldset
+              className="wbx-edit"
+              disabled={busy !== null}
+              style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+            >
               <div className="field">
                 <span className="field-label">推荐主路线</span>
                 <div className="wbx-route-chips">
-                  {ROUTE_ITEMS.map(item => (
+                  {ROUTE_ITEMS.map((item) => (
                     <button
                       key={item.key}
                       type="button"
                       title={item.hint}
-                      className={draft.route === item.key ? 'wbx-route-chip active' : 'wbx-route-chip'}
-                      onClick={() => {
-                        const key = item.key as WbRouteKey
-                        setDraft(d => (d ? { ...d, route: key } : d))
-                      }}
+                      className={
+                        draft.route === item.key ? 'wbx-route-chip active' : 'wbx-route-chip'
+                      }
+                      onClick={() => void changeRoute(item.key as WbRouteKey)}
                     >
                       {item.name || routeName(item.key as WbRouteKey)}
                     </button>
                   ))}
                 </div>
+                <span className="muted">
+                  {busy === 'route' ? (
+                    <>
+                      <span className="spinner" /> 正在按所选路线重新推演…
+                    </>
+                  ) : (
+                    '选择路线会重新推演理由、首战和暂缓事项，审阅后保存。'
+                  )}
+                </span>
               </div>
 
               <EditField
                 label="主要矛盾"
                 value={draft.primaryContradiction}
                 rows={3}
-                onChange={v => setDraft(d => (d ? { ...d, primaryContradiction: v } : d))}
+                onChange={(v) => setDraft((d) => (d ? { ...d, primaryContradiction: v } : d))}
               />
               <EditField
                 label="推荐路线理由"
                 value={draft.routeReason}
-                onChange={v => setDraft(d => (d ? { ...d, routeReason: v } : d))}
+                onChange={(v) => setDraft((d) => (d ? { ...d, routeReason: v } : d))}
               />
               <div className="wbx-edit-grid">
                 <EditField
                   label="最大缺口"
                   value={draft.biggestGap}
-                  onChange={v => setDraft(d => (d ? { ...d, biggestGap: v } : d))}
+                  onChange={(v) => setDraft((d) => (d ? { ...d, biggestGap: v } : d))}
                 />
                 <EditField
                   label="先打哪一仗"
                   value={draft.firstBattle}
-                  onChange={v => setDraft(d => (d ? { ...d, firstBattle: v } : d))}
+                  onChange={(v) => setDraft((d) => (d ? { ...d, firstBattle: v } : d))}
                 />
                 <EditField
                   label="暂时不碰（一行一条）"
                   value={draft.notNow}
                   rows={4}
-                  onChange={v => setDraft(d => (d ? { ...d, notNow: v } : d))}
+                  onChange={(v) => setDraft((d) => (d ? { ...d, notNow: v } : d))}
                 />
                 <EditField
                   label="继续调查（一行一条）"
                   value={draft.toInvestigate}
                   rows={4}
-                  onChange={v => setDraft(d => (d ? { ...d, toInvestigate: v } : d))}
+                  onChange={(v) => setDraft((d) => (d ? { ...d, toInvestigate: v } : d))}
                 />
               </div>
 
               <div className="wbx-edit-actions">
-                <button type="button" className="btn btn-sm btn-primary" disabled={busy !== null} onClick={() => void saveEdit()}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-primary"
+                  disabled={busy !== null}
+                  onClick={() => void saveEdit()}
+                >
                   {busy === 'save' && <span className="spinner" />} 保存修改
                 </button>
                 <button
@@ -363,30 +458,36 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
                   onClick={() => {
                     setEditing(false)
                     setDraft(null)
+                    setRoutePreview(null)
                   }}
                 >
                   取消
                 </button>
               </div>
-            </div>
+            </fieldset>
           ) : (
             <>
               <div className="wbx-contra">
                 <div className="wbx-label">主要矛盾</div>
-                <div className="wbx-contra-text serif">{decision.primaryContradiction || '（未填写）'}</div>
+                <div className="wbx-contra-text serif">
+                  {decision.primaryContradiction || '（未填写）'}
+                </div>
               </div>
 
               <div className="wbx-route">
                 <div className="wbx-label">推荐主路线</div>
                 <div className="wbx-route-row">
                   <span className="wbx-route-badge">{routeName(decision.route)}</span>
-                  <span className="wbx-route-reason">{decision.routeReason || '（未填写理由）'}</span>
+                  <span className="wbx-route-reason">
+                    {decision.routeReason || '（未填写理由）'}
+                  </span>
                 </div>
                 {otherRoutes.length > 0 && (
                   <div className="wbx-route-alt">
-                    {otherRoutes.map(r => (
+                    {otherRoutes.map((r) => (
                       <div key={r.key}>
-                        什么时候换线：{routeName(r.key)} —— {r.switchSignals[0] ?? '（未给出换线信号）'}
+                        什么时候换线：{routeName(r.key)} ——{' '}
+                        {r.switchSignals[0] ?? '（未给出换线信号）'}
                       </div>
                     ))}
                   </div>
@@ -400,7 +501,9 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
                 </div>
                 <div className="wbx-block wbx-first">
                   <div className="wbx-label">先打哪一仗</div>
-                  <div className="wbx-block-text wbx-strong">{decision.firstBattle || '（未填写）'}</div>
+                  <div className="wbx-block-text wbx-strong">
+                    {decision.firstBattle || '（未填写）'}
+                  </div>
                 </div>
               </div>
 
@@ -452,7 +555,7 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
                 <div className="wbx-section">
                   <div className="wbx-section-title">启用的增强模块</div>
                   <div className="wbx-chips">
-                    {decision.enhancements.map(en => (
+                    {decision.enhancements.map((en) => (
                       <span className="wbx-chip" key={en.key}>
                         <span className="wbx-chip-name">{enhancementName(en.key)}</span>
                         <span className="wbx-chip-point">{en.point}</span>
@@ -470,15 +573,25 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
             title="硬性自检"
             checks={decision.checks}
             busy={busy !== null}
-            onWaive={id => void run('save', () => waive(id))}
+            onWaive={(id) => void run('save', () => waive(id))}
           />
 
           <div className="wbx-check-actions">
-            <button type="button" className="btn btn-sm btn-ghost" disabled={busy !== null} onClick={() => void recheck()}>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              disabled={busy !== null}
+              onClick={() => void recheck()}
+            >
               {busy === 'recheck' && <span className="spinner" />} 重新检查
             </button>
             {blocking.length > 0 && (
-              <button type="button" className="btn btn-sm btn-ghost" disabled={busy !== null} onClick={() => void fixByChecks()}>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                disabled={busy !== null}
+                onClick={() => void fixByChecks()}
+              >
                 {busy === 'fix' && <span className="spinner" />} 按检查意见修复
               </button>
             )}
@@ -490,7 +603,12 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
               <button type="button" className="btn btn-primary" onClick={() => goStep('wb_act')}>
                 去行动 →
               </button>
-              <button type="button" className="btn btn-sm btn-ghost" disabled={busy !== null} onClick={() => void unconfirm()}>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                disabled={busy !== null}
+                onClick={() => void unconfirm()}
+              >
                 取消确认
               </button>
             </div>
@@ -504,7 +622,11 @@ export function WbDecideStep({ session, wb, updateWb, goStep, openSource }: WbSt
               >
                 {busy === 'save' && <span className="spinner" />} 确认决策，进入行动 →
               </button>
-              {blocking.length > 0 && <span className="muted">还有 {blocking.length} 项未通过：修复，或逐条标记已知晓</span>}
+              {blocking.length > 0 && (
+                <span className="muted">
+                  还有 {blocking.length} 项未通过：修复，或逐条标记已知晓
+                </span>
+              )}
             </div>
           )}
         </section>

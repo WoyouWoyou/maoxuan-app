@@ -1,0 +1,12 @@
+node_modules/
+dist/
+public/articles.json
+src/generated/
+test-results/
+playwright-report/
+artifacts/
+
+*.p12
+*.mobileprovision
+
+public/vditor/
