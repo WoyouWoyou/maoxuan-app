@@ -59,9 +59,16 @@ export function createSyncRepository(db: Database.Database): SyncRepository {
         else {
           const old = sessions.get(d.id)
           const s = { ...d.value.session, stateVersion: (old?.stateVersion ?? 0) + 1 }
-          if (old) sessions.save(s)
-          else sessions.insert(s)
-          for (const v of d.value.versions) if (!sessions.version(v.id)) sessions.snapshot(v)
+          if (!old) sessions.insert(s)
+          let nextVersion = Math.max(0, ...sessions.versions(d.id).map((v) => v.versionNo))
+          for (const v of [...d.value.versions].sort((a, b) => a.versionNo - b.versionNo)) {
+            const priorVersion = sessions.version(v.id)
+            if (priorVersion) {
+              if (canonical(priorVersion) !== canonical(v))
+                throw Error('历史版本身份冲突，已保留原数据')
+            } else sessions.snapshot({ ...v, versionNo: ++nextVersion })
+          }
+          sessions.save({ ...s, versionNo: nextVersion })
           sessions.clearMessages(d.id)
           for (const m of d.value.messages) sessions.addMessage(m)
         }

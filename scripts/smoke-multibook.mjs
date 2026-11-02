@@ -1,3 +1,5 @@
+import {request as httpsRequest} from 'node:https'
+import {createHash} from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -219,9 +221,41 @@ try {
       throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text)
     return r.result.value
   }
+  const waitFor = async (check, label, tries = 60) => {
+    for (let i = 0; i < tries; i++) {
+      const value = await check()
+      if (value) return value
+      await delay(125)
+    }
+    throw new Error('Timed out waiting for ' + label)
+  }
   const api = (expr) => evaluate(`(async()=>{${expr}})()`)
   await delay(500)
   assert.equal((await api('return await window.api.library.list()'))[0].chapters, 388)
+  // Exercise the actual preload -> main -> HTTPS -> SQLite path with isolated test data.
+  assert.equal((await api('return await window.api.sync.status()')).running, false)
+  const firstPair = JSON.parse((await api('return await window.api.sync.start()')).pairing[0])
+  await api('return await window.api.sync.stop()')
+  const secondPair = JSON.parse((await api('return await window.api.sync.start()')).pairing[0])
+  assert.equal(secondPair.fingerprint, firstPair.fingerprint)
+  assert.notEqual(secondPair.token, firstPair.token)
+  const postSync = (token, body) => new Promise((resolve, reject) => {
+    const req = httpsRequest(secondPair.url, {method:'POST',rejectUnauthorized:false,headers:{authorization:'Bearer '+token}}, res => {
+      const peer = res.socket.getPeerCertificate()
+      assert.equal(createHash('sha256').update(peer.raw).digest('hex'), secondPair.fingerprint)
+      let text='';res.on('data', chunk => text+=chunk);res.on('end',()=>resolve({code:res.statusCode,body:JSON.parse(text)}))
+    });req.on('error',reject);req.end(JSON.stringify(body))
+  })
+  assert.equal((await postSync(firstPair.token,{protocol:1,changes:[]})).code,403)
+  const syncNote={id:'lan-smoke-note',title:'局域网联调',markdown:'手机离线记录',tags:[],folderId:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),completedAt:null,deleted:false,source:'local',revision:1,attachments:[]}
+  const upload=await postSync(secondPair.token,{protocol:1,changes:[{document:{kind:'note',id:syncNote.id,value:syncNote},base:null}]})
+  assert.equal(upload.code,200)
+  const importedNote=(await api('return await window.api.journal.list()')).notes.find(n=>n.id===syncNote.id)
+  assert.equal(importedNote.markdown,'手机离线记录')
+  await api(`return await window.api.journal.apply(${JSON.stringify({kind:'noteSave',id:syncNote.id,revision:importedNote.revision,title:'局域网联调',markdown:'电脑修改后回传',tags:[]})})`)
+  const pulled=await postSync(secondPair.token,{protocol:1,changes:[]})
+  assert.equal(pulled.body.documents.find(d=>d.id===syncNote.id).value.markdown,'电脑修改后回传')
+  await api('return await window.api.sync.stop()')
   await fs.mkdir(path.join(root, 'import-previews'), { recursive: true })
   const id = '11111111-1111-1111-1111-111111111111'
   await fs.writeFile(
@@ -414,13 +448,14 @@ try {
   await delay(500)
   await evaluate('document.querySelector(\'input[placeholder="在本书标题与正文中搜索"]\').focus()')
   await cdp('Input.insertText', { text: '中国社会各阶级的分析' })
-  await delay(600)
-  assert.match(
-    await evaluate(
-      "[...document.querySelectorAll('.lib-hit')].find(el => el.querySelector('.lib-hit-title')?.textContent === '中国社会各阶级的分析')?.querySelector('.lib-hit-vol')?.textContent"
-    ),
-    /第一卷/
+  const searchVolume = await waitFor(
+    () =>
+      evaluate(
+        "[...document.querySelectorAll('.lib-hit')].find(el => el.querySelector('.lib-hit-title')?.textContent === '中国社会各阶级的分析')?.querySelector('.lib-hit-vol')?.textContent"
+      ),
+    'library search results'
   )
+  assert.match(searchVolume, /第一卷/)
   await evaluate(`document.querySelectorAll('.book-grid button')[1].click()`)
   await delay(250)
   const text = await evaluate('document.body.innerText')
@@ -470,8 +505,13 @@ try {
   let savedProject = await api(`return await window.api.sessions.get('${project.id}')`)
   assert.equal(savedProject.data.workbench.intake.facts[0].id, 'F1')
   assert.equal(savedProject.data.workbench.ledger.length, 1)
-  await clickText('进入三路诊断')
-  await clickText('一键三路诊断')
+  await clickText('进入方法诊断')
+  await clickText('我需要多个方法')
+  await evaluate(
+    "document.querySelectorAll('input[name=diagnosis-method]').forEach(input => {if(!input.checked)input.click()})"
+  )
+  await clickText('确认方法')
+  await clickText('开始所选诊断')
   savedProject = await api(`return await window.api.sessions.get('${project.id}')`)
   assert.ok(savedProject.data.workbench.diagnosis.contradiction)
   assert.ok(savedProject.data.workbench.diagnosis.routes)
@@ -502,14 +542,6 @@ try {
   const workbenchActions = async () => (await readProject()).data.workbench.actions
   const queuedActionsOf = async () =>
     (await workbenchActions()).filter((a) => a.planningState === 'queued')
-  const waitFor = async (check, label, tries = 60) => {
-    for (let i = 0; i < tries; i++) {
-      const value = await check()
-      if (value) return value
-      await delay(125)
-    }
-    throw new Error('Timed out waiting for ' + label)
-  }
   const laneExpr = (section, laneName) =>
     `[...document.querySelectorAll(${JSON.stringify(
       section + ' .wbx-lane'

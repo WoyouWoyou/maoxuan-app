@@ -153,6 +153,8 @@ export async function exchangeSnapshot(
       save(`desktop:action:${d.id}`, { type: 'action', value: d.value })
     else {
       const old = current(`desktop:session:${d.id}`)
+      const oldRecord =
+        old?.kind === 'desktop' && old.payload.type === 'session' ? old.payload.value : undefined
       save(`desktop:session:${d.id}`, {
         type: 'session',
         value: {
@@ -164,8 +166,8 @@ export async function exchangeSnapshot(
                 ? old.payload.value.session.stateVersion
                 : 0) + 1
           },
-          receipts: {},
-          chatEpoch: 0
+          receipts: oldRecord?.receipts ?? {},
+          chatEpoch: (oldRecord?.chatEpoch ?? 0) + 1
         }
       })
     }

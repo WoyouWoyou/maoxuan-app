@@ -229,3 +229,80 @@ it('session histories, standalone todos, different notes and soft-delete conflic
     db.close()
   }
 })
+
+it('conflicting session branches preserve both histories with independent local version numbers', async () => {
+  const { emptySessionData } = await import('../src/shared/types')
+  const db = openDatabase(':memory:')
+  try {
+    const repo = createSyncRepository(db)
+    const base = emptySessionData()
+    base.problem.text = '共同起点'
+    const session: import('../src/shared/types').Session = {
+      id: 'branches',
+      title: '同一问题',
+      mode: 'reading',
+      currentStep: 'problem',
+      status: 'active',
+      deletedAt: null,
+      stateVersion: 1,
+      versionNo: 1,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+      data: base
+    }
+    const initial: SyncDocument = {
+      kind: 'session',
+      id: session.id,
+      value: {
+        session,
+        versions: [
+          {
+            id: 'v1',
+            sessionId: session.id,
+            versionNo: 1,
+            step: 'problem',
+            label: '起点',
+            data: structuredClone(base),
+            createdAt: session.createdAt
+          }
+        ],
+        messages: []
+      }
+    }
+    repo.transaction(() => repo.apply([initial]))
+    const common = repo.read()[0]
+    const branch = (id: string): SyncDocument => {
+      const d = structuredClone(initial)
+      if (d.kind !== 'session') throw Error()
+      d.value.session.data.problem.text = id
+      d.value.session.versionNo = 2
+      d.value.versions.push({
+        id,
+        sessionId: session.id,
+        versionNo: 2,
+        step: 'problem',
+        label: id,
+        data: structuredClone(d.value.session.data),
+        createdAt: session.createdAt
+      })
+      return d
+    }
+    const pc = branch('pc-v2'),
+      phone = branch('phone-v2')
+    repo.transaction(() => repo.apply([pc]))
+    expect(
+      reconcile(
+        repo.read(),
+        { protocol: 1, changes: [{ document: phone, base: hash(common) }] },
+        hash
+      ).conflicts
+    ).toHaveLength(1)
+    repo.transaction(() => repo.apply([phone]))
+    const result = repo.read()[0]
+    if (result.kind !== 'session') throw Error()
+    expect(result.value.versions.map((v) => v.id).sort()).toEqual(['pc-v2', 'phone-v2', 'v1'])
+    expect(new Set(result.value.versions.map((v) => v.versionNo)).size).toBe(3)
+  } finally {
+    db.close()
+  }
+})
