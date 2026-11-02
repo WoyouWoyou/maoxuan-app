@@ -1,3 +1,4 @@
+import { cpSync } from 'node:fs'
 import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
@@ -20,12 +21,22 @@ export default defineConfig({
     resolve: { alias: { '@shared': resolve('src/shared') } }
   },
   renderer: {
+    publicDir: resolve('node_modules/.cache/maoxuan-renderer-public'),
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),
         '@shared': resolve('src/shared')
       }
     },
-    plugins: [react()]
+    plugins: [
+      react(),
+      {
+        name: 'journal-editor-assets',
+        buildStart() {
+          const destination = resolve('node_modules/.cache/maoxuan-renderer-public/vditor/dist')
+          cpSync(resolve('node_modules/vditor/dist'), destination, { recursive: true })
+        }
+      }
+    ]
   }
 })

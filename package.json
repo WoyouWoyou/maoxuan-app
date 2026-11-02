@@ -82,7 +82,8 @@
       "target": "dmg",
       "category": "public.app-category.education",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "用于在日常记录中录制语音备忘，录音保存在本机。"
+        "NSMicrophoneUsageDescription": "用于在日常记录中录制语音备忘，录音保存在本机。",
+        "NSLocalNetworkUsageDescription": "用于与您配对的手机在同一局域网同步阅读问题、Markdown 记录和待办。"
       },
       "entitlements": "resources/entitlements.mac.plist",
       "entitlementsInherit": "resources/entitlements.mac.plist"

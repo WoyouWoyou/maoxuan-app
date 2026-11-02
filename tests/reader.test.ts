@@ -20,6 +20,7 @@ describe('reading preferences and speech boundaries', () => {
       writeSecret: () => {}
     })
     expect(getReaderPreferences()).toEqual(DEFAULT_READER_PREFERENCES)
+    expect(getReaderPreferences().voice).toBe('zh-CN-YunjianNeural')
     const next = {
       ...DEFAULT_READER_PREFERENCES,
       enabled: true,
@@ -27,9 +28,45 @@ describe('reading preferences and speech boundaries', () => {
       rate: 1.25
     }
     expect(setReaderPreferences(next)).toEqual(next)
-    expect([...saved.keys()]).toEqual(['readerPreferences'])
+    expect([...saved.keys()]).toEqual(['readerPreferences', 'readerVoiceDefaultVersion'])
     expect(() => setReaderPreferences({ ...next, rate: 99 })).toThrow()
     expect(getReaderPreferences()).toEqual(next)
+  })
+  it('migrates the old default once and preserves later explicit voice choices and other preferences', () => {
+    const old = {
+      ...DEFAULT_READER_PREFERENCES,
+      enabled: true,
+      rate: 1.5,
+      voice: 'zh-CN-XiaoxiaoNeural'
+    }
+    const saved = new Map([['readerPreferences', JSON.stringify(old)]])
+    configureSettings({
+      read: (key) => saved.get(key) ?? null,
+      write: (key, value) => {
+        saved.set(key, value)
+      },
+      transaction: (fn) => fn(),
+      readSecret: () => '',
+      writeSecret: () => {}
+    })
+    expect(getReaderPreferences()).toEqual({ ...old, voice: 'zh-CN-YunjianNeural' })
+    expect(saved.get('readerVoiceDefaultVersion')).toBe('2')
+    expect(setReaderPreferences(old)).toEqual(old)
+    expect(getReaderPreferences()).toEqual(old)
+  })
+  it('keeps an existing non-default voice on upgrade', () => {
+    const old = { ...DEFAULT_READER_PREFERENCES, voice: 'zh-CN-YunxiNeural' }
+    const saved = new Map([['readerPreferences', JSON.stringify(old)]])
+    configureSettings({
+      read: (key) => saved.get(key) ?? null,
+      write: (key, value) => {
+        saved.set(key, value)
+      },
+      transaction: (fn) => fn(),
+      readSecret: () => '',
+      writeSecret: () => {}
+    })
+    expect(getReaderPreferences()).toEqual(old)
   })
   it('rejects malformed synthesis parameters before network access', () => {
     for (const request of [

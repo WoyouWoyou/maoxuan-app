@@ -6,6 +6,7 @@ import { isBuiltin } from 'node:module'
 const allowed = {
   'action-planning': ['sessions', 'settings', 'model-runtime', 'reading', 'workbench'],
   chat: ['sessions', 'settings', 'reading', 'workbench', 'library', 'model-runtime'],
+  'long-march': [],
   library: [],
   importing: ['library', 'tasks'],
   retrieval: ['library', 'model-runtime', 'tasks'],

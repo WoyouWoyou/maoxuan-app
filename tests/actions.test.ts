@@ -55,15 +55,58 @@ function wbAction(id: string, overrides: Partial<Omit<WbAction, 'id'>> = {}): Wb
   }
 }
 describe('unified action center', () => {
+  it.each(['reading', 'workbench'] as const)(
+    'hides archived %s actions and restores their original states without changing data',
+    (mode) => {
+      const s = add(session(mode))
+      const c = actionCommands(
+        s,
+        'same-id',
+        {
+          quadrant: 'plan',
+          dueDate: '2026-10-31',
+          purpose: '调查选址',
+          verify: '问两家店的房租'
+        },
+        { id: 'p1', text: '已联系店主', createdAt: '2026-10-29' }
+      )
+      if (mode === 'reading') s.data = applyReadingCommands(s.data, c.reading)
+      else s.data.workbench = applyWorkbenchCommands(s.data.workbench!, c.workbench)
+      if (mode === 'reading') {
+        const todo = s.data.actions[0]
+        s.data.actions.push(
+          { ...todo, id: 'done', status: 'done' },
+          { ...todo, id: 'dropped', status: 'dropped' }
+        )
+      } else {
+        const todo = s.data.workbench!.actions[0]
+        s.data.workbench!.actions.push(
+          { ...todo, id: 'done', status: 'done' },
+          { ...todo, id: 'dropped', status: 'dropped' },
+          wbAction('candidate')
+        )
+      }
+      const data = structuredClone(s.data)
+      const before = collectActions([s])
+      expect(before.map((t) => t.status)).toEqual(['todo', 'done', 'dropped'])
+      s.status = 'archived'
+      expect(collectActions([s])).toEqual([])
+      expect(() => newAction(s, 'new', { text: '新行动' }, '')).toThrow('已归档')
+      s.status = 'active'
+      expect(collectActions([s])).toEqual(before)
+      expect(s.data).toEqual(data)
+      s.deletedAt = '2026-10-29'
+      expect(collectActions([s])).toEqual([])
+    }
+  )
   it('collects both sources without guessing quadrants, keeps colliding ids distinct, excludes trash', () => {
     const reading = add(session()),
       workbench = add(session('workbench'))
-    workbench.status = 'archived'
     const trashed = { ...add(session()), id: 'trash', deletedAt: '2026-10-23' }
     const tasks = collectActions([reading, workbench, trashed])
     expect(tasks.map((t) => t.key)).toEqual(['reading:same-id', 'workbench:same-id'])
     expect(tasks.every((t) => t.quadrant === null)).toBe(true)
-    expect(tasks[1].archived).toBe(true)
+    expect(tasks[1].archived).toBe(false)
     expect(tasks[1].dueDate).toBe('')
   })
   it('persists planning, completion and progress on the original reading action without losing result', () => {
@@ -169,7 +212,6 @@ describe('unified action center', () => {
         }
       }
     ])
-    workbench.status = 'archived'
     const trashed = { ...session('workbench'), id: 'trash', deletedAt: '2026-10-24' }
     trashed.data = structuredClone(workbench.data)
 
@@ -179,7 +221,7 @@ describe('unified action center', () => {
     expect(tasks.some((t) => t.id === 'candidate-1')).toBe(false)
     expect(tasks[1]).toMatchObject({
       mode: 'workbench',
-      archived: true,
+      archived: false,
       text: '动作 same-id',
       horizon: '30d',
       purpose: '先调查',
