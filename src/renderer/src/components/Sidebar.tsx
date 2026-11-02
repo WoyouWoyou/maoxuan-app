@@ -1,11 +1,94 @@
-import { SquaresFour } from '@phosphor-icons/react'
+import { useFeaturePreferences } from '../features/settings/feature-preferences'
+import { SquaresFour, Mountains, Notebook } from '@phosphor-icons/react'
 import { useActionHub } from '../features/actions/context'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { stepMeta, type SessionMode, type SessionSummary, type StepKey } from '@shared/types'
 import { CloseSessionDialog } from './CloseSessionDialog'
 import './Sidebar.css'
 import { NewSessionDialog } from './NewSessionDialog'
+
+import { sessionLabels, validSessionLabel } from '../lib/session-labels'
+
+const LABELS_KEY = 'maoxuan.sidebarLabels'
+function readLabels(): Record<string, string> {
+  try {
+    const value = JSON.parse(localStorage.getItem(LABELS_KEY) || '{}')
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value).filter(
+            (entry): entry is [string, string] => typeof entry[1] === 'string'
+          )
+        )
+      : {}
+  } catch {
+    return {}
+  }
+}
+
+function LabelDialog({
+  session,
+  label,
+  onSave,
+  onClose
+}: {
+  session: SessionSummary
+  label: string
+  onSave: (value: string) => string | null
+  onClose: () => void
+}) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  const [value, setValue] = useState(label)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    dialog.current?.showModal()
+  }, [])
+  return (
+    <dialog
+      ref={dialog}
+      className="sb-label-dialog"
+      onCancel={onClose}
+      aria-labelledby="sb-label-heading"
+    >
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          const message = onSave(value.trim())
+          if (message) setError(message)
+          else onClose()
+        }}
+      >
+        <h3 id="sb-label-heading">修改问题标识</h3>
+        <p>{session.title}</p>
+        <label htmlFor="sb-label-input">输入 1～2 个字（汉字、字母或数字）</label>
+        <input
+          id="sb-label-input"
+          autoFocus
+          value={value}
+          onFocus={(event) => event.target.select()}
+          onChange={(event) => {
+            setValue(event.target.value)
+            setError('')
+          }}
+          aria-describedby={error ? 'sb-label-error' : undefined}
+        />
+        {error && (
+          <p id="sb-label-error" className="error-text" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="sb-label-actions">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            取消
+          </button>
+          <button type="submit" className="btn btn-primary">
+            保存
+          </button>
+        </div>
+      </form>
+    </dialog>
+  )
+}
 
 const COLLAPSE_KEY = 'maoxuan.sidebarCollapsed'
 
@@ -41,6 +124,8 @@ function readCollapsed(): boolean {
 }
 
 export function Sidebar() {
+  const features = useFeaturePreferences()
+  const showMarch = features.loaded && features.preferences.longMarch
   const { tasks: actionTasks } = useActionHub()
   const pendingActions = actionTasks.filter((task) => task.status === 'todo').length
   const [bookId, setBookId] = useState('maoxuan')
@@ -51,6 +136,37 @@ export function Sidebar() {
   const [mode, setMode] = useState<SessionMode>('reading')
   const [closing, setClosing] = useState<SessionSummary | null>(null)
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed)
+
+  const [customLabels, setCustomLabels] = useState(readLabels)
+  const [editingLabel, setEditingLabel] = useState<SessionSummary | null>(null)
+  const labels = useMemo(() => sessionLabels(sessions, customLabels), [sessions, customLabels])
+  const labelDialog = editingLabel ? (
+    <LabelDialog
+      key={editingLabel.id}
+      session={editingLabel}
+      label={labels[editingLabel.id]}
+      onClose={() => setEditingLabel(null)}
+      onSave={(value) => {
+        if (!validSessionLabel(value)) return '请输入 1～2 个字（汉字、字母或数字）。'
+        if (
+          sessions.some(
+            (session) =>
+              session.id !== editingLabel.id &&
+              labels[session.id].toLocaleLowerCase() === value.toLocaleLowerCase()
+          )
+        )
+          return '这个标识已被其他问题使用，请换一个。'
+        const next = { ...customLabels, [editingLabel.id]: value }
+        try {
+          localStorage.setItem(LABELS_KEY, JSON.stringify(next))
+        } catch {
+          return '保存失败，请重试。'
+        }
+        setCustomLabels(next)
+        return null
+      }}
+    />
+  ) : null
 
   const navigate = useNavigate()
   const location = useLocation()
@@ -137,7 +253,41 @@ export function Sidebar() {
             ＋
           </button>
 
-          <span className="spacer" />
+          <nav className="sb-rail-sessions" aria-label="问题列表">
+            {loading && <span className="spinner" aria-label="正在加载问题" />}
+            {error && (
+              <button
+                className="btn btn-ghost sb-rail-btn"
+                title={`${error}，点击重试`}
+                aria-label="加载问题失败，重试"
+                onClick={() => void load()}
+              >
+                !
+              </button>
+            )}
+            {sessions.map((session) => (
+              <button
+                key={session.id}
+                className={`btn btn-ghost sb-rail-btn sb-session-label${session.id === activeId ? ' active' : ''}`}
+                title={`${session.title}（右键修改标识）`}
+                aria-label={session.title}
+                aria-current={session.id === activeId ? 'page' : undefined}
+                onClick={() => navigate(`/session/${session.id}`)}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  setEditingLabel(session)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'F2') {
+                    event.preventDefault()
+                    setEditingLabel(session)
+                  }
+                }}
+              >
+                {labels[session.id]}
+              </button>
+            ))}
+          </nav>
 
           <NavLink
             to="/actions"
@@ -148,6 +298,29 @@ export function Sidebar() {
             aria-label="四象限工作法"
           >
             <SquaresFour size={18} />
+          </NavLink>
+          {showMarch && (
+            <NavLink
+              data-growth-target
+              to="/long-march"
+              className={({ isActive }) =>
+                `btn btn-ghost btn-sm sb-rail-btn${isActive ? ' active' : ''}`
+              }
+              title="长征不怕远征难"
+              aria-label="长征不怕远征难"
+            >
+              <Mountains size={18} />
+            </NavLink>
+          )}
+          <NavLink
+            to="/journal"
+            className={({ isActive }) =>
+              `btn btn-ghost btn-sm sb-rail-btn${isActive ? ' active' : ''}`
+            }
+            title="日常记录"
+            aria-label="日常记录"
+          >
+            <Notebook size={18} />
           </NavLink>
           <button
             className={
@@ -172,6 +345,7 @@ export function Sidebar() {
             设
           </button>
         </div>
+        {labelDialog}
       </aside>
     )
   }
@@ -234,7 +408,20 @@ export function Sidebar() {
               ×
             </button>
 
-            <div className="sb-item-title">{s.title}</div>
+            <div className="sb-item-title">
+              <button
+                className="sb-item-label"
+                title="修改问题标识"
+                aria-label={`修改「${s.title}」的问题标识`}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setEditingLabel(s)
+                }}
+              >
+                {labels[s.id]}
+              </button>
+              {s.title}
+            </div>
             <div className="sb-item-meta">
               {s.mode === 'workbench' ? <span className="badge sb-mode-badge">工作台</span> : null}
               <span className="badge sb-badge">{stepLabel(s.currentStep)}</span>
@@ -254,6 +441,23 @@ export function Sidebar() {
           四象限工作法
           {pendingActions > 0 && <span className="sb-actions-count">{pendingActions}</span>}
         </NavLink>
+        {showMarch && (
+          <NavLink
+            data-growth-target
+            to="/long-march"
+            className={({ isActive }) => (isActive ? 'sb-nav active' : 'sb-nav')}
+          >
+            <Mountains size={18} weight="duotone" />
+            长征不怕远征难
+          </NavLink>
+        )}
+        <NavLink
+          to="/journal"
+          className={({ isActive }) => (isActive ? 'sb-nav active' : 'sb-nav')}
+        >
+          <Notebook size={18} weight="duotone" />
+          日常记录
+        </NavLink>
         <NavLink
           className={({ isActive }) => (isActive ? 'sb-nav active' : 'sb-nav')}
           to="/library"
@@ -267,6 +471,8 @@ export function Sidebar() {
           设置
         </NavLink>
       </nav>
+
+      {labelDialog}
 
       {creating ? (
         <NewSessionDialog

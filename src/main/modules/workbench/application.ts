@@ -1,5 +1,6 @@
-import type { WbRecapInput } from '@shared/types'
-import { array, bool, object, text } from '@shared/contracts/validation'
+import type { WbRecapInput, WbDecisionRevision } from '@shared/types'
+import { selectedWorkbench } from '@shared/workbench'
+import { array, bool, object, text, oneOf } from '@shared/contracts/validation'
 import {
   intakeSchema,
   contradictionSchema,
@@ -44,7 +45,7 @@ const schemas = {
 export async function generateWorkbench<K extends keyof typeof operations>(
   operation: K,
   id: string,
-  input?: WbRecapInput
+  input?: WbRecapInput | WbDecisionRevision
 ): Promise<Awaited<ReturnType<(typeof operations)[K]>>> {
   const session = requireSession(id),
     wb = session.data.workbench
@@ -52,9 +53,26 @@ export async function generateWorkbench<K extends keyof typeof operations>(
   const ctx = createWorkbenchContext(session, `wb_${operation}`)
   if (operation === 'recap')
     object({ progress: text, factChanges: text, judgmentsToFix: text })(input, 'recap')
+  if (operation === 'decide' && input !== undefined)
+    object({ route: oneOf('steady', 'breakthrough', 'defensive'), primaryContradiction: text })(
+      input,
+      'revision'
+    )
   const result = await withModelContext(
     { purpose: `wb_${operation}`, sessionId: id, ...scopeOf(session.data) },
-    () => operations[operation](getSettings('workbench'), wb, input!)
+    () =>
+      operation === 'decide'
+        ? ai.wbDecide(
+            getSettings('workbench'),
+            selectedWorkbench(wb),
+            input as WbDecisionRevision | undefined
+          )
+        : operation === 'recap'
+          ? ai.wbRecap(getSettings('workbench'), selectedWorkbench(wb), input as WbRecapInput)
+          : operations[operation as Exclude<K, 'decide' | 'recap'>](
+              getSettings('workbench'),
+              ['recheck', 'actions'].includes(operation) ? selectedWorkbench(wb) : wb
+            )
   )
   schemas[operation](result, 'workbenchResult')
   assertWorkbenchContext(requireSession(id), { _context: ctx })

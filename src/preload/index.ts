@@ -11,6 +11,24 @@ function subscribe<T>(channel: string, callback: (event: T) => void): () => void
 }
 
 const api: MaoxuanApi = {
+  sync: {
+    status: () => ipcRenderer.invoke('sync:status'),
+    start: () => ipcRenderer.invoke('sync:start'),
+    stop: () => ipcRenderer.invoke('sync:stop')
+  },
+  journal: {
+    list: () => ipcRenderer.invoke('journal:list'),
+    apply: (command) => ipcRenderer.invoke('journal:apply', command),
+    attach: (id, name, mime, bytes) => ipcRenderer.invoke('journal:attach', id, name, mime, bytes),
+    media: (id) => ipcRenderer.invoke('journal:media', id),
+    import: (target) => ipcRenderer.invoke('journal:import', target),
+    export: (folderId, noteId) => ipcRenderer.invoke('journal:export', folderId, noteId)
+  },
+  march: {
+    get: () => ipcRenderer.invoke('march:get'),
+    plant: (nodeId, requestId) => ipcRenderer.invoke('march:plant', nodeId, requestId),
+    collect: (nodeId) => ipcRenderer.invoke('march:collect', nodeId)
+  },
   actions: {
     list: () => ipcRenderer.invoke('actions:list'),
     create: (edit) => ipcRenderer.invoke('actions:create', edit),
@@ -95,6 +113,7 @@ const api: MaoxuanApi = {
     reviseProblem: (sessionId) => ipcRenderer.invoke('ai:reviseProblem', sessionId),
     findPassages: (sessionId, articleId) =>
       ipcRenderer.invoke('ai:findPassages', sessionId, articleId),
+    draftNotes: (sessionId, articleId) => ipcRenderer.invoke('ai:draftNotes', sessionId, articleId),
     reviewNotes: (sessionId, articleId, notes) =>
       ipcRenderer.invoke('ai:reviewNotes', sessionId, articleId, notes),
     reviewSituation: (sessionId, newSituation) =>
@@ -108,12 +127,14 @@ const api: MaoxuanApi = {
     contradiction: (sessionId) => ipcRenderer.invoke('wb:contradiction', sessionId),
     routes: (sessionId) => ipcRenderer.invoke('wb:routes', sessionId),
     objSubj: (sessionId) => ipcRenderer.invoke('wb:objSubj', sessionId),
-    decide: (sessionId) => ipcRenderer.invoke('wb:decide', sessionId),
+    decide: (sessionId, revision) => ipcRenderer.invoke('wb:decide', sessionId, revision),
     recheck: (sessionId) => ipcRenderer.invoke('wb:recheck', sessionId),
     actions: (sessionId) => ipcRenderer.invoke('wb:actions', sessionId),
     recap: (sessionId, input) => ipcRenderer.invoke('wb:recap', sessionId, input)
   },
   settings: {
+    getFeatures: () => ipcRenderer.invoke('settings:getFeatures'),
+    setFeatures: (preferences) => ipcRenderer.invoke('settings:setFeatures', preferences),
     getReader: () => ipcRenderer.invoke('settings:getReader'),
     setReader: (preferences) => ipcRenderer.invoke('settings:setReader', preferences),
     getProxy: () => ipcRenderer.invoke('settings:getProxy'),

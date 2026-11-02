@@ -3,6 +3,7 @@ import {
   generateRevision,
   generatePassages,
   generateFeedback,
+  generateNotesDraft,
   generateReview,
   generateMindset,
   applyCommands
@@ -14,6 +15,7 @@ export function registerReadingHandlers(): void {
   register('ai:reviseProblem', generateRevision)
   register('ai:findPassages', generatePassages)
   register('ai:reviewNotes', generateFeedback)
+  register('ai:draftNotes', generateNotesDraft)
   register('ai:reviewSituation', generateReview)
   register('ai:mindset', generateMindset)
 }

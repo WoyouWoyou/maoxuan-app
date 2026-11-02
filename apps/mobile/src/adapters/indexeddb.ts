@@ -34,38 +34,43 @@ export async function createBrowserStore(name = 'maoxuan-mobile-v1'): Promise<At
       await completion
       return { entities, history, outbox } as Snapshot
     },
-    async commit(c: Commit) {
+    async commit(this: AtomicStore, c: Commit) {
+      return this.batch([c])
+    },
+    async batch(commands: Commit[]) {
       const tx = db.transaction([...names], 'readwrite')
       const completion = done(tx)
       // All requests remain inside one IDB transaction, including CAS and receipt.
-      const receipt = tx.objectStore('receipts').get(c.operationId)
-      receipt.onsuccess = () => {
-        if (receipt.result) {
-          if (receipt.result.fingerprint !== JSON.stringify(c)) tx.abort()
-          return
-        }
-        const current = tx.objectStore('entities').get(c.entity.id)
-        current.onsuccess = () => {
-          if ((current.result?.version ?? 0) !== c.expectedVersion) {
-            tx.abort()
+      for (const c of commands) {
+        const receipt = tx.objectStore('receipts').get(c.operationId)
+        receipt.onsuccess = () => {
+          if (receipt.result) {
+            if (receipt.result.fingerprint !== JSON.stringify(c)) tx.abort()
             return
           }
-          tx.objectStore('entities').put(c.entity)
-          tx.objectStore('history').put({
-            id: c.operationId,
-            entityId: c.entity.id,
-            snapshot: c.entity
-          })
-          tx.objectStore('outbox').put({
-            operationId: c.operationId,
-            entityId: c.entity.id,
-            baseVersion: c.expectedVersion,
-            payload: c.entity
-          })
-          tx.objectStore('receipts').put({
-            operationId: c.operationId,
-            fingerprint: JSON.stringify(c)
-          })
+          const current = tx.objectStore('entities').get(c.entity.id)
+          current.onsuccess = () => {
+            if ((current.result?.version ?? 0) !== c.expectedVersion) {
+              tx.abort()
+              return
+            }
+            tx.objectStore('entities').put(c.entity)
+            tx.objectStore('history').put({
+              id: c.operationId,
+              entityId: c.entity.id,
+              snapshot: c.entity
+            })
+            tx.objectStore('outbox').put({
+              operationId: c.operationId,
+              entityId: c.entity.id,
+              baseVersion: c.expectedVersion,
+              payload: c.entity
+            })
+            tx.objectStore('receipts').put({
+              operationId: c.operationId,
+              fingerprint: JSON.stringify(c)
+            })
+          }
         }
       }
       await completion

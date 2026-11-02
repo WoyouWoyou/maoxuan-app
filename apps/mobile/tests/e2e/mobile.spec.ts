@@ -296,3 +296,17 @@ test('mobile reading hides permanent panels, remembers the chapter preference, a
   await page.getByRole('button', { name: '关闭阅读选项', exact: true }).click()
   await page.screenshot({ path: 'test-results/reading-mobile.png' })
 })
+
+test('home has a fixed achievements entrance backed by real progress, and native sync is explicit',async({page})=>{
+ await page.goto('/')
+ await page.getByRole('button',{name:/我的成就/}).click()
+ await expect(page.getByRole('heading',{name:'长征不怕远征难'})).toBeVisible()
+ await expect(page.locator('.march-page')).toContainText('成长值')
+ await page.getByRole('button',{name:'返回首页',exact:true}).click()
+ await page.getByRole('button',{name:'我的',exact:true}).click()
+ const sync=page.getByRole('region',{name:'设备同步'})
+ await expect(sync).toBeVisible()
+ await sync.getByPlaceholder('粘贴电脑「设置 → 设备同步」中的配对码').fill('{}')
+ await sync.getByRole('button',{name:'立即同步',exact:true}).click()
+ await expect(sync.getByRole('alert')).toContainText('Android APK')
+})

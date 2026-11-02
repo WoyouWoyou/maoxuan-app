@@ -48,14 +48,19 @@ export function CloseSessionDialog({ session, onClose, onDone }: CloseSessionDia
         <div className="csd-problem serif">{session.title}</div>
 
         <p className="csd-note">
-          归档：从列表中收起，随时可在「设置 → 已归档」找回。回收站：{TRASH_RETENTION_DAYS} 天后彻底删除，期间可在「设置
-          → 回收站」恢复。
+          归档：收起问题及其四象限待办，取消归档后恢复，随时可在「设置 → 已归档」找回。回收站：
+          {TRASH_RETENTION_DAYS} 天后彻底删除，期间可在「设置 → 回收站」恢复。
         </p>
 
         {error ? <div className="error-text csd-error">{error}</div> : null}
 
         <div className="csd-actions">
-          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy !== null}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            disabled={busy !== null}
+          >
             取消
           </button>
           <button

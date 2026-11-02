@@ -27,6 +27,7 @@ export function normalizeSessionSources(data: SessionData): void {
   }
 }
 export type DesktopPayload =
+  | { type: 'march'; value: import('./march').MarchState }
   | { type: 'action'; value: ActionItem }
   | { type: 'session'; value: SessionRecord }
   | { type: 'journal'; value: JournalState }
@@ -34,6 +35,12 @@ export type DesktopPayload =
 export const desktopPayloadSchema = z.custom<DesktopPayload>((v: unknown) => {
   if (!v || typeof v !== 'object') return false
   const p = v as DesktopPayload
+  if (p.type === 'march')
+    return (
+      Array.isArray(p.value.events) &&
+      Array.isArray(p.value.plants) &&
+      Array.isArray(p.value.collected)
+    )
   if (p.type === 'action') {
     try {
       actionSchema(p.value, 'action')

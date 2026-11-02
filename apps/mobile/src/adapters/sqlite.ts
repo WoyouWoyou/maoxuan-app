@@ -1,6 +1,6 @@
 import { CapacitorSQLite, SQLiteConnection } from '@capacitor-community/sqlite'
 import { ConflictError, type Snapshot } from '../domain/models'
-import type { AtomicStore } from '../application/ports'
+import type { AtomicStore, Commit } from '../application/ports'
 export async function createNativeStore(): Promise<AtomicStore> {
   const sqlite = new SQLiteConnection(CapacitorSQLite)
   const db = await sqlite.createConnection('maoxuan_mobile', false, 'no-encryption', 1, false)
@@ -39,51 +39,56 @@ export async function createNativeStore(): Promise<AtomicStore> {
           outbox: await read('outbox')
         } as Snapshot
       }),
-    commit: (c) =>
+    async commit(this: AtomicStore, c: Commit) {
+      return this.batch([c])
+    },
+    batch: (commands) =>
       exclusive(() =>
         transaction(async () => {
-          const fingerprint = JSON.stringify(c)
-          const receipt = (
-            await db.query('SELECT fingerprint FROM receipts WHERE operation_id = ?', [
-              c.operationId
-            ])
-          ).values?.[0]
-          if (receipt) {
-            if (receipt.fingerprint !== fingerprint) throw new Error('操作 ID 已用于其他内容')
-            return
+          for (const c of commands) {
+            const fingerprint = JSON.stringify(c)
+            const receipt = (
+              await db.query('SELECT fingerprint FROM receipts WHERE operation_id = ?', [
+                c.operationId
+              ])
+            ).values?.[0]
+            if (receipt) {
+              if (receipt.fingerprint !== fingerprint) throw new Error('操作 ID 已用于其他内容')
+              continue
+            }
+            const current = (
+              await db.query('SELECT version FROM entities WHERE id = ?', [c.entity.id])
+            ).values?.[0]
+            if ((current?.version ?? 0) !== c.expectedVersion) throw new ConflictError()
+            await db.run(
+              'INSERT OR REPLACE INTO entities VALUES (?, ?, ?)',
+              [c.entity.id, c.entity.version, JSON.stringify(c.entity)],
+              false
+            )
+            await db.run(
+              'INSERT INTO history VALUES (?, ?, ?)',
+              [
+                c.operationId,
+                c.entity.id,
+                JSON.stringify({ id: c.operationId, entityId: c.entity.id, snapshot: c.entity })
+              ],
+              false
+            )
+            await db.run(
+              'INSERT INTO outbox VALUES (?, ?)',
+              [
+                c.operationId,
+                JSON.stringify({
+                  operationId: c.operationId,
+                  entityId: c.entity.id,
+                  baseVersion: c.expectedVersion,
+                  payload: c.entity
+                })
+              ],
+              false
+            )
+            await db.run('INSERT INTO receipts VALUES (?, ?)', [c.operationId, fingerprint], false)
           }
-          const current = (
-            await db.query('SELECT version FROM entities WHERE id = ?', [c.entity.id])
-          ).values?.[0]
-          if ((current?.version ?? 0) !== c.expectedVersion) throw new ConflictError()
-          await db.run(
-            'INSERT OR REPLACE INTO entities VALUES (?, ?, ?)',
-            [c.entity.id, c.entity.version, JSON.stringify(c.entity)],
-            false
-          )
-          await db.run(
-            'INSERT INTO history VALUES (?, ?, ?)',
-            [
-              c.operationId,
-              c.entity.id,
-              JSON.stringify({ id: c.operationId, entityId: c.entity.id, snapshot: c.entity })
-            ],
-            false
-          )
-          await db.run(
-            'INSERT INTO outbox VALUES (?, ?)',
-            [
-              c.operationId,
-              JSON.stringify({
-                operationId: c.operationId,
-                entityId: c.entity.id,
-                baseVersion: c.expectedVersion,
-                payload: c.entity
-              })
-            ],
-            false
-          )
-          await db.run('INSERT INTO receipts VALUES (?, ?)', [c.operationId, fingerprint], false)
         })
       ),
     restore: (s) =>

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-export const DATABASE_VERSION = 4
+export const DATABASE_VERSION = 7
 export function migrate(handle: Database.Database): void {
   const version = Number(handle.pragma('user_version', { simple: true }))
   if (version < 1)
@@ -69,4 +69,39 @@ export function migrate(handle: Database.Database): void {
       handle.exec(`CREATE TABLE IF NOT EXISTS standalone_actions (id TEXT PRIMARY KEY, data TEXT NOT NULL);
         PRAGMA user_version = 4;`)
     })()
+  if (version < 5)
+    handle.transaction(() => {
+      handle.exec(`
+        CREATE TABLE IF NOT EXISTS march_activities (id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('reading','reflection','action')), created_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS march_plants (request_id TEXT PRIMARY KEY, node_id TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS march_collection (node_id TEXT PRIMARY KEY);
+        PRAGMA user_version = 5;
+      `)
+    })()
+  if (version < 6)
+    handle.transaction(() => {
+      handle.exec(`
+      CREATE TABLE IF NOT EXISTS journal_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL);
+      INSERT OR IGNORE INTO journal_state VALUES(1, '{"folders":[],"notes":[]}');
+      ALTER TABLE march_activities RENAME TO march_activities_v5;
+      CREATE TABLE march_activities (id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('reading','reflection','action','journal')), created_at TEXT NOT NULL);
+      INSERT INTO march_activities(id,kind,created_at) SELECT id,kind,created_at FROM march_activities_v5;
+      DROP TABLE march_activities_v5;
+      PRAGMA user_version = 6;
+    `)
+    })()
+  if (version < 7)
+    handle.transaction(() => {
+      const columns = (table: string) => (handle.pragma(`table_info(${table})`) as { name: string }[]).map(c => c.name)
+      if (!columns('march_activities').includes('points')) handle.exec('ALTER TABLE march_activities ADD COLUMN points INTEGER NOT NULL DEFAULT 10')
+      if (!columns('march_activities').includes('reward_day')) handle.exec('ALTER TABLE march_activities ADD COLUMN reward_day TEXT')
+      if (!columns('march_plants').includes('planted_at')) handle.exec('ALTER TABLE march_plants ADD COLUMN planted_at TEXT')
+      handle.exec(`
+        UPDATE march_plants SET planted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+        UPDATE march_plants SET planted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-3 days')
+          WHERE node_id IN (SELECT node_id FROM march_plants GROUP BY node_id HAVING COUNT(*) >= 4);
+        PRAGMA user_version = 7;
+      `)
+    })()
+
 }

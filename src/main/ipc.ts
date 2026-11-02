@@ -1,3 +1,9 @@
+import { registerJournalHandlers } from './adapters/electron/journal-handlers'
+import {
+  getMarchProgress,
+  plantMarchTree,
+  collectMarchLandscape
+} from './modules/long-march/public'
 import {
   classifyActions,
   listActions,
@@ -15,6 +21,10 @@ import { registerWorkbenchHandlers } from './adapters/electron/workbench-handler
 import { registerSettingsHandlers } from './adapters/electron/settings-handlers'
 import { registerChatHandlers } from './adapters/electron/chat-handlers'
 export function registerIpc(): void {
+  registerJournalHandlers()
+  register('march:get', getMarchProgress)
+  register('march:plant', plantMarchTree)
+  register('march:collect', collectMarchLandscape)
   register('actions:list', listActions)
   register('actions:create', createAction)
   register('actions:edit', editAction)

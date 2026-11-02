@@ -6,6 +6,7 @@ export {
   generateRevision,
   generatePassages,
   generateFeedback,
+  generateNotesDraft,
   generateReview,
   generateMindset
 } from './application'

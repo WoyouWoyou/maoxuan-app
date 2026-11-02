@@ -1,7 +1,7 @@
 {
   "name": "maoxuan-app",
   "productName": "毛选实用工具箱",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "带着问题读《毛选》：明确问题、聚焦核心、联系自身、反复应用",
   "main": "./out/main/index.js",
   "private": true,
@@ -30,10 +30,14 @@
     "fast-xml-parser": "^5.11.2",
     "fflate": "^0.8.3",
     "iconv-lite": "^0.7.3",
-    "undici": "^8.12.3"
+    "selfsigned": "5.5.0",
+    "undici": "^8.12.3",
+    "vditor": "^4.0.1"
   },
   "devDependencies": {
+    "@capacitor/core": "8.6.0",
     "@electron/rebuild": "^4.2.0",
+    "@noble/hashes": "1.8.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
@@ -42,6 +46,7 @@
     "electron": "^44.4.5",
     "electron-builder": "^26.0.0",
     "electron-vite": "^5.0.0",
+    "fake-indexeddb": "6.2.4",
     "prettier": "^3.9.10",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -49,7 +54,8 @@
     "react-router-dom": "^7.0.0",
     "typescript": "~5.9.3",
     "vite": "^7.0.0",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "zod": "4.6.7"
   },
   "build": {
     "appId": "com.liamreed.maoxuan",
@@ -68,13 +74,18 @@
         "to": "core-audio/v1",
         "filter": [
           "*.audio",
-          "manifest.json"
+          "*manifest.json"
         ]
       }
     ],
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.education"
+      "category": "public.app-category.education",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "用于在日常记录中录制语音备忘，录音保存在本机。"
+      },
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist"
     },
     "win": {
       "target": [
@@ -92,6 +103,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
     },
-    "beforePack": "scripts/before-pack.cjs"
+    "beforePack": "scripts/before-pack.cjs",
+    "afterPack": "scripts/after-pack.cjs"
   }
 }

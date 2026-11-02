@@ -507,3 +507,16 @@ it('migrates early mobile records without losing Markdown or duplicating records
   expect((await second.api.journal.list()).notes).toHaveLength(1)
   expect(await second.api.sessions.list()).toHaveLength(1)
 })
+
+it('achievement ledger uses desktop daily cap and stable completion identities',async()=>{
+ const {mobileMarch}=await import('../src/application/march')
+ const notes=[1,2,3].map(n=>({id:String(n),completedAt:'2026-01-01T00:00:00Z'}))
+ const entities=[{kind:'desktop',payload:{type:'journal',value:{notes,folders:[]}}}] as unknown as import('../src/domain/models').Entity[]
+ const first=mobileMarch(undefined,entities,()=>new Date('2026-11-02T08:00:00Z'))
+ expect(first.service.getProgress()).toMatchObject({earned:20,counts:{journal:3}})
+ const repeat=mobileMarch(first.state,entities,()=>new Date('2026-11-03T08:00:00Z'))
+ expect(repeat.service.getProgress()).toMatchObject({earned:20,todayEarned:0})
+ const planted=repeat.service.plant('yudu','same-request')
+ expect(repeat.service.plant('yudu','same-request')).toEqual(planted)
+ expect(planted.balance).toBe(10)
+})

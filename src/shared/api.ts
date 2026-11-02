@@ -54,6 +54,22 @@ import type {
 
 /** Exposed by preload as `window.api`. Every method maps 1:1 to an ipcMain.handle channel named `${group}:${method}`. */
 export interface MaoxuanApi {
+  sync: {
+    exchange?(
+      pairing: string,
+      choices?: Record<string, 'local' | 'remote'>
+    ): Promise<{
+      count: number
+      conflicts: {
+        key: string
+        local: import('./sync/protocol').SyncDocument
+        remote: import('./sync/protocol').SyncDocument
+      }[]
+    }>
+    status(): Promise<import('./sync/protocol').SyncStatus>
+    start(): Promise<import('./sync/protocol').SyncStatus>
+    stop(): Promise<import('./sync/protocol').SyncStatus>
+  }
   journal: {
     list(): Promise<JournalState>
     apply(command: JournalCommand): Promise<JournalResult>

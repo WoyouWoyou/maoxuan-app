@@ -1,3 +1,5 @@
+import { DeviceSyncPanel } from '@renderer/features/sync/DeviceSyncPanel'
+import { LongMarchPage } from '@renderer/features/long-march/LongMarchPage'
 import { useEffect, useRef, useState } from 'react'
 import { HashRouter, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
 import {
@@ -125,6 +127,29 @@ function MobileApp({
     <div className={`app ${tab === 'notes' ? 'journal-mobile-shell' : ''}`}>
       <Routes>
         <Route
+          path="/achievements"
+          element={
+            <>
+              <button className="workspace-back" onClick={() => go('home')}>
+                返回首页
+              </button>
+              <LongMarchPage />
+            </>
+          }
+        />
+        <Route path="/long-march" element={<LongMarchPage />} />
+        <Route path="/long-march/:nodeId/scenery" element={<LongMarchPage />} />
+        <Route
+          path="/journal"
+          element={
+            <div className="desktop-journal">
+              <button onClick={() => go('home')}>返回首页</button>
+              <JournalPage />
+            </div>
+          }
+        />
+        <Route path="/long-march/:nodeId" element={<LongMarchPage />} />
+        <Route
           path="/session/:id"
           element={
             <div className="desktop-workspace">
@@ -193,6 +218,17 @@ function MobileApp({
                         <span>
                           <strong>我的书架</strong>
                           <small>原文目录 · 核心篇目 · 全文检索</small>
+                        </span>
+                        <CaretRight />
+                      </button>
+                      <button
+                        className="home-library-entry"
+                        onClick={() => navigate('/achievements')}
+                      >
+                        <Compass size={28} />
+                        <span>
+                          <strong>我的成就</strong>
+                          <small>长征成长 · 植树 · 风景收藏</small>
                         </span>
                         <CaretRight />
                       </button>
@@ -350,6 +386,7 @@ function MobileApp({
                   )}
                   {tab === 'profile' && (
                     <>
+                      <DeviceSyncPanel mobile onSynced={() => void reload()} />
                       <div className="page-heading">
                         <div>
                           <div className="eyebrow">YOUR READING COACH</div>

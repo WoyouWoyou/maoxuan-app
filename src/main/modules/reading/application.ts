@@ -14,6 +14,7 @@ import { getChapter, scopeOf, titleMap } from '../library/public'
 import { getSettings } from '../settings/public'
 import { withModelContext } from '../model-runtime/public'
 import * as profiles from './profiles'
+import { draftNotes } from './notes-draft'
 import { createReadingContext, assertReadingContext } from './context'
 async function generate<T>(
   id: string,
@@ -83,6 +84,14 @@ export const generatePassages = (id: string, articleId: string) =>
     (r, c) => {
       for (const p of r.passages) p._context = c
     },
+    articleId
+  )
+export const generateNotesDraft = (id: string, articleId: string) =>
+  generate(
+    id,
+    'draftNotes',
+    (s) => draftNotes(getSettings('reading'), s.data, chapter(s, articleId)),
+    () => {},
     articleId
   )
 export const generateFeedback = (id: string, articleId: string, notes: ThreeNotes) =>

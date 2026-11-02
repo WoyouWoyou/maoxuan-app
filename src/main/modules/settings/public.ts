@@ -1,4 +1,9 @@
 import {
+  DEFAULT_FEATURE_PREFERENCES,
+  featurePreferencesSchema,
+  type FeaturePreferences
+} from '@shared/contracts/features'
+import {
   DEFAULT_READER_PREFERENCES,
   readerPreferencesSchema,
   type ReaderPreferences
@@ -87,10 +92,35 @@ export function getReaderPreferences(): ReaderPreferences {
   if (!saved) return { ...DEFAULT_READER_PREFERENCES }
   const value = JSON.parse(saved)
   readerPreferencesSchema(value, 'readerPreferences')
+  // Older releases persisted Xiaoxiao even when the user never changed the default.
+  // Apply the new default once; subsequent explicit voice choices remain persistent.
+  if (repo.read('readerVoiceDefaultVersion') !== '2') {
+    if (value.voice === 'zh-CN-XiaoxiaoNeural') value.voice = DEFAULT_READER_PREFERENCES.voice
+    repo.transaction(() => {
+      repo.write('readerPreferences', JSON.stringify(value))
+      repo.write('readerVoiceDefaultVersion', '2')
+    })
+  }
   return value
 }
 export function setReaderPreferences(value: ReaderPreferences): ReaderPreferences {
   readerPreferencesSchema(value, 'readerPreferences')
-  repo.transaction(() => repo.write('readerPreferences', JSON.stringify(value)))
+  repo.transaction(() => {
+    repo.write('readerPreferences', JSON.stringify(value))
+    repo.write('readerVoiceDefaultVersion', '2')
+  })
   return getReaderPreferences()
+}
+
+export function getFeaturePreferences(): FeaturePreferences {
+  const saved = repo.read('featurePreferences')
+  if (!saved) return { ...DEFAULT_FEATURE_PREFERENCES }
+  const value = JSON.parse(saved)
+  featurePreferencesSchema(value, 'featurePreferences')
+  return value
+}
+export function setFeaturePreferences(value: FeaturePreferences): FeaturePreferences {
+  featurePreferencesSchema(value, 'featurePreferences')
+  repo.transaction(() => repo.write('featurePreferences', JSON.stringify(value)))
+  return getFeaturePreferences()
 }

@@ -1,3 +1,5 @@
+import { synchronize } from './sync'
+import { mobileMarch } from './march'
 import { createActionClassifier } from '@shared/engine/action-classifier'
 import { actionEditSchema } from '@shared/contracts/action-planning'
 import type { ActionItem } from '@shared/types'
@@ -1044,6 +1046,49 @@ export async function createDesktopApi(
   const complete = new Proxy(
     {
       ...api,
+      sync: {
+        status: async () => ({ running: false, pairing: [] }),
+        start: async () => {
+          throw Error('请在电脑端开启同步')
+        },
+        stop: async () => ({ running: false, pairing: [] }),
+        exchange: (pairing: string, choices?: Record<string, 'local' | 'remote'>) =>
+          exclusive(async () => {
+            const result = await synchronize(store, pairing, choices)
+            await load()
+            return result
+          })
+      },
+      march: {
+        get: () =>
+          exclusive(async () => {
+            const prior = stored('desktop:march')?.payload
+            const state = mobileMarch(prior?.type === 'march' ? prior.value : undefined, entities)
+            if (
+              !prior ||
+              prior.type !== 'march' ||
+              JSON.stringify(prior.value) !== JSON.stringify(state.state)
+            )
+              await persist('desktop:march', { type: 'march', value: state.state })
+            return state.service.getProgress()
+          }),
+        plant: (nodeId: string, requestId: string) =>
+          exclusive(async () => {
+            const prior = stored('desktop:march')?.payload
+            const state = mobileMarch(prior?.type === 'march' ? prior.value : undefined, entities)
+            const result = state.service.plant(nodeId, requestId)
+            await persist('desktop:march', { type: 'march', value: state.state })
+            return result
+          }),
+        collect: (nodeId: string) =>
+          exclusive(async () => {
+            const prior = stored('desktop:march')?.payload
+            const state = mobileMarch(prior?.type === 'march' ? prior.value : undefined, entities)
+            const result = state.service.collect(nodeId)
+            await persist('desktop:march', { type: 'march', value: state.state })
+            return result
+          })
+      },
       chat,
       journal,
       actions: { ...actions, classify: classifier.classifyActions },

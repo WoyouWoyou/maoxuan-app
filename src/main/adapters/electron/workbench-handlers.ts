@@ -1,4 +1,4 @@
-import type { WbRecapInput } from '@shared/types'
+import type { WbRecapInput, WbDecisionRevision } from '@shared/types'
 import { generateWorkbench, applyWorkbench } from '../../modules/workbench/public'
 import { register } from './transport'
 export function registerWorkbenchHandlers(): void {
@@ -13,7 +13,7 @@ export function registerWorkbenchHandlers(): void {
     'actions',
     'recap'
   ] as const)
-    register(`wb:${operation}`, (id: string, input?: WbRecapInput) =>
+    register(`wb:${operation}`, (id: string, input?: WbRecapInput | WbDecisionRevision) =>
       generateWorkbench(operation, id, input)
     )
 }

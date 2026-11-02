@@ -53,14 +53,15 @@ jobs:
         working-directory: apps/mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon assembleDebug
+          ./gradlew --no-daemon testDebugUnitTest assembleDebug
       - name: Verify APK signature and package artifacts
         env:
           BUILD_NUMBER: ${{ github.run_number }}
           BUILD_SHA: ${{ github.sha }}
         run: |
           mkdir -p apps/mobile/artifacts
-          apk="apps/mobile/artifacts/maoxuan-mobile-0.1.0-test-${BUILD_NUMBER}.apk"
+          version=$(node -p "require('./apps/mobile/package.json').version")
+          apk="apps/mobile/artifacts/maoxuan-mobile-${version}-test-${BUILD_NUMBER}.apk"
           cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk "$apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > apps/mobile/artifacts/package-info.txt

@@ -7,6 +7,8 @@ const labels: Record<string, string> = {
   action_classification: '行动自动分类',
   diagnose: '问题与选章',
   findPassages: '原文标注',
+  draftNotes: '笔记辅助填写',
+  ai_draftNotes: '笔记辅助填写',
   reviewNotes: '笔记反馈',
   reviewSituation: '复盘',
   mindset: '阅读小结',
