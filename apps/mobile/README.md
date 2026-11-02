@@ -24,7 +24,7 @@ npm run ios                    # Xcode
 
 ## GitHub Actions 打包 APK
 
-工作流为根目录 `.github/workflows/build-android.yml`，使用 Ubuntu、Node 22、Java 21、Android SDK 36 和工程自带的 Gradle wrapper。推送 `codex/android-apk-*` 构建分支会触发，也可在 Actions 的「Build Android test APK」中选分支手动运行。
+工作流为根目录 `.github/workflows/build-android.yml`，使用 Ubuntu、Node 22、Java 21、Android SDK 36 和工程自带的 Gradle wrapper。推送 `codex/android-apk-*` 构建分支会触发；工作流合入默认分支后，也可在 Actions 的「Build Android test APK」中选分支手动运行。
 
 流程安装移动端锁定依赖、运行单元测试与类型检查、构建网页资源、`cap sync android`、`assembleDebug`，最后验证 APK 签名。成功后在该次运行的 Artifacts 下载 `maoxuan-android-test-apk`，解压安装 `.apk`；同时包含 SHA-256 校验和及包信息，产物保留 30 天。该测试包使用 Android debug 签名，不需要配置正式发布证书或模型密钥。
 
@@ -57,9 +57,9 @@ npm run ios                    # Xcode
 
 ## 构建状态与边界
 
-已生成 Android/iOS 工程，iOS 使用 SPM。Android / iOS 原生工程的编译、签名及真机测试尚未完成：当前环境缺少 Java Runtime 和完整 Xcode。原生 SQLite、系统安全存储、文件选择/分享、键盘、系统返回与挂起恢复不能由浏览器测试替代。环境要求见 [Capacitor 官方文档](https://capacitorjs.com/docs/getting-started/environment-setup)。
+已生成 Android/iOS 工程，iOS 使用 SPM。Android 测试 APK 已通过 [GitHub Actions](https://github.com/WoyouWoyou/maoxuan-app/actions/runs/41373565823) 完成编译和签名校验（2026-11-02，构建分支 `codex/android-apk-20261102`）；本机仍缺少 Java Runtime，iOS 编译与签名仍缺少完整 Xcode。真机测试尚未完成；原生 SQLite、系统安全存储、文件选择/分享、键盘、系统返回与挂起恢复不能由浏览器或编译通过替代。环境要求见 [Capacitor 官方文档](https://capacitorjs.com/docs/getting-started/environment-setup)。
 
-尚未实现：原生后台音频/下载、局域网配对及同步、EPUB、手机录音/图片附件存储、长征内容迁移，以及完整 P0/P1/P3 验收。没有产出 APK/IPA；本版不等同于总体架构的「首个完整移动版本」。
+尚未实现：原生后台音频/下载、局域网配对及同步、EPUB、手机录音/图片附件存储、长征内容迁移，以及完整 P0/P1/P3 验收。已产出 Android 测试 APK，尚未产出 IPA；本版不等同于总体架构的「首个完整移动版本」。
 
 备份为带 SHA-256 校验的 JSON（20 MB 上限），包含实体与历史，排除密钥。恢复需明确确认，成功后保留历史、清空旧传输状态。导入书籍限 UTF-8 TXT 2 MB，Markdown 单文件限 2 MB。浏览器清理站点数据和卸载 App 会清除本地业务数据。
 
@@ -69,4 +69,4 @@ npm run ios                    # Xcode
 
 移动端通过 16 项存储/领域测试、7 条手机尺寸流程测试；此前已通过 1 条生产断网刷新测试。本次完成类型检查、生产构建和双端 `cap sync`。浏览器流程覆盖导航、阅读转行动、四象限进展与完成、Markdown 编辑/重载/导出、教练诊断确认、只运行所选分析方法，以及篇目收起偏好、感悟草稿和阅读选项；模型响应由测试模拟，不使用真实密钥。手机阅读视觉核对见 [design-qa.md](design-qa.md)。
 
-桌面根目录 `npm run verify`（175 项测试、边界、类型、构建）和 `npm run test:smoke` 均通过。冒烟脚本已对齐当前方法选择流程，并将搜索固定等待改为等待结果出现。原生编译与真机矩阵尚未验证。
+桌面根目录 `npm run verify`（175 项测试、边界、类型、构建）和 `npm run test:smoke` 均通过。冒烟脚本已对齐当前方法选择流程，并将搜索固定等待改为等待结果出现。Android 云端 debug 编译与 APK 签名校验已通过；iOS 编译与真机矩阵尚未验证。
