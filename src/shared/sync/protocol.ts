@@ -26,12 +26,17 @@ export interface SyncStatus {
   error?: string
 }
 export function canonical(value: unknown): string {
+  if (value === undefined) return 'null'
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']'
   return (
     '{' +
     Object.keys(value)
-      .filter((k) => !['stateVersion', 'versionNo', 'revision'].includes(k))
+      .filter(
+        (k) =>
+          (value as Record<string, unknown>)[k] !== undefined &&
+          !['stateVersion', 'versionNo', 'revision'].includes(k)
+      )
       .sort()
       .map(
         (k) =>
@@ -78,6 +83,8 @@ export function validateDocument(d: SyncDocument): void {
     )
       throw Error('无效会话')
     assertSessionData(s.data)
+    s.bookId = s.data.book?.bookId ?? 'maoxuan'
+    s.bookTitle = s.data.book?.title ?? '毛泽东选集'
     if (s.data.book && s.data.book.bookId !== 'maoxuan')
       throw Error('暂不支持导入书籍的会话同步，请保留原设备数据')
     for (const v of d.value.versions) {
@@ -147,6 +154,16 @@ export function reconcile(
       throw Error('无效基础版本')
     const prior = docs.get(key)
     if (prior && hash(prior) === hash(d)) continue
+    if (
+      prior?.kind === 'session' &&
+      d.kind === 'session' &&
+      hash({ ...prior, value: { ...prior.value, versions: [] } }) ===
+        hash({ ...d, value: { ...d.value, versions: [] } })
+    ) {
+      const versions = new Map([...prior.value.versions, ...d.value.versions].map((v) => [v.id, v]))
+      docs.set(key, { ...prior, value: { ...prior.value, versions: [...versions.values()] } })
+      continue
+    }
     if (prior ? hash(prior) === base : base === null) docs.set(key, d)
     else conflicts.push(key)
   }

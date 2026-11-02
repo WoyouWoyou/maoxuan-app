@@ -302,6 +302,10 @@ it('conflicting session branches preserve both histories with independent local 
     if (result.kind !== 'session') throw Error()
     expect(result.value.versions.map((v) => v.id).sort()).toEqual(['pc-v2', 'phone-v2', 'v1'])
     expect(new Set(result.value.versions.map((v) => v.versionNo)).size).toBe(3)
+    expect(
+      reconcile(repo.read(), { protocol: 1, changes: [{ document: phone, base: hash(pc) }] }, hash)
+        .conflicts
+    ).toHaveLength(0)
   } finally {
     db.close()
   }
