@@ -22,6 +22,12 @@ npm run ios                    # Xcode
 
 开发服务器只监听本机。正文由仓库 `resources/articles.json` 生成，Vditor 运行资源从固定依赖复制到本地；不依赖公共 CDN。生产浏览器预览首次完成离线缓存后可断网刷新；原生资源随安装包分发。
 
+## GitHub Actions 打包 APK
+
+工作流为根目录 `.github/workflows/build-android.yml`，使用 Ubuntu、Node 22、Java 21、Android SDK 36 和工程自带的 Gradle wrapper。推送 `codex/android-apk-*` 构建分支会触发，也可在 Actions 的「Build Android test APK」中选分支手动运行。
+
+流程安装移动端锁定依赖、运行单元测试与类型检查、构建网页资源、`cap sync android`、`assembleDebug`，最后验证 APK 签名。成功后在该次运行的 Artifacts 下载 `maoxuan-android-test-apk`，解压安装 `.apk`；同时包含 SHA-256 校验和及包信息，产物保留 30 天。该测试包使用 Android debug 签名，不需要配置正式发布证书或模型密钥。
+
 ## 与桌面共用的核心
 
 - **阅读法**：复用 `SessionPage` 和四步组件。明确问题/背景/已试办法 → 教练诊断或自行选章 → 推荐篇目/真实选段/逐段感悟 → 三条笔记、按感悟辅助填写、反馈及确认 → 行动、阶段进展、结果、复盘、阅读与实践小结。
