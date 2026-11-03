@@ -1,3 +1,5 @@
+import { registerPlugin, Capacitor } from '@capacitor/core'
+import { dismissBackLayer, backDestination } from './android-back'
 import { DeviceSyncPanel } from '@renderer/features/sync/DeviceSyncPanel'
 import { LongMarchPage } from '@renderer/features/long-march/LongMarchPage'
 import { useEffect, useRef, useState } from 'react'
@@ -94,12 +96,68 @@ function MobileApp({
       window.removeEventListener('hashchange', changed)
     }
   }, [])
+  useEffect(() => {
+    if (location.pathname === '/actions') {
+      setTab('todo')
+      navigate('/', { replace: true })
+    }
+  }, [location.pathname, navigate])
   const go = (t: string) => {
     setTab(t)
     setQuery('')
     navigate('/')
     window.scrollTo(0, 0)
   }
+  const backing = useRef(false)
+  useEffect(() => {
+    const back = async () => {
+      if (backing.current) return
+      backing.current = true
+      try {
+        if (quoteNote) {
+          setQuoteNote(undefined)
+          return
+        }
+        if (dismissBackLayer(document)) return
+        if (create) {
+          setCreate(false)
+          return
+        }
+        if (article) {
+          setArticle(undefined)
+          return
+        }
+        ;(document.activeElement as HTMLElement | null)?.blur()
+        await Promise.resolve()
+        const pending: Promise<unknown>[] = []
+        const request = new CustomEvent('maoxuan-before-back', {
+          cancelable: true,
+          detail: { waitUntil: (job: Promise<unknown>) => pending.push(job) }
+        })
+        window.dispatchEvent(request)
+        await Promise.all(pending)
+        if (request.defaultPrevented) return
+        const destination = backDestination(
+          window.location.hash.slice(1).split('?')[0] || location.pathname,
+          tab
+        )
+        if (destination) {
+          if (destination.tab) setTab(destination.tab)
+          navigate(destination.path)
+          return
+        }
+        if (Capacitor.getPlatform() === 'android')
+          await registerPlugin<{ minimize(): Promise<void> }>('LanSync').minimize()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        backing.current = false
+      }
+    }
+    const handler = () => void back()
+    window.addEventListener('maoxuan-back', handler)
+    return () => window.removeEventListener('maoxuan-back', handler)
+  }, [location.pathname, tab, create, article, quoteNote, navigate])
   const start = (m: SessionMode = 'reading') => {
     setMode(m)
     setCreate(true)
@@ -389,7 +447,7 @@ function MobileApp({
                     <>
                       <DeviceSyncPanel
                         mobile
-                        disabled={busy}
+                        disabled={busy || syncBusy}
                         onBusyChange={setSyncBusy}
                         onSynced={() => void reload()}
                       />

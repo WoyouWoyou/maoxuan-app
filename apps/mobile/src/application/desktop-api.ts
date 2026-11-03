@@ -1,3 +1,4 @@
+import { assetEntityId, encodeAsset, decodeAsset, assetHash } from '@shared/sync/assets'
 import { synchronize } from './sync'
 import { mobileMarch } from './march'
 import { createActionClassifier } from '@shared/engine/action-classifier'
@@ -21,6 +22,7 @@ import { createGenericProfile } from '@shared/engine/generic'
 import { createWorkbenchAI } from '@shared/engine/workbench-ai'
 import { createNotesDrafter } from '@shared/engine/notes-draft'
 import { selectedWorkbench } from '@shared/workbench'
+import { thinkingResultSchema } from '@shared/contracts/state-schema'
 import * as schemas from '@shared/contracts/state-schema'
 import { array, object, text, bool } from '@shared/contracts/validation'
 import { DEFAULT_READER_PREFERENCES } from '@shared/contracts/reader'
@@ -654,6 +656,7 @@ export async function createDesktopApi(
   const secure = secrets
   if (secure) key = await secure.get('model-key')
   const wbOperations = {
+    think: 'wbThink',
     intake: 'wbIntake',
     contradiction: 'wbContradiction',
     routes: 'wbRoutes',
@@ -664,6 +667,7 @@ export async function createDesktopApi(
     recap: 'wbRecap'
   } as const
   const wbSchemas = {
+    think: thinkingResultSchema,
     intake: schemas.intakeSchema,
     contradiction: schemas.contradictionSchema,
     routes: schemas.routesSchema,
@@ -688,7 +692,7 @@ export async function createDesktopApi(
             callJson: runtime.json(id),
             randomUUID: () => crypto.randomUUID()
           })
-        const wb = ['intake', 'contradiction', 'routes', 'objSubj'].includes(operation)
+        const wb = ['think', 'intake', 'contradiction', 'routes', 'objSubj'].includes(operation)
           ? s.data.workbench
           : selectedWorkbench(s.data.workbench)
         // The signature varies only for decision revision and recap input.
@@ -701,7 +705,10 @@ export async function createDesktopApi(
           result.actions.forEach((v: any) => (v._context = c))
           result.checks.forEach((v: any) => (v._context = c))
         } else if (operation === 'recap') result.entry._context = c
-        else result._context = c
+        else {
+          result._context = c
+          if (operation === 'think') result.actions.forEach((v: any) => (v._context = c))
+        }
         return result
       }
     })
@@ -780,8 +787,22 @@ export async function createDesktopApi(
       let value: JournalState = structuredClone(
         prior?.type === 'journal' ? prior.value : { folders: [], notes: [] }
       )
-      const unavailable = () => {
-        throw new Error('移动端附件存储尚未接入，Markdown 编辑和导入导出可正常使用')
+      const changedAssets = new Map<string, Uint8Array | null>()
+      const localAssets = {
+        put: (id: string, data: Uint8Array) => {
+          changedAssets.set(id, data)
+        },
+        get: (id: string) => {
+          const changed = changedAssets.get(id)
+          if (changed) return changed
+          const prior = stored(assetEntityId(id))?.payload
+          const data = prior?.type === 'settings' ? prior.value.data : undefined
+          if (typeof data !== 'string' || !data) throw Error('附件尚未同步，请连接电脑后再次同步')
+          return decodeAsset(data)
+        },
+        remove: (id: string) => {
+          changedAssets.set(id, null)
+        }
       }
       const service = createJournalService(
         {
@@ -791,11 +812,43 @@ export async function createDesktopApi(
           },
           transaction: (work) => work()
         },
-        { put: unavailable, get: unavailable, remove: unavailable },
+        localAssets,
         () => false
       )
       const result = fn(service)
-      if (write) await persist('desktop:journal', { type: 'journal', value })
+      if (write) {
+        const payloads: [string, DesktopPayload][] = [
+          ['desktop:journal', { type: 'journal', value }]
+        ]
+        for (const [id, bytes] of changedAssets)
+          payloads.push([
+            assetEntityId(id),
+            {
+              type: 'settings',
+              value: {
+                data: bytes ? encodeAsset(bytes) : '',
+                sha256: bytes ? assetHash(bytes) : ''
+              }
+            }
+          ])
+        await store.batch(
+          payloads.map(([id, payload]) => {
+            const old = stored(id)
+            return {
+              entity: {
+                ...newMeta(),
+                id,
+                kind: 'desktop' as const,
+                version: (old?.version ?? 0) + 1,
+                payload
+              },
+              expectedVersion: old?.version ?? 0,
+              operationId: crypto.randomUUID()
+            }
+          })
+        )
+        await load()
+      }
       return structuredClone(result)
     }
     return write ? exclusive(run) : run()
@@ -806,12 +859,9 @@ export async function createDesktopApi(
       journalCommandSchema(command, 'command')
       return journalWork((s) => s.apply(command), true)
     },
-    attach: async () => {
-      throw new Error('移动端图片和录音附件尚未接入')
-    },
-    media: async () => {
-      throw new Error('移动端附件存储尚未接入')
-    },
+    attach: (id: string, name: string, mime: string, bytes: Uint8Array) =>
+      journalWork((s) => s.attach(id, name, mime, new Uint8Array(bytes)), true),
+    media: (id: string) => journalWork((s) => s.media(id)),
     import: async (target: string | null) => {
       const files = await documents.choose()
       if (!files.length) return { cancelled: true, count: 0, message: '已取消' }

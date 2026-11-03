@@ -1,3 +1,11 @@
+import {
+  CHUNK_BYTES,
+  MAX_ASSET_BYTES,
+  assetHash,
+  encodeAsset,
+  decodeAsset,
+  assetEntityId
+} from '@shared/sync/assets'
 import { registerPlugin, Capacitor } from '@capacitor/core'
 import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils'
@@ -23,6 +31,7 @@ const native = registerPlugin<{
 const hash = (v: unknown) => bytesToHex(sha256(utf8ToBytes(canonical(v))))
 export interface SyncResult {
   count: number
+  attachments?: { transferred: number; pending: number; errors: string[] }
   conflicts: { key: string; local: SyncDocument; remote: SyncDocument }[]
 }
 export async function synchronize(store: AtomicStore, pairing: string): Promise<SyncResult> {
@@ -56,9 +65,7 @@ export async function exchangeSnapshot(
       ? structuredClone(journalEntity.payload.value)
       : { notes: [], folders: [] }
   const docs: SyncDocument[] = [
-    ...journal.notes
-      .filter((n) => !n.attachments.length)
-      .map((n) => ({ kind: 'note' as const, id: n.id, value: n })),
+    ...journal.notes.map((n) => ({ kind: 'note' as const, id: n.id, value: n })),
     ...journal.folders.map((f) => ({ kind: 'folder' as const, id: f.id, value: f }))
   ]
   for (const e of entities) {
@@ -182,5 +189,94 @@ export async function exchangeSnapshot(
     value: { baseline, conflicts, lastSync: new Date().toISOString() }
   })
   await store.batch(commits)
-  return { count: reply.documents.length, conflicts }
+  const attachments = { transferred: 0, pending: 0, errors: [] as string[] }
+  const manifests = new Map(
+    reply.documents
+      .flatMap((d) => (d.kind === 'note' ? d.value.attachments : []))
+      .map((a) => [a.id, a])
+  )
+  for (const a of manifests.values())
+    try {
+      const id = assetEntityId(a.id)
+      const local = (await store.snapshot()).entities.find((e) => e.id === id)
+      const data =
+        local?.kind === 'desktop' && local.payload.type === 'settings'
+          ? local.payload.value.data
+          : undefined
+      if (typeof data === 'string' && data) {
+        const bytes = decodeAsset(data)
+        if (bytes.length !== a.size) throw Error('本机附件大小不一致')
+        const digest = assetHash(bytes)
+        const probe = JSON.parse(
+          await exchange(JSON.stringify({ operation: 'asset-probe', id: a.id }))
+        )
+        if (probe.exists) {
+          if (probe.sha256 !== digest) throw Error('附件校验值不同，原文件均保留')
+          continue
+        }
+        for (let offset = 0; offset < bytes.length; offset += CHUNK_BYTES) {
+          const response = JSON.parse(
+            await exchange(
+              JSON.stringify({
+                operation: 'asset-write',
+                id: a.id,
+                offset,
+                total: bytes.length,
+                sha256: digest,
+                data: encodeAsset(bytes.subarray(offset, offset + CHUNK_BYTES))
+              })
+            )
+          )
+          if (response.complete) break
+          if (response.offset !== offset + Math.min(CHUNK_BYTES, bytes.length - offset))
+            throw Error('附件上传未确认')
+        }
+        attachments.transferred++
+      } else {
+        if (a.size > MAX_ASSET_BYTES) throw Error('附件超过100MB')
+        const bytes = new Uint8Array(a.size)
+        let digest = ''
+        for (let offset = 0; offset < a.size;) {
+          const response = JSON.parse(
+            await exchange(JSON.stringify({ operation: 'asset-read', id: a.id, offset }))
+          )
+          if (
+            response.total !== a.size ||
+            response.offset !== offset ||
+            !/^[a-f0-9]{64}$/.test(response.sha256)
+          )
+            throw Error('附件响应不完整')
+          if (digest && digest !== response.sha256) throw Error('附件在传输中发生变化')
+          digest = response.sha256
+          const chunk = decodeAsset(response.data)
+          if (!chunk.length || chunk.length > CHUNK_BYTES || offset + chunk.length > a.size)
+            throw Error('附件分块损坏')
+          bytes.set(chunk, offset)
+          offset += chunk.length
+        }
+        if (assetHash(bytes) !== digest) throw Error('附件校验失败')
+        const entity = {
+          ...newMeta(),
+          id,
+          kind: 'desktop' as const,
+          version: (local?.version ?? 0) + 1,
+          payload: {
+            type: 'settings' as const,
+            value: { data: encodeAsset(bytes), sha256: digest }
+          }
+        }
+        await store.commit({
+          entity,
+          expectedVersion: local?.version ?? 0,
+          operationId: crypto.randomUUID()
+        })
+        attachments.transferred++
+      }
+    } catch (error) {
+      attachments.pending++
+      attachments.errors.push(
+        `${a.name}：${error instanceof Error ? error.message : String(error)}`
+      )
+    }
+  return { count: reply.documents.length, conflicts, attachments }
 }

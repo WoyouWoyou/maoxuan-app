@@ -55,8 +55,10 @@ import type {
 /** Exposed by preload as `window.api`. Every method maps 1:1 to an ipcMain.handle channel named `${group}:${method}`. */
 export interface MaoxuanApi {
   sync: {
+    onChanged?(callback: () => void): () => void
     exchange?(pairing: string): Promise<{
       count: number
+      attachments?: { transferred: number; pending: number; errors: string[] }
       conflicts: {
         key: string
         local: import('./sync/protocol').SyncDocument
@@ -197,6 +199,7 @@ export interface MaoxuanApi {
       step?: StepKey,
       mutationId?: string
     ): Promise<Session>
+    think(sessionId: string): Promise<import('./workbench-thinking').ThinkingResult>
     /** 整理 form + 已回答的追问 + 现有事实台账，输出新的 WbIntake（事实 id 延续旧台账）。 */
     intake(sessionId: string): Promise<WbIntake>
     contradiction(sessionId: string): Promise<WbContradiction>

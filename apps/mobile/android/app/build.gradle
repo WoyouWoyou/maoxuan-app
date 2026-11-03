@@ -7,8 +7,8 @@ android {
         applicationId "com.liamreed.maoxuan.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "0.2.0"
+        versionCode 3
+        versionName "0.2.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,12 +16,27 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        preview {
+            def signingPath = System.getenv('MAOXUAN_ANDROID_STORE_PATH')
+            if (signingPath) {
+                storeFile file(signingPath)
+                storeType 'PKCS12'
+                storePassword System.getenv('MAOXUAN_ANDROID_STORE_PASSWORD')
+                keyAlias 'maoxuan-preview'
+                keyPassword System.getenv('MAOXUAN_ANDROID_STORE_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         debug {
-            applicationIdSuffix ".preview"
+            if (System.getenv('MAOXUAN_ANDROID_STORE_PATH')) {
+                signingConfig signingConfigs.preview
+            }
+            applicationIdSuffix ".preview.stable"
             versionNameSuffix "-preview"
-            resValue "string", "app_name", "毛选·同步测试版"
-            resValue "string", "title_activity_main", "毛选·同步测试版"
+            resValue "string", "app_name", "毛选·随身版"
+            resValue "string", "title_activity_main", "毛选·随身版"
         }
         release {
             minifyEnabled false

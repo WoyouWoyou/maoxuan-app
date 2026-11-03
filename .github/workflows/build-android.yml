@@ -49,6 +49,16 @@ jobs:
         run: npx cap sync android
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Prepare stable preview signing
+        env:
+          SIGNING_P12: ${{ secrets.MAOXUAN_ANDROID_PREVIEW_P12 }}
+          SIGNING_PASSWORD: ${{ secrets.MAOXUAN_ANDROID_PREVIEW_PASSWORD }}
+        run: |
+          test -n "$SIGNING_P12" && test -n "$SIGNING_PASSWORD"
+          umask 077
+          printf '%s' "$SIGNING_P12" | base64 --decode > "$RUNNER_TEMP/maoxuan-preview.p12"
+          printf 'MAOXUAN_ANDROID_STORE_PATH=%s\n' "$RUNNER_TEMP/maoxuan-preview.p12" >> "$GITHUB_ENV"
+          printf 'MAOXUAN_ANDROID_STORE_PASSWORD=%s\n' "$SIGNING_PASSWORD" >> "$GITHUB_ENV"
       - name: Assemble installable debug APK
         working-directory: apps/mobile/android
         run: |
@@ -63,7 +73,8 @@ jobs:
           version=$(node -p "require('./apps/mobile/package.json').version")
           apk="apps/mobile/artifacts/maoxuan-mobile-${version}-test-${BUILD_NUMBER}.apk"
           cp apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk "$apk"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk" > apps/mobile/artifacts/signing-info.txt
+          cat apps/mobile/artifacts/signing-info.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > apps/mobile/artifacts/package-info.txt
           printf 'commit=%s\nrun=%s\nvariant=debug\n' "$BUILD_SHA" "$BUILD_NUMBER" > apps/mobile/artifacts/build-info.txt
           cp -R apps/mobile/android/app/build/test-results/testDebugUnitTest apps/mobile/artifacts/native-tests

@@ -53,7 +53,7 @@ export function DeviceSyncPanel({
       <h2>设备同步</h2>
       <p>手机与电脑连接同一局域网，双向合并阅读问题、Markdown 记录和独立待办。</p>
       <p className="muted">
-        本版手动同步文本。附件、导入书籍、成长进度及永久删除暂不跨端传播；冲突保留双方版本。
+        手动同步正文、图片和录音。附件分块校验，未传完可再次同步；冲突保留双方版本。导入书籍、成长进度和永久删除暂不同步。
       </p>
       {mobile ? (
         <>
@@ -77,9 +77,10 @@ export function DeviceSyncPanel({
                 const result = await window.api.sync.exchange(pairing)
                 setConflicts(result.conflicts)
                 setMessage(
-                  `本轮核对 ${result.count} 项，${result.conflicts.length} 项冲突已保留两份`
+                  `本轮核对 ${result.count} 项，${result.conflicts.length} 项冲突已保留两份。本轮附件传输 ${result.attachments?.transferred ?? 0} 个，待重试 ${result.attachments?.pending ?? 0} 个。${result.attachments?.errors.join('；') ?? ''}`
                 )
                 window.dispatchEvent(new Event('sessions-changed'))
+                window.dispatchEvent(new Event('journal-synced'))
                 onSynced?.()
               })
             }

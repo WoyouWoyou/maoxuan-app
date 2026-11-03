@@ -146,111 +146,100 @@ test('coach diagnosis uses the desktop prompt and confirmation gate', async ({ p
   await page.getByRole('button', { name: '确认问题，进入第二步 →' }).click()
   await expect(page.locator('.step-focus')).toBeVisible()
 })
-test('workbench keeps the desktop method picker and runs only the selected analysis', async ({
-  page
-}) => {
+test('workbench uses two original frameworks and saves near-term suggestions in one pass', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
-  await page.route('https://mock.example/v1/chat/completions', (route) =>
-    route.fulfill({
-      json: {
-        choices: [
-          {
-            message: {
-              content: JSON.stringify({
-                factRefs: ['F1'],
-                missingFacts: [],
-                routes: [
-                  {
-                    key: 'steady',
-                    judgment: '先验证一个试点',
-                    policy: '小范围调查',
-                    result: '获得真实反馈',
-                    triggers: [],
-                    risks: [],
-                    switchSignals: []
-                  },
-                  {
-                    key: 'breakthrough',
-                    judgment: '扩大样本',
-                    policy: '增加访谈',
-                    result: '补充证据',
-                    triggers: [],
-                    risks: [],
-                    switchSignals: []
-                  },
-                  {
-                    key: 'defensive',
-                    judgment: '保留资源',
-                    policy: '延后扩展',
-                    result: '减少投入',
-                    triggers: [],
-                    risks: [],
-                    switchSignals: []
-                  }
-                ]
-              })
-            }
-          }
-        ]
-      }
-    })
-  )
+  let calls = 0
+  await page.route('https://mock.example/v1/chat/completions', async (route) => {
+    calls++
+    const request = route.request().postDataJSON()
+    expect(request.messages[0].content).toContain('成事 = 客观条件 × 主观能力')
+    const input = JSON.parse(request.messages[1].content)
+    expect(input.method).toBe('contradiction')
+    expect(input.situation).toContain('项目进度推不动')
+    await route.fulfill({ json: { choices: [{ message: { content: JSON.stringify({
+      status: 'ready', summary: '先打通需求反馈，减少反复返工。',
+      information: ['actor', 'tension', 'stage', 'constraints', 'goal'].map(key => ({ key, state: 'sufficient', evidence: '两人团队，项目进度推不动', judgment: '已有明确情境', missing: '' })),
+      questions: [],
+      contradiction: { all: ['需求变化 vs 交付周期', '人力有限 vs 多线投入'], primary: '需求变化 vs 交付周期',
+        why: '缩短反馈可以减少返工和资源浪费。', mainAspect: { name: '旧交付方式', strength: '已成习惯', weakness: '反馈很慢' },
+        secondaryAspect: { name: '小范围快速验证', strength: '成本低', weakness: '还未建立习惯' },
+        turningConditions: ['本周完成一次用户验证'], leverage: '先验证一个场景' },
+      objSubj: null, notNow: ['暂不全面推广，先验证'],
+      actions: [{ action: '本周访谈3位用户', purpose: '验证最需要缩短的交付环节', verify: '留下3份访谈记录' }]
+    }) } }] } })
+  })
   const id = await page.evaluate(async () => {
-    let s = await window.api.sessions.create('客户调研方案', 'workbench')
-    const form = {
-      ...s.data.workbench!.form,
-      objective: '验证客户需求的真实变化',
-      blockers: ['缺少一线反馈', '', '']
-    }
-    s = await window.api.wb.apply(
-      s.id,
-      [
-        { kind: 'form', value: form },
-        {
-          kind: 'intake',
-          value: {
-            facts: [
-              { id: 'F1', kind: 'fact', content: '已经收到三份反馈', confidence: 'confirmed' }
-            ],
-            missing: [],
-            questions: [],
-            mainline: form.objective,
-            sideGoals: [],
-            generatedAt: new Date().toISOString()
-          }
-        }
-      ],
-      s.stateVersion,
-      '整理事实',
-      'wb_diagnose'
-    )
-    return s.id
+    await window.api.settings.set({ apiKey: 'test', baseUrl: 'https://mock.example/v1', model: 'mock' })
+    return (await window.api.sessions.create('项目诊断', 'workbench')).id
   })
   await page.goto(`/#/session/${id}`)
-  await expect(page.getByLabel(/三条路线 · 选择难定/)).toBeVisible()
-  await page.getByLabel(/三条路线 · 选择难定/).check()
-  await page.getByRole('button', { name: '确认方法', exact: true }).click()
-  await page.evaluate(() =>
-    window.api.settings.set({ apiKey: 'test', baseUrl: 'https://mock.example/v1', model: 'mock' })
-  )
-  await page.getByRole('button', { name: '开始所选诊断', exact: true }).click()
-  await expect
-    .poll(() =>
-      page.evaluate(
-        async (id) =>
-          (await window.api.sessions.get(id))?.data.workbench?.diagnosis.routes?.routes.length,
-        id
-      )
-    )
-    .toBe(3)
-  const modules = await page.evaluate(
-    async (id) => (await window.api.sessions.get(id))!.data.workbench!.diagnosis,
-    id
-  )
-  expect(modules.contradiction).toBe(null)
-  expect(modules.objSubj).toBe(null)
+  await expect(page.getByRole('group', { name: '选择思考框架' }).getByRole('button')).toHaveCount(2)
+  await expect(page.getByRole('button', { name: /三条路线/ })).toHaveCount(0)
+  await expect(page.locator('.wbt-root textarea')).toHaveCount(1)
+  await page.getByLabel('你现在遇到了什么事？').fill('我带两人团队，项目进度推不动，需求每周变，交付要两个月，希望本月缩短反馈周期。')
+  await page.getByRole('button', { name: '开始分析，给我近期建议' }).click()
+  await expect(page.getByRole('heading', { name: '近期行动推荐', exact: true })).toBeVisible()
+  await expect(page.locator('.wbt-analysis')).toContainText('需求变化 vs 交付周期')
+  expect(calls).toBe(1)
+  await page.getByRole('button', { name: '加入待办', exact: true }).click()
+  await expect(page.getByRole('button', { name: '已加入待办 ✓', exact: true })).toBeDisabled()
+  await page.reload()
+  await expect(page.getByLabel('你现在遇到了什么事？')).toHaveValue(/项目进度推不动/)
+  await expect(page.getByRole('heading', { name: '近期行动推荐', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '已加入待办 ✓', exact: true })).toBeDisabled()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.locator('.wbt-analysis').evaluate(el => el.scrollIntoView({ block: 'start' }))
   await page.screenshot({ path: 'test-results/workbench-mobile.png', fullPage: true })
+  await page.getByRole('link', { name: '去工作清单记录进展 →' }).click()
+  await expect(page.getByRole('heading', { name: '四象限工作法', exact: true })).toBeVisible()
+})
+
+test('subject-object missing data prompts only key questions and reanalyzes the supplied answer', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible()
+  let calls = 0
+  await page.route('https://mock.example/v1/chat/completions', async route => {
+    calls++
+    const input = JSON.parse(route.request().postDataJSON().messages[1].content)
+    expect(input.method).toBe('objSubj')
+    const answered = calls > 1
+    if (answered) expect(input.situation).toContain('聊过3个人')
+    await route.fulfill({ json: { choices: [{ message: { content: JSON.stringify({
+      status: answered ? 'ready' : 'needs_info', summary: answered ? '先做一个小范围验证。' : '需求信息空白，暂不能判断可行性。',
+      information: ['structure','demand','trend','ability','organization'].map(key => ({ key,
+        state: !answered && key === 'demand' ? 'missing' : 'sufficient', evidence: answered ? '已有3位用户反馈' : '用户描述',
+        judgment: !answered && key === 'demand' ? '尚无需求证据' : '具备部分条件', missing: !answered && key === 'demand' ? '真实用户反馈' : '' })),
+      questions: answered ? [] : [{ question: '你和目标用户聊过吗？', why: '真实需求决定是否值得继续投入' }],
+      contradiction: null, objSubj: { objective: '需要核实需求', subjective: '有开发经验', quadrant: answered ? 'build' : 'unknown', conclusion: answered ? '谨慎可行，先补交付能力' : '暂不能判断', gap: '需求与交付验证' },
+      notNow: ['不大规模投入'], actions: [{ action: '本周访谈3位用户', purpose: '验证需求', verify: '记录3份原话反馈' }]
+    }) } }] } })
+  })
+  const id = await page.evaluate(async () => {
+    await window.api.settings.set({ apiKey: 'test', baseUrl: 'https://mock.example/v1', model: 'mock' })
+    return (await window.api.sessions.create('副业可行性', 'workbench')).id
+  })
+  await page.goto(`/#/session/${id}`)
+  await page.getByRole('button', { name: /主客分析法/ }).click()
+  await page.getByLabel('你现在遇到了什么事？').fill('我想做副业项目，有开发经验，每晚能投入两小时，但还没验证需求。')
+  await page.getByRole('button', { name: '开始分析，给我近期建议' }).click()
+  await expect(page.locator('.wbt-insight')).toContainText('暂不能判断可行性')
+  await expect(page.getByRole('heading', { name: '成事 = 客观条件 × 主观能力', exact: true })).toBeVisible()
+  await expect(page.locator('.wbt-dimension')).toHaveCount(5)
+  await expect(page.locator('.wbt-matrix .is-selected')).toHaveCount(0)
+  await expect(page.locator('.wbt-questions textarea')).toHaveCount(1)
+  await page.getByLabel('你和目标用户聊过吗？').fill('聊过3个人，都愿意试用现有原型。')
+  await page.getByRole('button', { name: '补充后继续分析', exact: true }).click()
+  await expect(page.locator('.wbt-matrix .is-selected')).toContainText('先练内功')
+  expect(calls).toBe(2)
+  await page.reload()
+  await expect(page.getByLabel('你现在遇到了什么事？')).toHaveValue(/聊过3个人/)
+  await expect(page.locator('.wbt-matrix .is-selected')).toBeVisible()
+  await page.locator('.wbt-analysis').evaluate(el => el.scrollIntoView({ block: 'start' }))
+  await page.screenshot({ path: 'test-results/workbench-objsubj-mobile.png', fullPage: true })
+  await page.getByLabel('你现在遇到了什么事？').fill('情况有变化，预算缩减了。')
+  await expect(page.locator('.wbt-notice')).toContainText('上次分析')
+  await expect(page.getByRole('button', { name: '加入待办', exact: true })).toBeDisabled()
 })
 
 test('mobile reading hides permanent panels, remembers the chapter preference, and keeps reflection drafts when closed', async ({
@@ -297,16 +286,113 @@ test('mobile reading hides permanent panels, remembers the chapter preference, a
   await page.screenshot({ path: 'test-results/reading-mobile.png' })
 })
 
-test('home has a fixed achievements entrance backed by real progress, and native sync is explicit',async({page})=>{
- await page.goto('/')
- await page.getByRole('button',{name:/我的成就/}).click()
- await expect(page.getByRole('heading',{name:'长征不怕远征难'})).toBeVisible()
- await expect(page.locator('.march-page')).toContainText('成长值')
- await page.getByRole('button',{name:'返回首页',exact:true}).click()
- await page.getByRole('button',{name:'我的',exact:true}).click()
- const sync=page.getByRole('region',{name:'设备同步'})
- await expect(sync).toBeVisible()
- await sync.getByPlaceholder('粘贴电脑「设置 → 设备同步」中的配对码').fill('{}')
- await sync.getByRole('button',{name:'立即同步',exact:true}).click()
- await expect(sync.getByRole('alert')).toContainText('Android APK')
+test('home has a fixed achievements entrance backed by real progress, and native sync is explicit', async ({
+  page
+}) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /我的成就/ }).click()
+  await expect(page.getByRole('heading', { name: '长征不怕远征难' })).toBeVisible()
+  await expect(page.locator('.march-page')).toContainText('成长值')
+  await page.getByRole('button', { name: '返回首页', exact: true }).click()
+  await page.getByRole('button', { name: '我的', exact: true }).click()
+  const sync = page.getByRole('region', { name: '设备同步' })
+  await expect(sync).toBeVisible()
+  await sync.getByPlaceholder('粘贴电脑「设置 → 设备同步」中的配对码').fill('{}')
+  await sync.getByRole('button', { name: '立即同步', exact: true }).click()
+  await expect(sync.getByRole('alert')).toContainText('Android APK')
+})
+
+test('Android back event dismisses dialogs, returns through pages, and flushes Markdown before leaving', async ({
+  page
+}) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: /我的成就/ }).click()
+  await expect(page.getByRole('heading', { name: '长征不怕远征难' })).toBeVisible()
+  await page.evaluate(() => window.dispatchEvent(new Event('maoxuan-back')))
+  await expect(page.getByRole('button', { name: /我的成就/ })).toBeVisible()
+  await page.getByRole('button', { name: '新建阅读问题', exact: true }).click()
+  await page.evaluate(() => window.dispatchEvent(new Event('maoxuan-back')))
+  await expect(page.getByRole('dialog')).not.toBeVisible()
+  await createReading(page)
+  await page.getByRole('button', { name: '自行选章，直接阅读 →' }).click()
+  await page.getByRole('button', { name: '篇目', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '篇目与推荐', exact: true })).toBeVisible()
+  await page.evaluate(() => window.dispatchEvent(new Event('maoxuan-back')))
+  await expect(page.getByRole('dialog', { name: '篇目与推荐', exact: true })).not.toBeVisible()
+  await expect(page.locator('.mobile-focus-session')).toBeVisible()
+  await page.evaluate(() => window.dispatchEvent(new Event('maoxuan-back')))
+  await expect(page.locator('.mobile-focus-session')).not.toBeVisible()
+  await page.getByRole('button', { name: '记录', exact: true }).click()
+  await page.getByRole('button', { name: '开始写',exact:true }).click()
+  const title = page.getByLabel('记录标题', { exact: true })
+  await title.fill('返回前保存')
+  await page.evaluate(() => window.dispatchEvent(new Event('maoxuan-back')))
+  await expect(title).not.toBeVisible()
+  expect(
+    await page.evaluate(async () =>
+      (await window.api.journal.list()).notes.some((n) => n.title === '返回前保存')
+    )
+  ).toBe(true)
+})
+
+test('image and audio attachments persist and render after reloading the mobile app', async ({
+  page
+}) => {
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: '记录', exact: true })).toBeVisible()
+  await page.evaluate(async () => {
+    const made = await window.api.journal.apply({ kind: 'noteCreate', folderId: null })
+    await window.api.journal.apply({
+      kind: 'noteSave',
+      id: made.selectedId!,
+      revision: 0,
+      title: '含图片录音的笔记',
+      markdown: '附件和正文一起保存',
+      tags: []
+    })
+    const png = Uint8Array.from(
+      atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+      ),
+      (c) => c.charCodeAt(0)
+    )
+    await window.api.journal.attach(made.selectedId!, '照片.png', 'image/png', png)
+    const wav = new Uint8Array(1644),
+      v = new DataView(wav.buffer),
+      text = (at: number, s: string) => {
+        for (let n = 0; n < s.length; n++) wav[at + n] = s.charCodeAt(n)
+      }
+    text(0, 'RIFF')
+    v.setUint32(4, 1636, true)
+    text(8, 'WAVEfmt ')
+    v.setUint32(16, 16, true)
+    v.setUint16(20, 1, true)
+    v.setUint16(22, 1, true)
+    v.setUint32(24, 8000, true)
+    v.setUint32(28, 16000, true)
+    v.setUint16(32, 2, true)
+    v.setUint16(34, 16, true)
+    text(36, 'data')
+    v.setUint32(40, 1600, true)
+    await window.api.journal.attach(made.selectedId!, '录音.wav', 'audio/wav', wav)
+  })
+  await page.reload()
+  await page.getByRole('button', { name: '记录', exact: true }).click()
+  await page.getByRole('button',{name:'打开文件夹',exact:true}).click()
+  await page.getByRole('button',{name:/含图片录音的笔记/}).first().click()
+  await page.locator('.journal-media-toggle').click()
+  await expect
+    .poll(() =>
+      page.locator('.journal-media img').evaluate((img: HTMLImageElement) => img.naturalWidth)
+    )
+    .toBe(1)
+  await expect
+    .poll(() =>
+      page
+        .locator('.journal-media audio')
+        .evaluate(
+          (audio: HTMLAudioElement) => Number.isFinite(audio.duration) && audio.duration > 0
+        )
+    )
+    .toBe(true)
 })

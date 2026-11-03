@@ -12,6 +12,7 @@ function subscribe<T>(channel: string, callback: (event: T) => void): () => void
 
 const api: MaoxuanApi = {
   sync: {
+    onChanged: (cb) => subscribe('sync:changed', cb),
     status: () => ipcRenderer.invoke('sync:status'),
     start: () => ipcRenderer.invoke('sync:start'),
     stop: () => ipcRenderer.invoke('sync:stop')
@@ -123,6 +124,7 @@ const api: MaoxuanApi = {
   wb: {
     apply: (id, commands, version, label, step, mutationId = crypto.randomUUID()) =>
       ipcRenderer.invoke('wb:apply', id, commands, version, label, step, mutationId),
+    think: (sessionId) => ipcRenderer.invoke('wb:think', sessionId),
     intake: (sessionId) => ipcRenderer.invoke('wb:intake', sessionId),
     contradiction: (sessionId) => ipcRenderer.invoke('wb:contradiction', sessionId),
     routes: (sessionId) => ipcRenderer.invoke('wb:routes', sessionId),

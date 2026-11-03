@@ -2,8 +2,16 @@ import { useEffect, useState } from 'react'
 import type { JournalAttachment } from '@shared/journal'
 export function JournalMedia({ attachment }: { attachment: JournalAttachment }) {
   const [url, setUrl] = useState('')
+  const [epoch, setEpoch] = useState(0)
+  useEffect(() => {
+    const changed = () => setEpoch((n) => n + 1)
+    window.addEventListener('journal-assets-changed', changed)
+    return () => window.removeEventListener('journal-assets-changed', changed)
+  }, [])
   const [error, setError] = useState('')
   useEffect(() => {
+    setError('')
+    setUrl('')
     let alive = true
     let objectUrl = ''
     window.api.journal
@@ -22,7 +30,7 @@ export function JournalMedia({ attachment }: { attachment: JournalAttachment }) 
       alive = false
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [attachment.id])
+  }, [attachment.id, epoch])
   return (
     <div className="journal-media">
       <span>{attachment.name}</span>

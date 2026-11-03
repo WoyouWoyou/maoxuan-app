@@ -391,3 +391,91 @@ it('folder and todo conflicts create stable editable copies without overwriting 
     db.close()
   }
 })
+
+it('syncs image/audio notes in both directions, keeps text on interrupted media, and retries missing chunks', async () => {
+  const { CHUNK_BYTES } = await import('../src/shared/sync/assets')
+  const { createDesktopApi } = await import('../apps/mobile/src/application/desktop-api')
+  const db = openDatabase(':memory:')
+  try {
+    const files = new Map<string, Uint8Array>()
+    const assets = {
+      put: (id: string, bytes: Uint8Array) => {
+        files.set(id, new Uint8Array(bytes))
+      },
+      get: (id: string) => {
+        const bytes = files.get(id)
+        if (!bytes) throw Error('missing')
+        return bytes
+      },
+      remove: (id: string) => {
+        files.delete(id)
+      }
+    }
+    const repo = createSyncRepository(db, assets),
+      store = await createBrowserStore(crypto.randomUUID())
+    const imageId = crypto.randomUUID(),
+      audioId = crypto.randomUUID()
+    const image = Uint8Array.from(
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+        'base64'
+      )
+    )
+    const audio = new Uint8Array(CHUNK_BYTES + 128)
+    audio.set(new TextEncoder().encode('RIFF'))
+    audio.set(new TextEncoder().encode('WAVE'), 8)
+    files.set(imageId, image)
+    files.set(audioId, audio)
+    const source = note('with-media', '图片与录音的正文都不能丢')
+    if (source.kind !== 'note') throw Error()
+    source.value.attachments = [
+      { id: imageId, name: '照片.png', mime: 'image/png', size: image.length },
+      { id: audioId, name: '录音.wav', mime: 'audio/wav', size: audio.length }
+    ]
+    repo.transaction(() => repo.apply([source]))
+    let fail = true
+    const round = async (body: string) => {
+      const input = JSON.parse(body)
+      if (input.operation) {
+        if (fail && input.id === audioId && input.offset >= CHUNK_BYTES) throw Error('中途断线')
+        return JSON.stringify(repo.asset!(input))
+      }
+      return repo.transaction(() => {
+        const reply = reconcile(repo.read(), input, hash)
+        repo.apply(reply.documents)
+        reply.documents = repo.read()
+        return JSON.stringify(reply)
+      })
+    }
+    const first = await exchangeSnapshot(store, 'media-pc', round)
+    expect(first.attachments?.pending).toBe(1)
+    let phone = await createDesktopApi(store, [])
+    let notes = await phone.api.journal.list()
+    expect(notes.notes[0].markdown).toBe('图片与录音的正文都不能丢')
+    expect(notes.notes[0].attachments).toHaveLength(2)
+    expect((await phone.api.journal.media(imageId)).bytes).toEqual(image)
+    await expect(phone.api.journal.media(audioId)).rejects.toThrow('附件尚未同步')
+    fail = false
+    expect((await exchangeSnapshot(store, 'media-pc', round)).attachments?.pending).toBe(0)
+    await phone.refresh()
+    expect((await phone.api.journal.media(audioId)).bytes).toEqual(audio)
+    notes = await phone.api.journal.list()
+    await phone.api.journal.apply({
+      kind: 'noteSave',
+      id: source.id,
+      revision: notes.notes[0].revision,
+      title: '手机编辑',
+      markdown: '手机修改后仍保留照片录音',
+      tags: []
+    })
+    const added = await phone.api.journal.attach(source.id, '手机上传.wav', 'audio/wav', audio)
+    expect((await exchangeSnapshot(store, 'media-pc', round)).attachments?.pending).toBe(0)
+    expect(files.get(added.id)).toEqual(audio)
+    expect(repo.read().find((d) => d.id === source.id)!.value).toMatchObject({
+      markdown: '手机修改后仍保留照片录音'
+    })
+    expect(repo.read().filter((d) => d.kind === 'note')).toHaveLength(1)
+  } finally {
+    db.close()
+  }
+})

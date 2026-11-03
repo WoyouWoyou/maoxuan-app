@@ -37,9 +37,15 @@ import { configureModelRuntime } from './modules/model-runtime/public'
 import { configureRetrieval } from './modules/retrieval/public'
 export async function bootstrap(handle: Database.Database): Promise<void> {
   const lanSync = createLanSync(
-    createSyncRepository(handle),
+    createSyncRepository(
+      handle,
+      createJournalAssets(join(app.getPath('userData'), 'journal', 'assets'))
+    ),
     undefined,
-    certificateStore(join(app.getPath('userData'), 'device-sync-certificate.enc'))
+    certificateStore(join(app.getPath('userData'), 'device-sync-certificate.enc')),
+    () => {
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('sync:changed')
+    }
   )
   for (const [channel, job] of [
     ['sync:status', () => lanSync.status()],

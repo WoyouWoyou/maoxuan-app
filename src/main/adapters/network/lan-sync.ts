@@ -11,6 +11,7 @@ import {
 } from '@shared/sync/protocol'
 const hash = (v: unknown) => createHash('sha256').update(canonical(v)).digest('hex')
 export interface SyncRepository {
+  asset?: (request: any) => unknown
   read(): SyncDocument[]
   apply(d: SyncDocument[]): void
   transaction<T>(work: () => T): T
@@ -18,7 +19,8 @@ export interface SyncRepository {
 export function createLanSync(
   repo: SyncRepository,
   testHost?: string,
-  identity?: () => Promise<{ cert: string; private: string }>
+  identity?: () => Promise<{ cert: string; private: string }>,
+  onChanged?: () => void
 ) {
   let server: Server | undefined
   let status: SyncStatus = { running: false, pairing: [] }
@@ -81,6 +83,13 @@ export function createLanSync(
               if (res.writableEnded) return
               try {
                 const request = JSON.parse(Buffer.concat(chunks).toString()) as SyncRequest
+                if ('operation' in request) {
+                  if (!repo.asset) throw Error('附件同步尚未启用')
+                  const result = repo.asset(request) as { complete?: boolean }
+                  res.end(JSON.stringify(result))
+                  if (result.complete) onChanged?.()
+                  return
+                }
                 const output = repo.transaction(() => {
                   const reply = reconcile(repo.read(), request, hash)
                   repo.apply(reply.documents)
@@ -90,6 +99,7 @@ export function createLanSync(
                     throw Error('同步文本超过20MB，请减少数据后重试')
                   return json
                 })
+                if (request.changes.length) onChanged?.()
                 res.end(output)
               } catch (e) {
                 res

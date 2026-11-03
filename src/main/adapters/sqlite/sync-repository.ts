@@ -1,10 +1,15 @@
+import { createAssetExchange } from '../network/sync-assets'
+import type { JournalAssets } from '../../modules/journal/public'
 import type Database from 'better-sqlite3'
 import { createSessionRepository } from './session-repository'
 import { createActionRepository } from './action-repository'
 import { createJournalRepository } from './journal-repository'
 import { documentKey, canonical, type SyncDocument } from '@shared/sync/protocol'
 import type { SyncRepository } from '../network/lan-sync'
-export function createSyncRepository(db: Database.Database): SyncRepository {
+export function createSyncRepository(
+  db: Database.Database,
+  assets?: JournalAssets
+): SyncRepository {
   const sessions = createSessionRepository(db),
     actions = createActionRepository(db),
     journal = createJournalRepository(db)
@@ -12,9 +17,7 @@ export function createSyncRepository(db: Database.Database): SyncRepository {
     const state = journal.read()
     const docs: SyncDocument[] = [
       ...state.folders.map((f) => ({ kind: 'folder' as const, id: f.id, value: f })),
-      ...state.notes
-        .filter((n) => !n.attachments.length)
-        .map((n) => ({ kind: 'note' as const, id: n.id, value: n })),
+      ...state.notes.map((n) => ({ kind: 'note' as const, id: n.id, value: n })),
       ...actions.list().map((a) => ({ kind: 'action' as const, id: a.id, value: a }))
     ]
     for (const filter of ['active', 'archived', 'trash'] as const)
@@ -35,6 +38,7 @@ export function createSyncRepository(db: Database.Database): SyncRepository {
   }
   return {
     read,
+    asset: assets ? createAssetExchange(read, assets) : undefined,
     transaction: (work) => db.transaction(work)(),
     apply: (docs) => {
       const prior = new Map(read().map((d) => [documentKey(d), canonical(d)]))

@@ -120,7 +120,16 @@ export function validateDocument(d: SyncDocument): void {
       !(n.folderId === null || typeof n.folderId === 'string')
     )
       throw Error('无效Markdown记录')
-    if (n.attachments.length) throw Error('暂不支持附件同步，请先保留有附件的记录在原设备')
+    for (const a of n.attachments)
+      if (
+        !/^[a-f0-9-]{36}$/.test(a.id) ||
+        typeof a.name !== 'string' ||
+        !/^(image\/(png|jpeg|webp|gif)|audio\/(webm|ogg|mp4|mpeg|wav))$/.test(a.mime) ||
+        !Number.isInteger(a.size) ||
+        a.size < 16 ||
+        a.size > 100 * 1024 * 1024
+      )
+        throw Error('无效附件清单')
   } else if (d.kind === 'folder') {
     const f = d.value
     if (

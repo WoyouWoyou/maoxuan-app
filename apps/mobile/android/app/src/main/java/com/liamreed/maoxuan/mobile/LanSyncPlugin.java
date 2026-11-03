@@ -9,6 +9,10 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 @CapacitorPlugin(name="LanSync")
 public class LanSyncPlugin extends Plugin {
+ @PluginMethod public void minimize(PluginCall call) {
+  getActivity().runOnUiThread(()->{getActivity().moveTaskToBack(true);call.resolve();});
+ }
+
  @PluginMethod public void exchange(PluginCall call) {
   new Thread(()->{
    HttpsURLConnection connection=null;

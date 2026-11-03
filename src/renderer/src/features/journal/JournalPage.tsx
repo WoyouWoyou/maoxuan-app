@@ -54,6 +54,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 export function JournalPage() {
   const attachmentInput = useRef<HTMLInputElement>(null)
   const [mediaOpen, setMediaOpen] = useState(false)
+  const [externalRevision, setExternalRevision] = useState(0)
   const [templateOpen, setTemplateOpen] = useState(false)
   const [state, setState] = useState<JournalState>(EMPTY)
   const [view, setView] = usePreference<View>('view', 'all')
@@ -163,6 +164,75 @@ export function JournalPage() {
     saveQueue.current = pending
     return pending
   }, [])
+  useEffect(() => {
+    let alive = true
+    const refresh = async () => {
+      if (dirtyRef.current || recorder.current) return
+      try {
+        const next = await window.api.journal.list()
+        if (!alive || dirtyRef.current || recorder.current) return
+        setState(next)
+        const current = draftRef.current
+        const selected = current ? (next.notes.find((n) => n.id === current.id) ?? null) : null
+        if (current && JSON.stringify(current) !== JSON.stringify(selected)) {
+          selectDraft(selected)
+          setExternalRevision((n) => n + 1)
+        }
+      } catch (e) {
+        if (alive) setError(message(e))
+      }
+    }
+    const changed = () => {
+      void refresh()
+      window.dispatchEvent(new Event('journal-assets-changed'))
+    }
+    const focused = () => void refresh()
+    window.addEventListener('journal-synced', changed)
+    window.addEventListener('focus', focused)
+    const off = window.api.sync?.onChanged?.(changed)
+    return () => {
+      alive = false
+      window.removeEventListener('journal-synced', changed)
+      window.removeEventListener('focus', focused)
+      off?.()
+    }
+  }, [])
+  useEffect(() => {
+    const back = (event: Event) => {
+      const request = event as CustomEvent<{ waitUntil: (work: Promise<unknown>) => void }>
+      if (recorder.current && recorder.current.state !== 'inactive') {
+        event.preventDefault()
+        setError('请先停止录音并保存，再返回')
+        return
+      }
+      if (mediaOpen) {
+        event.preventDefault()
+        setMediaOpen(false)
+        return
+      }
+      if (drawer) {
+        event.preventDefault()
+        setDrawer(false)
+        return
+      }
+      if (focused) {
+        event.preventDefault()
+        setFocused(false)
+        return
+      }
+      if (draftRef.current) {
+        event.preventDefault()
+        request.detail.waitUntil(
+          flush().then(() => {
+            selectDraft(null)
+            setTreeHidden(false)
+          })
+        )
+      }
+    }
+    window.addEventListener('maoxuan-before-back', back)
+    return () => window.removeEventListener('maoxuan-before-back', back)
+  }, [flush, mediaOpen, drawer, focused])
   useEffect(() => {
     if (!dirty || composing.current) return
     const timer = setTimeout(() => {
@@ -970,7 +1040,7 @@ export function JournalPage() {
               />
               <div className="journal-writing-scroll">
                 <MarkdownEditor
-                  key={`${draft.id}:${disabled}`}
+                  key={`${draft.id}:${disabled}:${externalRevision}`}
                   initialValue={draft.markdown}
                   disabled={disabled}
                   onChange={(markdown) => change({ markdown })}

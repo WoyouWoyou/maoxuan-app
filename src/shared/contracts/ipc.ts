@@ -17,6 +17,7 @@ import {
   type Schema
 } from './validation'
 import {
+  thinkingResultSchema,
   actionSchema,
   actionPlanningSchema,
   checkSchema,
@@ -78,6 +79,7 @@ export const readingCommandSchema = tagged('kind', {
 })
 export const workbenchCommandSchema = tagged('kind', {
   form: o({ kind: oneOf('form'), value: formSchema }),
+  thinking: o({ kind: oneOf('thinking'), value: n(thinkingResultSchema) }),
   intake: o({ kind: oneOf('intake'), value: n(intakeSchema) }),
   decision: o({ kind: oneOf('decision'), value: n(decisionSchema) }),
   checks: o({ kind: oneOf('checks'), value: array(checkSchema) }),
@@ -206,6 +208,7 @@ for (const channel of [
   'ai:diagnose',
   'ai:reviseProblem',
   'ai:mindset',
+  'wb:think',
   'wb:intake',
   'wb:contradiction',
   'wb:routes',
