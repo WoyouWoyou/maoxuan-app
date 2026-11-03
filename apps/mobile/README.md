@@ -65,7 +65,7 @@ Android 与桌面已接入手动局域网笔记与附件同步：电脑「设置
 
 ## 构建状态与边界
 
-已生成 Android/iOS 工程，iOS 使用 SPM。Android 测试 APK 已通过 [GitHub Actions](https://github.com/WoyouWoyou/maoxuan-app/actions/runs/41436053662) 完成编译和签名校验（2026-11-02，构建分支 `codex/android-apk-20261102`）；本机仍缺少 Java Runtime，iOS 编译与签名仍缺少完整 Xcode。真机测试尚未完成；原生 SQLite、系统安全存储、文件选择/分享、键盘、系统返回与挂起恢复不能由浏览器或编译通过替代。环境要求见 [Capacitor 官方文档](https://capacitorjs.com/docs/getting-started/environment-setup)。
+已生成 Android/iOS 工程，iOS 使用 SPM。Android 测试 APK 已通过 [GitHub Actions](https://github.com/WoyouWoyou/maoxuan-app/actions/runs/41554868309) 完成编译和签名校验（2026-11-03，构建分支 `codex/android-apk-20261102`）；本机仍缺少 Java Runtime，iOS 编译与签名仍缺少完整 Xcode。真机测试尚未完成；原生 SQLite、系统安全存储、文件选择/分享、键盘、系统返回与挂起恢复不能由浏览器或编译通过替代。环境要求见 [Capacitor 官方文档](https://capacitorjs.com/docs/getting-started/environment-setup)。
 
 尚未实现：原生后台音频/下载、完整局域网配对、分页增量同步、EPUB、以及完整 P0/P1/P3 验收。已产出 Android 测试 APK，尚未产出 IPA；本版不等同于总体架构的「首个完整移动版本」。
 
