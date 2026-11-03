@@ -1,5 +1,5 @@
-import {request as httpsRequest} from 'node:https'
-import {createHash} from 'node:crypto'
+import { request as httpsRequest } from 'node:https'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -90,58 +90,162 @@ try {
   const secondPair = JSON.parse((await api('return await window.api.sync.start()')).pairing[0])
   assert.equal(secondPair.fingerprint, firstPair.fingerprint)
   assert.notEqual(secondPair.token, firstPair.token)
-  const postSync = (token, body) => new Promise((resolve, reject) => {
-    const req = httpsRequest(secondPair.url, {method:'POST',rejectUnauthorized:false,headers:{authorization:'Bearer '+token}}, res => {
-      const peer = res.socket.getPeerCertificate()
-      assert.equal(createHash('sha256').update(peer.raw).digest('hex'), secondPair.fingerprint)
-      let text='';res.on('data', chunk => text+=chunk);res.on('end',()=>resolve({code:res.statusCode,body:JSON.parse(text)}))
-    });req.on('error',reject);req.end(JSON.stringify(body))
-  })
-  assert.equal((await postSync(firstPair.token,{protocol:2,changes:[]})).code,403)
-  const syncNote={id:'lan-smoke-note',title:'局域网联调',markdown:'手机离线记录',tags:[],folderId:null,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),completedAt:null,deleted:false,source:'local',revision:1,attachments:[]}
-  const upload=await postSync(secondPair.token,{protocol:2,changes:[{document:{kind:'note',id:syncNote.id,value:syncNote},base:null}]})
-  assert.equal(upload.code,200)
-  const importedNote=(await api('return await window.api.journal.list()')).notes.find(n=>n.id===syncNote.id)
-  assert.equal(importedNote.markdown,'手机离线记录')
-  await api(`return await window.api.journal.apply(${JSON.stringify({kind:'noteSave',id:syncNote.id,revision:importedNote.revision,title:'局域网联调',markdown:'电脑修改后回传',tags:[]})})`)
-  const pulled=await postSync(secondPair.token,{protocol:2,changes:[]})
-  assert.equal(pulled.body.documents.find(d=>d.id===syncNote.id).value.markdown,'电脑修改后回传')
-  const mediaBytes = Buffer.alloc(600000, 7)
-  mediaBytes.write('RIFF', 0); mediaBytes.write('WAVE', 8)
-  const imageBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64')
-  const manifests = [
-    {id:crypto.randomUUID(),name:'录音.wav',mime:'audio/wav',size:mediaBytes.length},
-    {id:crypto.randomUUID(),name:'照片.png',mime:'image/png',size:imageBytes.length}
-  ]
-  const before=(await postSync(secondPair.token,{protocol:2,changes:[]})).body.documents.find(d=>d.id===syncNote.id)
-  const digest=v=>createHash('sha256').update(v).digest('hex')
-  const canonical=v=>Array.isArray(v)?'['+v.map(canonical).join(',')+']':v&&typeof v==='object'?'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}':JSON.stringify(v)
-  const withMedia=structuredClone(before);withMedia.value.attachments=manifests
-  assert.equal((await postSync(secondPair.token,{protocol:2,changes:[{document:withMedia,base:digest(canonical(before))}]})).code,200)
-  assert.equal((await postSync(secondPair.token,{operation:'asset-read',id:crypto.randomUUID(),offset:0})).code,400)
-  for(const [i,bytes] of [mediaBytes,imageBytes].entries()){
-    const id=manifests[i].id,sha256=digest(bytes)
-    assert.equal((await postSync(secondPair.token,{operation:'asset-probe',id})).body.exists,false)
-    if(i===1){
-      assert.equal((await postSync(secondPair.token,{operation:'asset-write',id,offset:0,total:bytes.length,sha256:'0'.repeat(64),data:bytes.toString('base64')})).code,400)
-      assert.equal((await postSync(secondPair.token,{operation:'asset-probe',id})).body.exists,false)
-    }
-    for(let offset=0;offset<bytes.length;offset+=393216){
-      const part=await postSync(secondPair.token,{operation:'asset-write',id,offset,total:bytes.length,sha256,data:bytes.subarray(offset,offset+393216).toString('base64')})
-      assert.equal(part.code,200)
-    }
-    assert.equal((await postSync(secondPair.token,{operation:'asset-probe',id})).body.sha256,sha256)
-    const loaded=await api(`return Array.from((await window.api.journal.media('${id}')).bytes)`)
-    assert.equal(digest(Buffer.from(loaded)),sha256)
-    let chunks=[]
-    for(let offset=0;offset<bytes.length;){
-      const part=await postSync(secondPair.token,{operation:'asset-read',id,offset})
-      assert.equal(part.code,200);assert.equal(part.body.offset,offset)
-      const chunk=Buffer.from(part.body.data,'base64');chunks.push(chunk);offset+=chunk.length
-    }
-    assert.equal(digest(Buffer.concat(chunks)),sha256)
+  const postSync = (token, body) =>
+    new Promise((resolve, reject) => {
+      const req = httpsRequest(
+        secondPair.url,
+        {
+          method: 'POST',
+          rejectUnauthorized: false,
+          headers: { authorization: 'Bearer ' + token }
+        },
+        (res) => {
+          const peer = res.socket.getPeerCertificate()
+          assert.equal(createHash('sha256').update(peer.raw).digest('hex'), secondPair.fingerprint)
+          let text = ''
+          res.on('data', (chunk) => (text += chunk))
+          res.on('end', () => resolve({ code: res.statusCode, body: JSON.parse(text) }))
+        }
+      )
+      req.on('error', reject)
+      req.end(JSON.stringify(body))
+    })
+  assert.equal((await postSync(firstPair.token, { protocol: 2, changes: [] })).code, 403)
+  const syncNote = {
+    id: 'lan-smoke-note',
+    title: '局域网联调',
+    markdown: '手机离线记录',
+    tags: [],
+    folderId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    completedAt: null,
+    deleted: false,
+    source: 'local',
+    revision: 1,
+    attachments: []
   }
-  console.log('PASS: actual Electron preload, HTTPS authentication, note metadata, image/audio upload/download, checksum rejection and persisted media bytes')
+  const upload = await postSync(secondPair.token, {
+    protocol: 2,
+    changes: [{ document: { kind: 'note', id: syncNote.id, value: syncNote }, base: null }]
+  })
+  assert.equal(upload.code, 200)
+  const importedNote = (await api('return await window.api.journal.list()')).notes.find(
+    (n) => n.id === syncNote.id
+  )
+  assert.equal(importedNote.markdown, '手机离线记录')
+  await api(
+    `return await window.api.journal.apply(${JSON.stringify({ kind: 'noteSave', id: syncNote.id, revision: importedNote.revision, title: '局域网联调', markdown: '电脑修改后回传', tags: [] })})`
+  )
+  const pulled = await postSync(secondPair.token, { protocol: 2, changes: [] })
+  assert.equal(
+    pulled.body.documents.find((d) => d.id === syncNote.id).value.markdown,
+    '电脑修改后回传'
+  )
+  const mediaBytes = Buffer.alloc(600000, 7)
+  mediaBytes.write('RIFF', 0)
+  mediaBytes.write('WAVE', 8)
+  const imageBytes = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+    'base64'
+  )
+  const manifests = [
+    { id: crypto.randomUUID(), name: '录音.wav', mime: 'audio/wav', size: mediaBytes.length },
+    { id: crypto.randomUUID(), name: '照片.png', mime: 'image/png', size: imageBytes.length }
+  ]
+  const before = (
+    await postSync(secondPair.token, { protocol: 2, changes: [] })
+  ).body.documents.find((d) => d.id === syncNote.id)
+  const digest = (v) => createHash('sha256').update(v).digest('hex')
+  const canonical = (v) =>
+    Array.isArray(v)
+      ? '[' + v.map(canonical).join(',') + ']'
+      : v && typeof v === 'object'
+        ? '{' +
+          Object.keys(v)
+            .sort()
+            .map((k) => JSON.stringify(k) + ':' + canonical(v[k]))
+            .join(',') +
+          '}'
+        : JSON.stringify(v)
+  const withMedia = structuredClone(before)
+  withMedia.value.attachments = manifests
+  assert.equal(
+    (
+      await postSync(secondPair.token, {
+        protocol: 2,
+        changes: [{ document: withMedia, base: digest(canonical(before)) }]
+      })
+    ).code,
+    200
+  )
+  assert.equal(
+    (
+      await postSync(secondPair.token, {
+        operation: 'asset-read',
+        id: crypto.randomUUID(),
+        offset: 0
+      })
+    ).code,
+    400
+  )
+  for (const [i, bytes] of [mediaBytes, imageBytes].entries()) {
+    const id = manifests[i].id,
+      sha256 = digest(bytes)
+    assert.equal(
+      (await postSync(secondPair.token, { operation: 'asset-probe', id })).body.exists,
+      false
+    )
+    if (i === 1) {
+      assert.equal(
+        (
+          await postSync(secondPair.token, {
+            operation: 'asset-write',
+            id,
+            offset: 0,
+            total: bytes.length,
+            sha256: '0'.repeat(64),
+            data: bytes.toString('base64')
+          })
+        ).code,
+        400
+      )
+      assert.equal(
+        (await postSync(secondPair.token, { operation: 'asset-probe', id })).body.exists,
+        false
+      )
+    }
+    for (let offset = 0; offset < bytes.length; offset += 393216) {
+      const part = await postSync(secondPair.token, {
+        operation: 'asset-write',
+        id,
+        offset,
+        total: bytes.length,
+        sha256,
+        data: bytes.subarray(offset, offset + 393216).toString('base64')
+      })
+      assert.equal(part.code, 200)
+    }
+    assert.equal(
+      (await postSync(secondPair.token, { operation: 'asset-probe', id })).body.sha256,
+      sha256
+    )
+    const loaded = await api(`return Array.from((await window.api.journal.media('${id}')).bytes)`)
+    assert.equal(digest(Buffer.from(loaded)), sha256)
+    let chunks = []
+    for (let offset = 0; offset < bytes.length;) {
+      const part = await postSync(secondPair.token, { operation: 'asset-read', id, offset })
+      assert.equal(part.code, 200)
+      assert.equal(part.body.offset, offset)
+      const chunk = Buffer.from(part.body.data, 'base64')
+      chunks.push(chunk)
+      offset += chunk.length
+    }
+    assert.equal(digest(Buffer.concat(chunks)), sha256)
+  }
+  console.log(
+    'PASS: actual Electron preload, HTTPS authentication, note metadata, image/audio upload/download, checksum rejection and persisted media bytes'
+  )
   await api('return await window.api.sync.stop()')
 } catch (e) {
   console.error(e)

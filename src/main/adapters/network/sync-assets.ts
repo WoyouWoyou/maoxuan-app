@@ -39,7 +39,6 @@ export function createAssetExchange(read: () => SyncDocument[], assets: JournalA
         } catch {
           throw Error('源设备附件文件缺失，正文已保留，可恢复附件后重试')
         }
-        if (bytes.length !== info.size) throw Error('附件大小与清单不一致')
         cached = { id: input.id, bytes, sha256: assetHash(bytes) }
       }
       return cached!
@@ -55,6 +54,7 @@ export function createAssetExchange(read: () => SyncDocument[], assets: JournalA
     if (!Number.isInteger(input.offset) || input.offset! < 0) throw Error('无效附件偏移')
     if (input.operation === 'asset-read') {
       const file = get()
+      if (file.bytes.length !== info.size) throw Error('附件大小与清单不一致，原文件已保留')
       if (input.offset! >= file.bytes.length) throw Error('附件偏移超出范围')
       return {
         offset: input.offset,

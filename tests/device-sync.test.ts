@@ -447,6 +447,18 @@ it('syncs image/audio notes in both directions, keeps text on interrupted media,
         return JSON.stringify(reply)
       })
     }
+    // A conflicting file identity must never replace an existing binary, even with a different size.
+    expect(() =>
+      repo.asset!({
+        operation: 'asset-write',
+        id: imageId,
+        offset: 0,
+        total: image.length,
+        sha256: '0'.repeat(64),
+        data: Buffer.from(image).toString('base64')
+      })
+    ).toThrow('身份冲突')
+    expect(files.get(imageId)).toEqual(image)
     const first = await exchangeSnapshot(store, 'media-pc', round)
     expect(first.attachments?.pending).toBe(1)
     let phone = await createDesktopApi(store, [])
