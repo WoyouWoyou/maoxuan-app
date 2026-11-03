@@ -22,7 +22,11 @@ function normalizeWorkbench(raw: WorkbenchData): WorkbenchData {
   const actions = Array.isArray(raw.actions) ? raw.actions : []
 
   return {
+    ...(raw.thinking !== undefined ? { thinking: raw.thinking } : {}),
     form: {
+      ...(form.situation !== undefined ? { situation: form.situation } : {}),
+      ...(form.thinkingMethod ? { thinkingMethod: form.thinkingMethod } : {}),
+      ...(form.diagnosisMethods ? { diagnosisMethods: form.diagnosisMethods } : {}),
       projectName: form.projectName ?? base.form.projectName,
       objective: form.objective ?? base.form.objective,
       timeScale: form.timeScale ?? base.form.timeScale,

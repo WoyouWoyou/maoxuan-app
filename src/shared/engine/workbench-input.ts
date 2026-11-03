@@ -1,8 +1,11 @@
 import type { SessionData } from '@shared/types'
+import { thinkingInput } from '@shared/workbench-thinking'
 export function workbenchInput(data: SessionData, purpose: string): unknown {
   const wb = data.workbench
   if (!wb) throw new Error('缺少工作台数据')
   switch (purpose) {
+    case 'wb_think':
+      return thinkingInput(wb)
     case 'wb_intake':
     case 'wb_contradiction':
     case 'wb_routes':

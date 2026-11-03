@@ -53,6 +53,9 @@ export function applyWorkbenchCommands(
         }
         break
       }
+      case 'thinking':
+        next.thinking = c.value
+        break
       case 'decision':
         next.decision = c.value
         break

@@ -35,6 +35,7 @@ import {
   ruleChecksDecision
 } from '@shared/workbench'
 import type { CallJson, LlmMessage } from './ports'
+import { createThinkingAI } from './workbench-thinking'
 
 import {
   WB_ACTIONS_SYSTEM,
@@ -538,6 +539,7 @@ export function createWorkbenchAI(ports: { callJson: CallJson; randomUUID: () =>
   }
 
   return {
+    wbThink: createThinkingAI(ports),
     wbIntake,
     wbContradiction,
     wbRoutes,

@@ -4,6 +4,7 @@ import { register } from './transport'
 export function registerWorkbenchHandlers(): void {
   register('wb:apply', applyWorkbench)
   for (const operation of [
+    'think',
     'intake',
     'contradiction',
     'routes',

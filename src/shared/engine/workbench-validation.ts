@@ -24,6 +24,7 @@ export function createWorkbenchValidator(ports: { assertWorkbenchContext: Contex
         ]
         if (blockingChecks(checks).length) throw new Error('请先处理或确认决策检查项')
       }
+      assertWorkbenchContext(session, wb.thinking, old.thinking)
       assertWorkbenchContext(session, wb.intake, old.intake)
       assertWorkbenchContext(session, wb.decision, old.decision)
       for (const k of ['contradiction', 'routes', 'objSubj'] as const)

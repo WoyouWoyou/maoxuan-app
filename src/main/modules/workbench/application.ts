@@ -1,5 +1,6 @@
 import type { WbRecapInput, WbDecisionRevision } from '@shared/types'
 import { selectedWorkbench } from '@shared/workbench'
+import { thinkingResultSchema } from '@shared/contracts/state-schema'
 import { array, bool, object, text, oneOf } from '@shared/contracts/validation'
 import {
   intakeSchema,
@@ -18,6 +19,7 @@ import { scopeOf } from '../library/public'
 import * as ai from './generation'
 import { createWorkbenchContext, assertWorkbenchContext } from './context'
 const operations = {
+  think: ai.wbThink,
   intake: ai.wbIntake,
   contradiction: ai.wbContradiction,
   routes: ai.wbRoutes,
@@ -28,6 +30,7 @@ const operations = {
   recap: ai.wbRecap
 }
 const schemas = {
+  think: thinkingResultSchema,
   intake: intakeSchema,
   contradiction: contradictionSchema,
   routes: routesSchema,
@@ -84,6 +87,10 @@ export async function generateWorkbench<K extends keyof typeof operations>(
     for (const c of r.checks) c._context = ctx
   } else if (operation === 'recap')
     (result as Awaited<ReturnType<typeof ai.wbRecap>>).entry._context = ctx
-  else Object.assign(result, { _context: ctx })
+  else {
+    Object.assign(result, { _context: ctx })
+    if (operation === 'think')
+      for (const a of (result as Awaited<ReturnType<typeof ai.wbThink>>).actions) a._context = ctx
+  }
   return result as Awaited<ReturnType<(typeof operations)[K]>>
 }

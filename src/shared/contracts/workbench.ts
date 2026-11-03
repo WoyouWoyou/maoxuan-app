@@ -18,6 +18,7 @@ export interface WbQueuedActionInput {
 export type WorkbenchCommand =
   | { kind: 'form'; value: WorkbenchData['form'] }
   | { kind: 'intake'; value: WorkbenchData['intake'] }
+  | { kind: 'thinking'; value: NonNullable<WorkbenchData['thinking']> | null }
   | {
       kind: 'diagnosisModule'
       module: keyof WorkbenchData['diagnosis']
@@ -33,7 +34,7 @@ export type WorkbenchCommand =
   | { kind: 'appendLedger'; value: WbLedgerEntry }
 export function workbenchCommands(before: WorkbenchData, after: WorkbenchData): WorkbenchCommand[] {
   const out: WorkbenchCommand[] = []
-  for (const kind of ['form', 'intake', 'decision'] as const)
+  for (const kind of ['form', 'intake', 'decision', 'thinking'] as const)
     if (changed(before[kind], after[kind]))
       out.push({ kind, value: after[kind] } as WorkbenchCommand)
   for (const module of ['contradiction', 'routes', 'objSubj'] as const)

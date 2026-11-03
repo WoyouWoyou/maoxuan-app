@@ -10,7 +10,7 @@ const MAX_NAME_LENGTH = 20
 const MODES: SessionMode[] = ['reading', 'workbench']
 const MODE_DESCRIPTIONS: Record<SessionMode, string> = {
   reading: '带着问题读原文，写下自己的理解。',
-  workbench: '带着项目做决策，把事实转成行动。'
+  workbench: '说说你的处境，用两个思考框架找到突破口。'
 }
 
 interface NewSessionDialogProps {

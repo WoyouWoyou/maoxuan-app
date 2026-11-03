@@ -424,7 +424,7 @@ export function Sidebar() {
             </div>
             <div className="sb-item-meta">
               {s.mode === 'workbench' ? <span className="badge sb-mode-badge">工作台</span> : null}
-              <span className="badge sb-badge">{stepLabel(s.currentStep)}</span>
+              {s.mode !== 'workbench' && <span className="badge sb-badge">{stepLabel(s.currentStep)}</span>}
               <span className="spacer" />
               <span className="sb-item-time">{formatTime(s.updatedAt)}</span>
             </div>

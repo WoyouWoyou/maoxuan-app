@@ -13,6 +13,7 @@ import {
   routeName,
   selectedWorkbench
 } from '@shared/workbench'
+import { thinkingInput, THINKING_METHODS } from '@shared/workbench-thinking'
 
 export const WB_RULES = `你是「毛选工作台」的分析员：把《毛选》工作法变成一条稳定的项目决策流水线，而不是复读毛选。
 
@@ -565,36 +566,21 @@ export function buildWbRecapUser(wb: WorkbenchData, input: WbRecapInput): string
 /* ------------------------------ 右侧对话 ------------------------------ */
 
 export function buildWbChatSystem(wb: WorkbenchData): string {
+  const input = thinkingInput(wb)
+  const report = wb.thinking
+  const current = report && report.situation === input.situation && report.method === input.method
   return [
-    `你是「毛选工作台」的参谋，陪用户推进这一个项目。
-
-规则：
-- 不是角色扮演，不用毛泽东第一人称，不评价历史人物、不讨论政治路线。
-- 回答前先分清对方说的是事实、判断还是愿望；事实不足就追问，而不是替他脑补。
-- 只基于下面的项目资料和他在对话里说的新情况；引用事实写 F 编号。
-- 预测写成条件判断，不写“一定会”。不写空话，给出的建议要有对象、数量或时限。
-- 他说出了新事实时，提醒他到「第一步 · 摸清事实」补进台账，或在「第四步 · 复盘」里记一笔，这样判断才会跟着更新。
-- 用中文，一般不超过 250 字，可用短列表。`,
-    '',
-    '【项目原始输入】',
-    formBlock(wb),
-    '',
-    '【事实台账】',
-    factsBlock(wb),
-    '',
-    '【主要矛盾】',
-    contradictionBlock(wb),
-    '',
-    '【主客分析】',
-    objSubjBlock(wb),
-    '',
-    '【决策快照】',
-    decisionBlock(wb),
-    '',
-    '【行动】',
-    actionsBlock(wb),
-    '',
-    '【最近的台账】',
-    ledgerBlock(wb)
+    `你是毛选工作台的思考助手，围绕用户的实际处境讨论。不是历史人物角色扮演。
+只使用抓主要矛盾和主客分析法，不做三条路线推演。当前框架：${THINKING_METHODS.find((m) => m.key === input.method)?.name}。
+矛盾分析先看特殊背景，找解决后能带动其他问题的那个矛盾，分清双方力量和转化条件。
+主客分析坚持“成事 = 客观条件 × 主观能力”：看结构、需求、趋势，建能力、组织，不给总分，信息不足不强行落入象限。
+区分事实、判断和愿望，不能编造用户没说过的条件。缺关键事实只问一两句。回答一般不超过250字。
+建议落到未来7天的具体一步，说明为什么做、如何验证。候选建议不是已执行；新事实可补充到上方处境描述，重新分析。`,
+    '【当前处境与已承诺的行动】',
+    JSON.stringify(input),
+    current ? '【当前分析】' : '【上次分析，仅供回顾；输入已变化，不得当成当前结论】',
+    JSON.stringify(report ?? null),
+    '【行动的实际状态】',
+    actionsBlock(wb)
   ].join('\n')
 }

@@ -32,7 +32,7 @@ export const MODE_META: Record<SessionMode, { name: string; short: string; desc:
   workbench: {
     name: '毛选工作台',
     short: '台',
-    desc: '带着项目做决策：摸事实 → 主要矛盾 / 三条路线 / 主客分析 → 综合 → 7/30/90 天行动'
+    desc: '带着项目做决策：描述处境 → 抓主要矛盾 / 主客分析法 → 近期行动推荐'
   }
 }
 
@@ -211,6 +211,9 @@ export type WbStage = '起步' | '相持' | '攻坚' | '扩张' | '调整'
 export type WbMethod = 'contradiction' | 'routes' | 'objSubj'
 
 export interface WbForm {
+  /** 简化工作台：自然语言输入和两个原始思考框架。 */
+  situation?: string
+  thinkingMethod?: import('./workbench-thinking').ThinkingMethod
   /** 用户明确确认的方法；缺省表示尚未选择。 */
   diagnosisMethods?: WbMethod[]
   projectName: string
@@ -429,6 +432,7 @@ export interface WbRecapResult {
 }
 
 export interface WorkbenchData {
+  thinking?: import('./workbench-thinking').ThinkingResult | null
   form: WbForm
   intake: WbIntake | null
   diagnosis: WbDiagnosis
