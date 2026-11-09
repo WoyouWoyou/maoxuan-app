@@ -1,0 +1,82 @@
+# 毛选 · 随身读：桌面核心对齐开发版
+
+移动端复用桌面的业务流程与规则，只适配手机布局。导航固定为 **首页、实践、待办、记录、我的**；书架从首页进入。
+
+## 启动与验证
+
+推荐 Node 22 LTS（至少 22.12）。在本目录执行：
+
+```sh
+npm ci
+npm run resources
+npm run dev                    # http://127.0.0.1:5174
+npm run verify                 # 单元/存储测试、类型检查、生产构建
+npx playwright install chromium
+npm run test:e2e               # 手机尺寸交互；AI 使用模拟服务
+npm run test:offline            # 先 build，验证生产预览断网刷新
+npm run preview -- --port 4174 # 生产预览
+npm run native:sync             # 更新 Android / iOS 资源和插件
+npm run android                # Android Studio
+npm run ios                    # Xcode
+```
+
+开发服务器只监听本机。正文由仓库 `resources/articles.json` 生成，Vditor 运行资源从固定依赖复制到本地；不依赖公共 CDN。生产浏览器预览首次完成离线缓存后可断网刷新；原生资源随安装包分发。
+
+## GitHub Actions 打包 APK
+
+工作流为根目录 `.github/workflows/build-android.yml`，使用 Ubuntu、Node 22、Java 21、Android SDK 36 和工程自带的 Gradle wrapper。推送 `codex/android-apk-*` 构建分支会触发；工作流合入默认分支后，也可在 Actions 的「Build Android test APK」中选分支手动运行。
+
+流程安装移动端锁定依赖、运行单元测试与类型检查、构建网页资源、`cap sync android`、`assembleDebug`，最后验证 APK 签名。成功后在该次运行的 Artifacts 下载 `maoxuan-android-test-apk`，解压安装 `.apk`；同时包含 SHA-256 校验和及包信息，产物保留 30 天。debug 构建使用仓库加密秘密 `MAOXUAN_ANDROID_PREVIEW_P12` / `MAOXUAN_ANDROID_PREVIEW_PASSWORD` 中的固定签名（PKCS12，alias `maoxuan-preview`）；不包含模型密钥。签名指纹写入产物 `signing-info.txt`。
+
+## 与桌面共用的核心
+
+- **阅读法**：复用 `SessionPage` 和四步组件。明确问题/背景/已试办法 → 教练诊断或自行选章 → 推荐篇目/真实选段/逐段感悟 → 三条笔记、按感悟辅助填写、反馈及确认 → 行动、阶段进展、结果、复盘、阅读与实践小结。
+- **手机精读布局**：按选定的第一版设计，正文占满阅读区；篇目与推荐通过临时抽屉打开，可设置并记住「默认收起篇目栏」。底部固定篇目、记感悟、我读完了，感悟以底部面板打开，关闭再打开保留当前草稿。标注目录横向滚动，Aa 打开原阅读选项，教练对话和版本历史从顶部更多操作进入。
+- **毛选工作台**：复用桌面新版 `WorkbenchPage`，提供「抓主要矛盾」「主客分析法」两个框架。从一段实际情境开始，缺关键事实时先补充，再生成分析与近期行动建议；两种框架分别保留结果，明确加入后才进入待办。手机使用单列报告、可展开的长文本和依据、44px 触控按钮与全宽原文抽屉，讨论和版本历史按需展开。
+- **待办**：复用 `ActionsPage`、`ActionHubProvider` 和共享行动投影。四象限/Todo 清单，来源筛选、搜索、日期、目的和完成标准、进展、完成/重开、AI 分类。工作台候选不进入待办，明确纳入后才出现；从待办修改会写回原会话。
+- **记录**：复用 `JournalPage`、`MarkdownEditor` 和日记用例，使用相同 Vditor 编辑器和 `JournalNote.markdown`。支持格式工具、即时渲染/编辑模式、自动保存、文件夹、模板、标签、完成、归档/回收站、Markdown 导入及 `.md`/批量 ZIP 导出。图片/录音附件持久化到手机本地，可显示/播放并参与局域网双向同步；麦克风需系统授权，真机仍需验证。
+- **教练对话与版本**：复用讨论、修订和版本面板。AI 结果生成后再次核对输入；确认时执行同一来源校验与适用性规则；恢复历史始终产生新版本。
+
+原先散落在 `src/main/modules` 的纯命令、验证器、会话用例、模型结果归一化、检索选择、提示词和日记规则提取到 `src/shared/engine`。桌面原入口代理这些实现，移动端也调用这些实现，不维护另一套简化规则。领域代码通过工厂注入模型传输、ID、哈希和仓库。
+
+## 成就与设备同步联调版
+
+首页固定「我的成就」入口，复用桌面长征成长、植树、故事和风景收藏界面与规则。成长事实按稳定 ID 去重，每日上限、植树消耗和等待规则均复用桌面引擎。
+
+Android 与桌面已接入手动局域网笔记与附件同步：电脑「设置 → 设备同步」开启并获取配对码，手机「我的 → 设备同步」粘贴后立即同步。阅读/工作台问题、版本、对话、待办、Markdown 记录及文件夹按稳定身份合并，冲突自动生成两份可编辑记录，由用户自行处理。Android 使用独立证书固定插件，浏览器和 iOS 暂不支持连接。具体能力和测试边界见 [联调说明](../../docs/device-sync-v1.md)。
+
+0.2.1 debug APK 使用独立包名后缀 `.preview.stable`，显示「毛选·随身版」，与旧「同步测试版」并存，保留旧应用数据。今后使用固定签名支持覆盖升级。迁移时从旧应用「我的」导出备份，在新应用「我的」恢复，再配对新版电脑。备份恢复仍受 20 MB 限制。
+
+## 移动适配器
+
+系统栏由原生窗口统一预留：视口使用 `viewport-fit=contain`，Capacitor `SystemBars.insetsHandling=native`，系统栏保持可见并使用适合浅色背景的深色图标。Android 的 WebView 整体位于通知栏、挖孔和底部导航栏以内，包括固定定位的工作台、阅读区和弹层；各页面无需自行估算状态栏高度。修改后需重新构建并安装原生包验证，浏览器测试不能验证系统栏。
+
+`src/application/desktop-api.ts` 提供桌面组件所需的 `MaoxuanApi` 兼容客户端。异步读取本地实体后，在隔离快照中运行同步的共享用例；一个会话的状态、版本、消息和回执通过一次异步 CAS 提交。任何版本冲突显式失败，不以最新版本覆盖重试。此阶段保留兼容全局客户端，尚未将所有桌面组件改成 Context 注入。
+
+手机使用 SQLite，浏览器使用 IndexedDB；均与桌面数据库隔离。会话分别持久化，记录仍保持桌面 JournalState 聚合；这不是完整同步实体拆分方案。outbox 只是本地基础设施，不能跨设备比较其本地版本；局域网同步使用独立哈希基线。
+
+早期移动版记录迁入 Markdown 笔记，阅读问题迁入会话；使用稳定迁移身份避免重复，原实体仍保留在备份。早期独立行动模型仍保留在原始备份中，尚未迁移为桌面工作台行动。
+
+## AI 与密钥
+
+「我的 → AI 服务」配置兼容 OpenAI Chat Completions 的地址、模型和自己的 API Key。复用桌面提示词及解析规则，不自动发送模型请求，不自动重试可能已计费的请求。
+
+浏览器使用 fetch，对话支持 SSE 流；服务商须允许浏览器跨域。浏览器密钥只存在当前页面内存，刷新后需重填，业务数据库和备份不保存密钥。原生使用 Capacitor HTTP，密钥存入系统安全存储（插件已接入、真机未验证）；当前原生 HTTP 不提供流式回调，取消后不接收结果，但不承诺服务端停止计费。原生按密钥引用进行网络授权的独立插件仍为后续工作。
+
+本版提供单模型配置，尚未迁移桌面多模型路由、用量账本、代理等设置模块。无 AI 时仍可自行选章、阅读、写笔记和实践。
+
+## 构建状态与边界
+
+已生成 Android/iOS 工程，iOS 使用 SPM。Android 测试 APK 已通过 [GitHub Actions](https://github.com/WoyouWoyou/maoxuan-app/actions/runs/41554868309) 完成编译和签名校验（2026-11-03，构建分支 `codex/android-apk-20261102`）；本机仍缺少 Java Runtime，iOS 编译与签名仍缺少完整 Xcode。真机测试尚未完成；原生 SQLite、系统安全存储、文件选择/分享、键盘、系统返回与挂起恢复不能由浏览器或编译通过替代。环境要求见 [Capacitor 官方文档](https://capacitorjs.com/docs/getting-started/environment-setup)。
+
+尚未实现：原生后台音频/下载、完整局域网配对、分页增量同步、EPUB、以及完整 P0/P1/P3 验收。已产出 Android 测试 APK，尚未产出 IPA；本版不等同于总体架构的「首个完整移动版本」。
+
+备份为带 SHA-256 校验的 JSON（20 MB 上限），包含实体与历史，排除密钥。恢复需明确确认，成功后保留历史、清空旧传输状态。导入书籍限 UTF-8 TXT 2 MB，Markdown 单文件限 2 MB。浏览器清理站点数据和卸载 App 会清除本地业务数据。
+
+依赖全部固定，详见 package.json / package-lock。新增 Vditor 4.0.1（MIT）、React Router 7.18.5（MIT）、React Markdown 10.1.0（MIT）、fflate 0.8.3（MIT）、@noble/hashes 1.8.0（MIT）、@aparajita/capacitor-secure-storage 8.0.1（MIT）。原生插件生命周期、维护状态和兼容性仍须 P0 实测。生产依赖审计无已知报告；开发依赖仍有 Capacitor CLI 的 4 项 moderate 传递依赖报告。
+
+## 本次验证
+
+移动端通过 18 项存储/领域测试、11 条手机尺寸流程测试；此前已通过 1 条生产断网刷新测试。本次完成类型检查、生产构建和双端 `cap sync`。浏览器流程覆盖导航、阅读转行动、四象限进展与完成、Markdown 编辑/重载/导出、教练诊断确认、只运行所选分析方法，以及篇目收起偏好、感悟草稿和阅读选项；模型响应由测试模拟，不使用真实密钥。手机阅读视觉核对见 [design-qa.md](design-qa.md)。
+
+桌面根目录 `npm run verify`（188 项测试、边界、类型、构建）通过；`node scripts/smoke-device-sync.mjs` 验证实际 Electron/HTTPS/SQLite 附件上传下载和校验失败拒绝。完整旧版工作台冒烟脚本仍使用四步按钮，不适用于当前两个框架界面，尚未完成重写。冒烟脚本已对齐当前方法选择流程，并将搜索固定等待改为等待结果出现。Android 云端 debug 编译与 APK 签名校验已通过；iOS 编译与真机矩阵尚未验证。

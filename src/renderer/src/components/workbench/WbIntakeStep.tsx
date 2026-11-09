@@ -449,7 +449,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
           <div className="card wb-card">
             <div className="card-title">还缺哪些关键事实</div>
             {intake.missing.length === 0 ? (
-              <div className="muted">没有明显缺口，可以直接进三路诊断。</div>
+              <div className="muted">没有明显缺口，可以直接进方法诊断。</div>
             ) : (
               <div className="wb-miss-list">
                 {intake.missing.map((item, i) => (
@@ -517,7 +517,7 @@ export function WbIntakeStep({ session, wb, updateWb, goStep, openSource }: WbSt
           disabled={!gate.ok}
           onClick={() => goStep('wb_diagnose')}
         >
-          进入三路诊断 →
+          进入方法诊断 →
         </button>
         {!gate.ok && <span className="muted">{gate.reason}</span>}
       </div>

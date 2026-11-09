@@ -19,6 +19,7 @@ export interface ArticleReaderProps {
   focusQuestion?: string
   scrollToParagraph?: number | null
   compact?: boolean
+  mobile?: boolean
   /** 提供后，段落编号变成可点击按钮（点击即关联 / 取消关联该段） */
   onParagraphClick?: (index: number) => void
   /** 当前“关联到感悟”的段落下标 */
@@ -48,6 +49,7 @@ export function ArticleReader({
   focusQuestion,
   scrollToParagraph = null,
   compact = false,
+  mobile = false,
   onParagraphClick,
   activeParagraph = null
 }: ArticleReaderProps) {
@@ -124,7 +126,7 @@ export function ArticleReader({
   function jumpTo(idx: number) {
     const el = bodyRef.current?.querySelector<HTMLElement>(`[data-idx="${idx}"]`)
     if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.scrollIntoView({ behavior: 'smooth', block: mobile ? 'start' : 'center' })
     el.classList.remove('reader-flash')
     void el.offsetWidth
     el.classList.add('reader-flash')
@@ -135,7 +137,7 @@ export function ArticleReader({
     if (scrollToParagraph === null) return
     const el = bodyRef.current?.querySelector<HTMLElement>(`[data-idx="${scrollToParagraph}"]`)
     if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.scrollIntoView({ behavior: 'smooth', block: mobile ? 'start' : 'center' })
     el.classList.add('reader-flash')
     const timer = window.setTimeout(() => el.classList.remove('reader-flash'), 1600)
     return () => window.clearTimeout(timer)
@@ -156,9 +158,13 @@ export function ArticleReader({
               <button
                 key={`${p.paragraphIndex}-${i}`}
                 type="button"
-                className="reader-toc-item"
+                className={`reader-toc-item${mobile && activeParagraph === p.paragraphIndex ? ' is-active' : ''}`}
                 title={p.verified ? p.quote : `${p.quote}（未能逐字核对）`}
-                onClick={() => jumpTo(p.paragraphIndex)}
+                onClick={() => {
+                  if (mobile && activeParagraph !== p.paragraphIndex)
+                    onParagraphClick?.(p.paragraphIndex)
+                  jumpTo(p.paragraphIndex)
+                }}
               >
                 第 {p.paragraphIndex + 1} 段
               </button>
@@ -188,10 +194,17 @@ export function ArticleReader({
             className={`btn btn-ghost btn-sm${optionsOpen ? ' is-open' : ''}`}
             aria-expanded={optionsOpen}
             aria-haspopup="dialog"
+            aria-label="阅读选项"
             onClick={() => optionsRef.current?.togglePopover()}
           >
-            <SlidersHorizontalIcon size={16} />
-            阅读选项
+            {mobile ? (
+              <span className="focus-type-control">Aa</span>
+            ) : (
+              <>
+                <SlidersHorizontalIcon size={16} />
+                阅读选项
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -341,10 +354,10 @@ export function ArticleReader({
                       title="关联到感悟"
                       onClick={() => onParagraphClick(idx)}
                     >
-                      {idx + 1}
+                      {mobile ? `第 ${idx + 1} 段` : idx + 1}
                     </button>
                   ) : (
-                    <span className="reader-no">{idx + 1}</span>
+                    <span className="reader-no">{mobile ? `第 ${idx + 1} 段` : idx + 1}</span>
                   )}
                   <span className="reader-content">
                     <span className="reader-text">{renderText(text)}</span>
@@ -379,7 +392,11 @@ export function ArticleReader({
                 <button
                   key={i}
                   className="reader-side-item"
-                  onClick={() => jumpTo(p.paragraphIndex)}
+                  onClick={() => {
+                    if (mobile && activeParagraph !== p.paragraphIndex)
+                      onParagraphClick?.(p.paragraphIndex)
+                    jumpTo(p.paragraphIndex)
+                  }}
                 >
                   <span className="reader-side-no">第 {p.paragraphIndex + 1} 段</span>
                   <span className="reader-side-quote">{clip(p.quote, 36)}</span>

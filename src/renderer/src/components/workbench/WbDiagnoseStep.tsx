@@ -7,7 +7,13 @@ import type {
   WbRouteKey,
   WbRoutes
 } from '@shared/types'
-import { WB_OBJSUBJ, WB_ROUTES, WB_SOURCES, wbStepUnlocked } from '@shared/workbench'
+import {
+  WB_OBJSUBJ,
+  WB_ROUTES,
+  WB_SOURCES,
+  wbStepUnlocked,
+  selectedMethods
+} from '@shared/workbench'
 import type { WbSourceArea } from '@shared/workbench'
 import type { WbStepProps } from './types'
 import { toMessage } from './types'
@@ -39,7 +45,7 @@ const ROUTE_FIELDS: { key: keyof RouteDraft; label: string; rows: number; lines:
 function splitLines(text: string): string[] {
   return text
     .split('\n')
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean)
 }
 
@@ -50,12 +56,12 @@ function clampScore(raw: string): number {
 }
 
 function scoreMeta(key: ScoreKey): { name: string; desc: string } {
-  const item = WB_OBJSUBJ.find(f => f.key === key)
+  const item = WB_OBJSUBJ.find((f) => f.key === key)
   return { name: item?.name ?? key, desc: item?.desc ?? '' }
 }
 
 function factTitle(intake: WbIntake | null, id: string): string {
-  const fact = intake?.facts.find(f => f.id === id)
+  const fact = intake?.facts.find((f) => f.id === id)
   return fact ? `${fact.id} ${fact.content}` : id
 }
 
@@ -93,7 +99,7 @@ function PanelFoot(props: { factRefs: string[]; missingFacts: string[]; intake: 
         {factRefs.length === 0 ? (
           <span className="muted wb-missing-note">没有引用事实</span>
         ) : (
-          factRefs.map(id => (
+          factRefs.map((id) => (
             <span className="badge" key={id} title={factTitle(intake, id)}>
               {id}
             </span>
@@ -107,12 +113,22 @@ function PanelFoot(props: { factRefs: string[]; missingFacts: string[]; intake: 
   )
 }
 
-function EditArea(props: { label: string; rows: number; value: string; onChange: (v: string) => void }) {
+function EditArea(props: {
+  label: string
+  rows: number
+  value: string
+  onChange: (v: string) => void
+}) {
   const { label, rows, value, onChange } = props
   return (
     <div className="field wb-edit-field">
       <div className="field-label">{label}</div>
-      <textarea className="textarea" rows={rows} value={value} onChange={e => onChange(e.target.value)} />
+      <textarea
+        className="textarea"
+        rows={rows}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </div>
   )
 }
@@ -161,7 +177,7 @@ function ScoreRow(props: {
         <div className="muted wb-score-desc">{desc}</div>
       </div>
       <div className="wb-dots">
-        {[1, 2, 3, 4, 5].map(n => (
+        {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
@@ -225,7 +241,14 @@ interface PanelProps<M> {
   onSave: (patch: Partial<WbDiagnosis>, versionLabel: string) => Promise<void>
 }
 
-function ContradictionPanel({ module, busy, err, intake, onRegenerate, onSave }: PanelProps<WbContradiction>) {
+function ContradictionPanel({
+  module,
+  busy,
+  err,
+  intake,
+  onRegenerate,
+  onSave
+}: PanelProps<WbContradiction>) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<ContraDraft | null>(null)
   const [saving, setSaving] = useState(false)
@@ -234,7 +257,13 @@ function ContradictionPanel({ module, busy, err, intake, onRegenerate, onSave }:
   if (!module) {
     return (
       <div className="wb-panel">
-        <PanelHead title="主要矛盾" edited={false} busy={busy} onRegenerate={onRegenerate} onEdit={null} />
+        <PanelHead
+          title="主要矛盾"
+          edited={false}
+          busy={busy}
+          onRegenerate={onRegenerate}
+          onEdit={null}
+        />
         {err ? <div className="error-text">{err}</div> : <div className="empty">还没有诊断</div>}
       </div>
     )
@@ -246,7 +275,10 @@ function ContradictionPanel({ module, busy, err, intake, onRegenerate, onSave }:
     setSaving(true)
     setSaveErr('')
     try {
-      await onSave({ contradiction: { ...m, ...fromContraDraft(values), edited: true } }, '第二步：修改主要矛盾')
+      await onSave(
+        { contradiction: { ...m, ...fromContraDraft(values), edited: true } },
+        '第二步：修改主要矛盾'
+      )
       setEditing(false)
       setDraft(null)
     } catch (e) {
@@ -261,29 +293,60 @@ function ContradictionPanel({ module, busy, err, intake, onRegenerate, onSave }:
     const set = (patch: Partial<ContraDraft>) => setDraft({ ...d, ...patch })
     return (
       <div className="wb-panel">
-        <PanelHead title="主要矛盾" edited={m.edited} busy={busy} onRegenerate={onRegenerate} onEdit={null} />
+        <PanelHead
+          title="主要矛盾"
+          edited={m.edited}
+          busy={busy}
+          onRegenerate={onRegenerate}
+          onEdit={null}
+        />
         {err && <div className="error-text">{err}</div>}
         <div className="wb-edit">
-          <EditArea label="全部矛盾（一行一条）" rows={4} value={d.all} onChange={v => set({ all: v })} />
-          <EditArea label="主要矛盾" rows={2} value={d.primary} onChange={v => set({ primary: v })} />
+          <EditArea
+            label="全部矛盾（一行一条）"
+            rows={4}
+            value={d.all}
+            onChange={(v) => set({ all: v })}
+          />
+          <EditArea
+            label="主要矛盾"
+            rows={2}
+            value={d.primary}
+            onChange={(v) => set({ primary: v })}
+          />
           <div className="wb-edit-grid">
-            <EditArea label="主要方面" rows={2} value={d.mainAspect} onChange={v => set({ mainAspect: v })} />
+            <EditArea
+              label="主要方面"
+              rows={2}
+              value={d.mainAspect}
+              onChange={(v) => set({ mainAspect: v })}
+            />
             <EditArea
               label="次要方面"
               rows={2}
               value={d.secondaryAspect}
-              onChange={v => set({ secondaryAspect: v })}
+              onChange={(v) => set({ secondaryAspect: v })}
             />
           </div>
-          <EditArea label="为什么是当前主矛盾" rows={3} value={d.why} onChange={v => set({ why: v })} />
+          <EditArea
+            label="为什么是当前主矛盾"
+            rows={3}
+            value={d.why}
+            onChange={(v) => set({ why: v })}
+          />
           <EditArea
             label="转化条件（一行一条）"
             rows={3}
             value={d.turningConditions}
-            onChange={v => set({ turningConditions: v })}
+            onChange={(v) => set({ turningConditions: v })}
           />
-          <EditArea label="当前抓手" rows={2} value={d.focus} onChange={v => set({ focus: v })} />
-          <EditArea label="暂时不碰（一行一条）" rows={3} value={d.defer} onChange={v => set({ defer: v })} />
+          <EditArea label="当前抓手" rows={2} value={d.focus} onChange={(v) => set({ focus: v })} />
+          <EditArea
+            label="暂时不碰（一行一条）"
+            rows={3}
+            value={d.defer}
+            onChange={(v) => set({ defer: v })}
+          />
           <div className="wb-edit-actions">
             <button
               type="button"
@@ -401,8 +464,8 @@ interface RouteDraft {
 }
 
 function toRouteDrafts(m: WbRoutes): RouteDraft[] {
-  return WB_ROUTES.map(meta => {
-    const route = m.routes.find(r => r.key === meta.key)
+  return WB_ROUTES.map((meta) => {
+    const route = m.routes.find((r) => r.key === meta.key)
     return {
       judgment: route?.judgment ?? '',
       policy: route?.policy ?? '',
@@ -415,20 +478,26 @@ function toRouteDrafts(m: WbRoutes): RouteDraft[] {
 }
 
 function fromRouteDrafts(drafts: RouteDraft[]) {
-  return WB_ROUTES.map<{ key: WbRouteKey; judgment: string; policy: string; result: string; triggers: string[]; risks: string[]; switchSignals: string[] }>(
-    (meta, i) => {
-      const d = drafts[i]
-      return {
-        key: meta.key as WbRouteKey,
-        judgment: d.judgment.trim(),
-        policy: d.policy.trim(),
-        result: d.result.trim(),
-        triggers: splitLines(d.triggers),
-        risks: splitLines(d.risks),
-        switchSignals: splitLines(d.switchSignals)
-      }
+  return WB_ROUTES.map<{
+    key: WbRouteKey
+    judgment: string
+    policy: string
+    result: string
+    triggers: string[]
+    risks: string[]
+    switchSignals: string[]
+  }>((meta, i) => {
+    const d = drafts[i]
+    return {
+      key: meta.key as WbRouteKey,
+      judgment: d.judgment.trim(),
+      policy: d.policy.trim(),
+      result: d.result.trim(),
+      triggers: splitLines(d.triggers),
+      risks: splitLines(d.risks),
+      switchSignals: splitLines(d.switchSignals)
     }
-  )
+  })
 }
 
 function RoutesPanel({ module, busy, err, intake, onRegenerate, onSave }: PanelProps<WbRoutes>) {
@@ -440,7 +509,13 @@ function RoutesPanel({ module, busy, err, intake, onRegenerate, onSave }: PanelP
   if (!module) {
     return (
       <div className="wb-panel">
-        <PanelHead title="三条路线" edited={false} busy={busy} onRegenerate={onRegenerate} onEdit={null} />
+        <PanelHead
+          title="三条路线"
+          edited={false}
+          busy={busy}
+          onRegenerate={onRegenerate}
+          onEdit={null}
+        />
         {err ? <div className="error-text">{err}</div> : <div className="empty">还没有诊断</div>}
       </div>
     )
@@ -449,14 +524,19 @@ function RoutesPanel({ module, busy, err, intake, onRegenerate, onSave }: PanelP
   const m = module
 
   function setDraftAt(index: number, key: keyof RouteDraft, value: string) {
-    setDrafts(prev => (prev ? prev.map((d, i) => (i === index ? { ...d, [key]: value } : d)) : prev))
+    setDrafts((prev) =>
+      prev ? prev.map((d, i) => (i === index ? { ...d, [key]: value } : d)) : prev
+    )
   }
 
   async function commit(values: RouteDraft[]) {
     setSaving(true)
     setSaveErr('')
     try {
-      await onSave({ routes: { ...m, routes: fromRouteDrafts(values), edited: true } }, '第二步：修改三条路线')
+      await onSave(
+        { routes: { ...m, routes: fromRouteDrafts(values), edited: true } },
+        '第二步：修改三条路线'
+      )
       setEditing(false)
       setDrafts(null)
     } catch (e) {
@@ -470,7 +550,13 @@ function RoutesPanel({ module, busy, err, intake, onRegenerate, onSave }: PanelP
     const list = drafts ?? toRouteDrafts(m)
     return (
       <div className="wb-panel">
-        <PanelHead title="三条路线" edited={m.edited} busy={busy} onRegenerate={onRegenerate} onEdit={null} />
+        <PanelHead
+          title="三条路线"
+          edited={m.edited}
+          busy={busy}
+          onRegenerate={onRegenerate}
+          onEdit={null}
+        />
         {err && <div className="error-text">{err}</div>}
         <div className="wb-edit">
           <div className="wb-grid3">
@@ -478,13 +564,13 @@ function RoutesPanel({ module, busy, err, intake, onRegenerate, onSave }: PanelP
               <div className="card wb-route" key={meta.key}>
                 <div className="wb-route-name">{meta.name}</div>
                 <div className="muted wb-route-desc">{meta.desc}</div>
-                {ROUTE_FIELDS.map(field => (
+                {ROUTE_FIELDS.map((field) => (
                   <EditArea
                     key={field.key}
                     label={field.label}
                     rows={field.rows}
                     value={list[i][field.key]}
-                    onChange={v => setDraftAt(i, field.key, v)}
+                    onChange={(v) => setDraftAt(i, field.key, v)}
                   />
                 ))}
               </div>
@@ -534,8 +620,8 @@ function RoutesPanel({ module, busy, err, intake, onRegenerate, onSave }: PanelP
       {err && <div className="error-text">{err}</div>}
 
       <div className="wb-grid3">
-        {WB_ROUTES.map(meta => {
-          const route = m.routes.find(r => r.key === meta.key)
+        {WB_ROUTES.map((meta) => {
+          const route = m.routes.find((r) => r.key === meta.key)
           return (
             <div className="card wb-route" key={meta.key}>
               <div className="wb-route-name">{meta.name}</div>
@@ -598,10 +684,22 @@ function fromObjSubjDraft(m: WbObjSubj, d: ObjSubjDraft): WbObjSubj {
     ...m,
     edited: true,
     trend: { score: clampScore(d.scores.trend.score), reason: d.scores.trend.reason.trim() },
-    resources: { score: clampScore(d.scores.resources.score), reason: d.scores.resources.reason.trim() },
-    constraints: { score: clampScore(d.scores.constraints.score), reason: d.scores.constraints.reason.trim() },
-    judgment: { score: clampScore(d.scores.judgment.score), reason: d.scores.judgment.reason.trim() },
-    execution: { score: clampScore(d.scores.execution.score), reason: d.scores.execution.reason.trim() },
+    resources: {
+      score: clampScore(d.scores.resources.score),
+      reason: d.scores.resources.reason.trim()
+    },
+    constraints: {
+      score: clampScore(d.scores.constraints.score),
+      reason: d.scores.constraints.reason.trim()
+    },
+    judgment: {
+      score: clampScore(d.scores.judgment.score),
+      reason: d.scores.judgment.reason.trim()
+    },
+    execution: {
+      score: clampScore(d.scores.execution.score),
+      reason: d.scores.execution.reason.trim()
+    },
     ready: d.ready.trim(),
     biggestGap: d.biggestGap.trim(),
     firstFix: d.firstFix.trim(),
@@ -618,7 +716,13 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
   if (!module) {
     return (
       <div className="wb-panel">
-        <PanelHead title="主客分析" edited={false} busy={busy} onRegenerate={onRegenerate} onEdit={null} />
+        <PanelHead
+          title="主客分析"
+          edited={false}
+          busy={busy}
+          onRegenerate={onRegenerate}
+          onEdit={null}
+        />
         {err ? <div className="error-text">{err}</div> : <div className="empty">还没有诊断</div>}
       </div>
     )
@@ -637,7 +741,7 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
       execution: key === 'execution' ? { ...m.execution, score: n } : m.execution
     }
     setSaveErr('')
-    void onSave({ objSubj: next }, '第二步：修改主客分析').catch(e => setSaveErr(toMessage(e)))
+    void onSave({ objSubj: next }, '第二步：修改主客分析').catch((e) => setSaveErr(toMessage(e)))
   }
 
   async function commit(values: ObjSubjDraft) {
@@ -660,13 +764,19 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
       setDraft({ ...d, scores: { ...d.scores, [key]: { ...d.scores[key], ...patch } } })
     return (
       <div className="wb-panel">
-        <PanelHead title="主客分析" edited={m.edited} busy={busy} onRegenerate={onRegenerate} onEdit={null} />
+        <PanelHead
+          title="主客分析"
+          edited={m.edited}
+          busy={busy}
+          onRegenerate={onRegenerate}
+          onEdit={null}
+        />
         {err && <div className="error-text">{err}</div>}
         <div className="wb-edit">
-          {SCORE_GROUPS.map(group => (
+          {SCORE_GROUPS.map((group) => (
             <div className="wb-group" key={group.title}>
               <div className="wb-group-title">{group.title}</div>
-              {group.keys.map(key => {
+              {group.keys.map((key) => {
                 const meta = scoreMeta(key)
                 return (
                   <div className="field wb-edit-field" key={key}>
@@ -680,13 +790,13 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
                         min={1}
                         max={5}
                         value={d.scores[key].score}
-                        onChange={e => setScore(key, { score: e.target.value })}
+                        onChange={(e) => setScore(key, { score: e.target.value })}
                       />
                       <textarea
                         className="textarea"
                         rows={2}
                         value={d.scores[key].reason}
-                        onChange={e => setScore(key, { reason: e.target.value })}
+                        onChange={(e) => setScore(key, { reason: e.target.value })}
                       />
                     </div>
                   </div>
@@ -694,19 +804,29 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
               })}
             </div>
           ))}
-          <EditArea label="当前具备的条件" rows={2} value={d.ready} onChange={v => setDraft({ ...d, ready: v })} />
+          <EditArea
+            label="当前具备的条件"
+            rows={2}
+            value={d.ready}
+            onChange={(v) => setDraft({ ...d, ready: v })}
+          />
           <EditArea
             label="最大缺口"
             rows={2}
             value={d.biggestGap}
-            onChange={v => setDraft({ ...d, biggestGap: v })}
+            onChange={(v) => setDraft({ ...d, biggestGap: v })}
           />
-          <EditArea label="先补哪一项" rows={2} value={d.firstFix} onChange={v => setDraft({ ...d, firstFix: v })} />
+          <EditArea
+            label="先补哪一项"
+            rows={2}
+            value={d.firstFix}
+            onChange={(v) => setDraft({ ...d, firstFix: v })}
+          />
           <EditArea
             label="如果不补会发生什么"
             rows={2}
             value={d.ifNotFixed}
-            onChange={v => setDraft({ ...d, ifNotFixed: v })}
+            onChange={(v) => setDraft({ ...d, ifNotFixed: v })}
           />
           <div className="wb-edit-actions">
             <button
@@ -736,7 +856,8 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
     )
   }
 
-  const total = m.trend.score + m.resources.score + m.constraints.score + m.judgment.score + m.execution.score
+  const total =
+    m.trend.score + m.resources.score + m.constraints.score + m.judgment.score + m.execution.score
 
   return (
     <div className="wb-panel">
@@ -757,10 +878,10 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
         成事条件 <b>{total}</b> / 25
       </div>
 
-      {SCORE_GROUPS.map(group => (
+      {SCORE_GROUPS.map((group) => (
         <div className="wb-group" key={group.title}>
           <div className="wb-group-title">{group.title}</div>
-          {group.keys.map(key => {
+          {group.keys.map((key) => {
             const meta = scoreMeta(key)
             return (
               <ScoreRow
@@ -770,7 +891,7 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
                 score={m[key].score}
                 reason={m[key].reason}
                 disabled={false}
-                onPick={n => pickScore(key, n)}
+                onPick={(n) => pickScore(key, n)}
               />
             )
           })}
@@ -805,7 +926,18 @@ function ObjSubjPanel({ module, busy, err, intake, onRegenerate, onSave }: Panel
 /* ------------------------------ 第二步外壳 ------------------------------ */
 
 export function WbDiagnoseStep({ session, wb, updateWb, goStep, openSource }: WbStepProps) {
-  const [tab, setTab] = useState<TabKey>('contradiction')
+  const [tab, setTab] = useState<TabKey>(
+    selectedMethods(wb)[0] ?? wb.intake?.recommendation?.method ?? 'contradiction'
+  )
+  const [choosing, setChoosing] = useState(!selectedMethods(wb).length)
+  const [selection, setSelection] = useState<TabKey[]>(
+    selectedMethods(wb).length
+      ? selectedMethods(wb)
+      : [wb.intake?.recommendation?.method ?? 'contradiction']
+  )
+  const [multiple, setMultiple] = useState(selectedMethods(wb).length > 1)
+  const [selectionError, setSelectionError] = useState('')
+  const [savingSelection, setSavingSelection] = useState(false)
   const [busy, setBusy] = useState<Record<TabKey, boolean>>({
     contradiction: false,
     routes: false,
@@ -820,22 +952,23 @@ export function WbDiagnoseStep({ session, wb, updateWb, goStep, openSource }: Wb
   const diagnosis = wb.diagnosis
   const intake = wb.intake
   const gate = wbStepUnlocked(wb, 'wb_decide')
-  const current = TABS.find(t => t.key === tab) ?? TABS[0]
-  const source = WB_SOURCES.find(s => s.area === current.area)
+  const current = TABS.find((t) => t.key === tab) ?? TABS[0]
+  const source = WB_SOURCES.find((s) => s.area === current.area)
 
-  const allDone = Boolean(diagnosis.contradiction && diagnosis.routes && diagnosis.objSubj)
+  const methods = selectedMethods(wb)
+  const allDone = methods.length > 0 && methods.every((key) => diagnosis[key])
   const anyBusy = busy.contradiction || busy.routes || busy.objSubj
 
   function setLoading(key: TabKey, value: boolean) {
-    setBusy(prev => ({ ...prev, [key]: value }))
+    setBusy((prev) => ({ ...prev, [key]: value }))
   }
 
   function setErr(key: TabKey, message: string) {
-    setErrs(prev => ({ ...prev, [key]: message }))
+    setErrs((prev) => ({ ...prev, [key]: message }))
   }
 
   function patchDiagnosis(patch: Partial<WbDiagnosis>, versionLabel: string) {
-    return updateWb(l => ({ ...l, diagnosis: { ...l.diagnosis, ...patch } }), { versionLabel })
+    return updateWb((l) => ({ ...l, diagnosis: { ...l.diagnosis, ...patch } }), { versionLabel })
   }
 
   async function runContradiction() {
@@ -878,7 +1011,8 @@ export function WbDiagnoseStep({ session, wb, updateWb, goStep, openSource }: Wb
   }
 
   async function runAll() {
-    await Promise.allSettled([runContradiction(), runRoutes(), runObjSubj()])
+    const runners = { contradiction: runContradiction, routes: runRoutes, objSubj: runObjSubj }
+    await Promise.allSettled(methods.map((key) => runners[key]()))
   }
 
   return (
@@ -890,72 +1024,185 @@ export function WbDiagnoseStep({ session, wb, updateWb, goStep, openSource }: Wb
           </div>
         )}
         <span className="spacer" />
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => openSource(current.area)}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => openSource(current.area)}
+        >
           看原文依据 →
         </button>
       </div>
 
-      <div className="wb-bar">
-        <button type="button" className="btn btn-primary" disabled={anyBusy} onClick={() => void runAll()}>
-          {anyBusy && <span className="spinner" />} {allDone ? '全部重新诊断' : '一键三路诊断'}
-        </button>
-        <span className="muted wb-bar-note">三个分析员各干各的：只看事实台账，互不参考</span>
-      </div>
-
-      <div className="wb-tabs">
-        {TABS.map(item => {
-          const done = Boolean(diagnosis[item.key])
-          const loading = busy[item.key]
-          return (
+      <div className="card">
+        <div className="card-title">先确定分析方法</div>
+        {intake?.recommendation ? (
+          <p>
+            AI 推荐「{TABS.find((t) => t.key === intake.recommendation?.method)?.name}」：
+            {intake.recommendation.reason}
+          </p>
+        ) : (
+          <p className="muted">
+            重新整理事实台账后，AI 会分析问题并推荐一种方法。你也可以直接按当前需要选择。
+          </p>
+        )}
+        {choosing ? (
+          <>
+            <p className="muted">默认使用一种方法。只有你主动勾选，才会使用多个。</p>
+            {TABS.map((item) => (
+              <label key={item.key} className="wb-line">
+                <input
+                  type={multiple ? 'checkbox' : 'radio'}
+                  name="diagnosis-method"
+                  checked={selection.includes(item.key)}
+                  disabled={savingSelection || anyBusy}
+                  onChange={(e) =>
+                    setSelection((prev) =>
+                      multiple
+                        ? e.target.checked
+                          ? [...prev, item.key]
+                          : prev.filter((key) => key !== item.key)
+                        : [item.key]
+                    )
+                  }
+                />{' '}
+                {item.name} ·{' '}
+                {
+                  {
+                    contradiction: '卡点多、不知道先抓什么',
+                    routes: '选择难定、需要比较打法',
+                    objSubj: '判断条件够不够、先补什么'
+                  }[item.key]
+                }
+              </label>
+            ))}
             <button
-              key={item.key}
               type="button"
-              className={`wb-tab${tab === item.key ? ' is-on' : ''}`}
-              onClick={() => setTab(item.key)}
+              className="btn btn-ghost btn-sm"
+              disabled={savingSelection || anyBusy}
+              onClick={() => {
+                if (multiple) setSelection(selection.slice(0, 1))
+                setMultiple(!multiple)
+              }}
             >
-              {loading && <span className="spinner" />}
-              {item.name}
-              {done && !loading ? ' ✓' : ''}
+              {multiple ? '恢复单方法' : '我需要多个方法'}
             </button>
-          )
-        })}
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!selection.length || savingSelection || anyBusy}
+              onClick={() =>
+                void (async () => {
+                  setSavingSelection(true)
+                  setSelectionError('')
+                  try {
+                    await updateWb(
+                      (l) => ({ ...l, form: { ...l.form, diagnosisMethods: selection } }),
+                      { versionLabel: '第二步：确认诊断方法' }
+                    )
+                    setTab(selection[0])
+                    setChoosing(false)
+                  } catch (e) {
+                    setSelectionError(toMessage(e))
+                  } finally {
+                    setSavingSelection(false)
+                  }
+                })()
+              }
+            >
+              确认方法
+            </button>
+            {selectionError && <div className="error-text">{selectionError}</div>}
+          </>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={anyBusy}
+            onClick={() => {
+              setSelection(methods)
+              setChoosing(true)
+            }}
+          >
+            更换方法 / 主动添加其他方法
+          </button>
+        )}
       </div>
 
-      {tab === 'contradiction' && (
-        <ContradictionPanel
-          module={diagnosis.contradiction}
-          busy={busy.contradiction}
-          err={errs.contradiction}
-          intake={intake}
-          onRegenerate={() => void runContradiction()}
-          onSave={patchDiagnosis}
-        />
-      )}
+      {!choosing && methods.length > 0 && (
+        <>
+          <div className="wb-bar">
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={anyBusy}
+              onClick={() => void runAll()}
+            >
+              {anyBusy && <span className="spinner" />}{' '}
+              {allDone ? '重新运行所选诊断' : '开始所选诊断'}
+            </button>
+            <span className="muted wb-bar-note">只围绕所选方法分析事实台账</span>
+          </div>
 
-      {tab === 'routes' && (
-        <RoutesPanel
-          module={diagnosis.routes}
-          busy={busy.routes}
-          err={errs.routes}
-          intake={intake}
-          onRegenerate={() => void runRoutes()}
-          onSave={patchDiagnosis}
-        />
-      )}
+          <div className="wb-tabs">
+            {TABS.filter((item) => methods.includes(item.key)).map((item) => {
+              const done = Boolean(diagnosis[item.key])
+              const loading = busy[item.key]
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`wb-tab${tab === item.key ? ' is-on' : ''}`}
+                  onClick={() => setTab(item.key)}
+                >
+                  {loading && <span className="spinner" />}
+                  {item.name}
+                  {done && !loading ? ' ✓' : ''}
+                </button>
+              )
+            })}
+          </div>
 
-      {tab === 'objSubj' && (
-        <ObjSubjPanel
-          module={diagnosis.objSubj}
-          busy={busy.objSubj}
-          err={errs.objSubj}
-          intake={intake}
-          onRegenerate={() => void runObjSubj()}
-          onSave={patchDiagnosis}
-        />
-      )}
+          {tab === 'contradiction' && (
+            <ContradictionPanel
+              module={diagnosis.contradiction}
+              busy={busy.contradiction}
+              err={errs.contradiction}
+              intake={intake}
+              onRegenerate={() => void runContradiction()}
+              onSave={patchDiagnosis}
+            />
+          )}
 
+          {tab === 'routes' && (
+            <RoutesPanel
+              module={diagnosis.routes}
+              busy={busy.routes}
+              err={errs.routes}
+              intake={intake}
+              onRegenerate={() => void runRoutes()}
+              onSave={patchDiagnosis}
+            />
+          )}
+
+          {tab === 'objSubj' && (
+            <ObjSubjPanel
+              module={diagnosis.objSubj}
+              busy={busy.objSubj}
+              err={errs.objSubj}
+              intake={intake}
+              onRegenerate={() => void runObjSubj()}
+              onSave={patchDiagnosis}
+            />
+          )}
+        </>
+      )}
       <div className="wb-bar">
-        <button type="button" className="btn btn-primary" disabled={!gate.ok} onClick={() => goStep('wb_decide')}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={choosing || anyBusy || !gate.ok}
+          onClick={() => goStep('wb_decide')}
+        >
           进入综合决策 →
         </button>
         {!gate.ok && <span className="muted">{gate.reason}</span>}

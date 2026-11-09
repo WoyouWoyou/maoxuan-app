@@ -22,8 +22,8 @@ export const STEPS: StepMeta<ReadingStepKey>[] = [
 
 export const WB_STEPS: StepMeta<WbStepKey>[] = [
   { key: 'wb_intake', no: 1, name: '摸清事实', hint: '先调查，后判断：分清事实、判断、愿望' },
-  { key: 'wb_diagnose', no: 2, name: '三路诊断', hint: '主要矛盾 · 三条路线 · 主客分析' },
-  { key: 'wb_decide', no: 3, name: '综合决策', hint: '三块结论打架，先修再走' },
+  { key: 'wb_diagnose', no: 2, name: '方法诊断', hint: 'AI 推荐一种方法，由你确认' },
+  { key: 'wb_decide', no: 3, name: '综合决策', hint: '围绕所选方法，提炼关键判断' },
   { key: 'wb_act', no: 4, name: '行动复盘', hint: '7 天 · 30 天 · 90 天，做了再改' }
 ]
 
@@ -32,7 +32,7 @@ export const MODE_META: Record<SessionMode, { name: string; short: string; desc:
   workbench: {
     name: '毛选工作台',
     short: '台',
-    desc: '带着项目做决策：摸事实 → 主要矛盾 / 三条路线 / 主客分析 → 综合 → 7/30/90 天行动'
+    desc: '带着项目做决策：描述处境 → 抓主要矛盾 / 主客分析法 → 近期行动推荐'
   }
 }
 
@@ -208,7 +208,14 @@ export type WbTimeScale = '7天' | '30天' | '90天' | '1年' | '5年'
 export type WbStage = '起步' | '相持' | '攻坚' | '扩张' | '调整'
 
 /** 第一步用户填写的原始输入。 */
+export type WbMethod = 'contradiction' | 'routes' | 'objSubj'
+
 export interface WbForm {
+  /** 简化工作台：自然语言输入和两个原始思考框架。 */
+  situation?: string
+  thinkingMethod?: import('./workbench-thinking').ThinkingMethod
+  /** 用户明确确认的方法；缺省表示尚未选择。 */
+  diagnosisMethods?: WbMethod[]
   projectName: string
   /** 一个项目只围绕一个主目标 */
   objective: string
@@ -249,6 +256,7 @@ export interface WbQuestion {
 }
 
 export interface WbIntake {
+  recommendation?: { method: WbMethod; reason: string }
   _context?: AIContext
   facts: WbFact[]
   missing: string[]
@@ -341,6 +349,11 @@ export interface WbCheck {
   waived: boolean
 }
 
+export interface WbDecisionRevision {
+  route: WbRouteKey
+  primaryContradiction: string
+}
+
 export interface WbDecision {
   _context?: AIContext
   primaryContradiction: string
@@ -419,6 +432,13 @@ export interface WbRecapResult {
 }
 
 export interface WorkbenchData {
+  thinking?: import('./workbench-thinking').ThinkingResult | null
+  thinkingResults?: Partial<
+    Record<
+      import('./workbench-thinking').ThinkingMethod,
+      import('./workbench-thinking').ThinkingResult
+    >
+  >
   form: WbForm
   intake: WbIntake | null
   diagnosis: WbDiagnosis

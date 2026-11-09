@@ -1,6 +1,84 @@
+.app:has(.wbp-root),
+.wbp-root {
+  --paper: #faf9f5;
+  --paper-2: #f0eee8;
+  --ink: #222622;
+  --red: #a83d32;
+  --red-soft: #f6e8e3;
+  --muted: #7c8177;
+  --line: #deded4;
+}
+.wbp-root .sp-main {
+  padding: 20px 0 0;
+  gap: 3px;
+}
+.wbp-root .sp-header {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 28px 6px;
+}
+.wbp-heading {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wbp-breadcrumb {
+  color: #868a81;
+  font-size: 12px;
+}
+.wbp-root .sp-title {
+  font: 500 13px/1.8 var(--sans);
+  max-width: 45ch;
+  overflow-wrap: anywhere;
+}
+.wbp-root .sp-title-input {
+  font: 500 13px/1.8 var(--sans);
+  max-width: 300px;
+}
 .wbp-sub {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  font-size: 10px;
+  color: #9c9e94;
+}
+.wbp-panel-button {
+  flex: 0 0 auto;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: #82877c;
+  font: 11px/1.5 var(--sans);
+  cursor: pointer;
+}
+.wbp-panel-button:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 4px;
+}
+.wbp-root .sp-panel.is-collapsed {
+  display: none;
+}
+@media (max-width: 700px) {
+  .desktop-workspace .wbp-root .sp-main,
+  .wbp-root .sp-main {
+    padding: 18px 16px 0;
+  }
+  .wbp-root .sp-header {
+    padding: 0 0 12px;
+    align-items: start;
+  }
+  .wbp-sub {
+    display: none;
+  }
+}
+
+.wbp-root .sp-header {
+  max-width: 1320px;
+  width: 100%;
+  align-self: center;
 }

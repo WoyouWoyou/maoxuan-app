@@ -1,0 +1,6 @@
+.growth-pickup-layer { position: fixed; inset: 0; z-index: 10000; pointer-events: none; overflow: hidden; }
+.growth-pickup-token { position: absolute; top: 0; left: 0; display: flex; flex-direction: column; align-items: center; gap: 7px; will-change: transform, opacity; }
+.growth-pickup-bag { position: relative; display: grid; place-items: center; width: 40px; height: 43px; border-radius: 12px 12px 17px 17px; background: linear-gradient(135deg, #e7d6a1, #b59556); border: 2px solid #f6e9bf; box-shadow: 0 5px 15px #42351c30, inset 0 -5px 0 #9b7b3930; color: #426644; font-size: 25px; }
+.growth-pickup-bag::before { content: ''; position: absolute; top: -7px; width: 23px; height: 9px; border-radius: 3px 3px 1px 1px; background: #c6ad73; border-bottom: 3px solid #647e4d; transform: rotate(-5deg); }
+.growth-pickup-label { color: #355b37; background: #f6f5e9; border: 1px solid #c4d1b4; box-shadow: 0 3px 12px #28452d18; border-radius: 20px; padding: 4px 12px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.growth-pickup-announcement { position: fixed; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

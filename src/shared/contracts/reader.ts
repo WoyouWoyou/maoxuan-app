@@ -1,11 +1,12 @@
-import { object, oneOf, bool, text, type Schema } from './validation'
+import { object, oneOf, bool, text, optional, type Schema } from './validation'
 
 export const EDGE_VOICES = [
+  { id: 'zh-CN-YunjianNeural', label: '云健（男声，沉稳）' },
   { id: 'zh-CN-XiaoxiaoNeural', label: '晓晓（女声，自然）' },
-  { id: 'zh-CN-YunxiNeural', label: '云希（男声，清晰）' },
-  { id: 'zh-CN-YunjianNeural', label: '云健（男声，沉稳）' }
+  { id: 'zh-CN-YunxiNeural', label: '云希（男声，清晰）' }
 ] as const
 export interface ReaderPreferences {
+  mobileTocCollapsed?: boolean
   layout: 'centered' | 'full'
   enabled: boolean
   provider: 'edge' | 'system'
@@ -22,6 +23,7 @@ export const DEFAULT_READER_PREFERENCES: ReaderPreferences = {
   follow: true
 }
 export const readerPreferencesSchema = object({
+  mobileTocCollapsed: optional(bool),
   layout: oneOf('centered', 'full'),
   enabled: bool,
   provider: oneOf('edge', 'system'),

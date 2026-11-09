@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { List, PencilSimple, CaretDown, X } from '@phosphor-icons/react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { Article, ArticleMeta, Reading, Reflection, SearchHit } from '@shared/types'
 import { CORE_ARTICLES } from '@shared/core'
@@ -32,8 +33,39 @@ export function StepFocus({
   update,
   focusArticleId,
   setFocusArticleId,
-  scrollToParagraph
-}: StepProps) {
+  scrollToParagraph,
+  mobile = false
+}: StepProps & { mobile?: boolean }) {
+  const [tocOpen, setTocOpen] = useState(false)
+  const [reflectionOpen, setReflectionOpen] = useState(false)
+  const [defaultCollapsed, setDefaultCollapsed] = useState(true)
+  const [preferenceError, setPreferenceError] = useState('')
+  useEffect(() => {
+    if (!mobile) return
+    let alive = true
+    window.api.settings
+      .getReader()
+      .then((p) => {
+        if (alive) {
+          setDefaultCollapsed(p.mobileTocCollapsed ?? true)
+          setTocOpen(p.mobileTocCollapsed === false)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [mobile])
+  async function changeDefault(value: boolean) {
+    setDefaultCollapsed(value)
+    setPreferenceError('')
+    try {
+      const prefs = await window.api.settings.getReader()
+      await window.api.settings.setReader({ ...prefs, mobileTocCollapsed: value })
+    } catch {
+      setPreferenceError('偏好未保存，请重试')
+    }
+  }
   const [article, setArticle] = useState<Article | null>(null)
   const [loadingArticle, setLoadingArticle] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -70,6 +102,7 @@ export function StepFocus({
 
   async function select(articleId: string, title?: string, focusQuestion = '') {
     setFocusArticleId(articleId)
+    if (mobile) setTocOpen(false)
     if (readings.some((r) => r.articleId === articleId)) return
     let finalTitle = title ?? ''
     if (!finalTitle) {
@@ -234,6 +267,7 @@ export function StepFocus({
   function jumpToParagraph(index: number) {
     setActiveParagraph(index)
     setJumpTo(null)
+    if (mobile) setReflectionOpen(false)
     window.setTimeout(() => setJumpTo(index), 0)
   }
 
@@ -262,103 +296,161 @@ export function StepFocus({
   ).filter((c) => !recommendedIds.includes(c.articleId))
   const scrollTarget = jumpTo ?? scrollToParagraph
 
+  const reflectionPanel =
+    article && reading ? (
+      <ReflectionPanel
+        article={article}
+        reflections={reading.reflections ?? []}
+        activeParagraph={activeParagraph}
+        onClearParagraph={() => setActiveParagraph(null)}
+        onAdd={addReflection}
+        onRemove={removeReflection}
+        onJump={jumpToParagraph}
+      />
+    ) : null
+  const sidebar = (
+    <aside className="step-focus-list scroll">
+      {recommendations.length > 0 && (
+        <div className="step-focus-group">
+          <div className="step-focus-group-title">教练推荐</div>
+          {recommendations.map((rec) => (
+            <button
+              key={rec.articleId}
+              type="button"
+              className={`step-focus-item${focusArticleId === rec.articleId ? ' is-active' : ''}`}
+              title={rec.reason}
+              onClick={() => void select(rec.articleId, rec.title, rec.focusQuestion)}
+            >
+              <span className="step-focus-item-head">
+                <span className="step-focus-item-title">{rec.title}</span>
+                <span className="badge badge-red">推荐</span>
+              </span>
+              <span className="step-focus-item-sub">{rec.reason}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="step-focus-group">
+        <div className="step-focus-group-title">
+          {generic ? '本书目录（也可自行选择）' : '核心五篇'}
+        </div>
+        {restCore.map((core) => (
+          <button
+            key={core.articleId}
+            type="button"
+            className={`step-focus-item${focusArticleId === core.articleId ? ' is-active' : ''}`}
+            title={core.solves}
+            onClick={() => void select(core.articleId, core.title)}
+          >
+            <span className="step-focus-item-head">
+              <span className="step-focus-item-title">{core.title}</span>
+            </span>
+            <span className="step-focus-item-sub">{core.solves}</span>
+          </button>
+        ))}
+      </div>
+
+      {extraReadings.length > 0 && (
+        <div className="step-focus-group">
+          <div className="step-focus-group-title">已加入的篇目</div>
+          {extraReadings.map((item) => (
+            <button
+              key={item.articleId}
+              type="button"
+              className={`step-focus-item${focusArticleId === item.articleId ? ' is-active' : ''}`}
+              onClick={() => setFocusArticleId(item.articleId)}
+            >
+              <span className="step-focus-item-head">
+                <span className="step-focus-item-title">{item.title}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="step-focus-group">
+        <div className="step-focus-group-title">从全书搜索</div>
+        <input
+          className="input"
+          value={query}
+          placeholder="如：调查研究 / 群众路线"
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {searching && (
+          <div className="muted step-focus-search-tip">
+            <span className="spinner" /> 搜索中…
+          </div>
+        )}
+        {!searching && query.trim().length > 0 && hits.length === 0 && (
+          <div className="muted step-focus-search-tip">没有找到相关文章</div>
+        )}
+        {hits.map((hit) => (
+          <button
+            key={hit.id}
+            type="button"
+            className={`step-focus-item${focusArticleId === hit.id ? ' is-active' : ''}`}
+            title={hit.volume}
+            onClick={() => void select(hit.id, hit.title)}
+          >
+            <span className="step-focus-item-head">
+              <span className="step-focus-item-title">{hit.title}</span>
+            </span>
+            <span className="step-focus-item-sub">{hit.snippet}</span>
+          </button>
+        ))}
+      </div>
+    </aside>
+  )
   return (
-    <div className="step-focus">
-      <aside className="step-focus-list scroll">
-        {recommendations.length > 0 && (
-          <div className="step-focus-group">
-            <div className="step-focus-group-title">教练推荐</div>
-            {recommendations.map((rec) => (
-              <button
-                key={rec.articleId}
-                type="button"
-                className={`step-focus-item${focusArticleId === rec.articleId ? ' is-active' : ''}`}
-                title={rec.reason}
-                onClick={() => void select(rec.articleId, rec.title, rec.focusQuestion)}
-              >
-                <span className="step-focus-item-head">
-                  <span className="step-focus-item-title">{rec.title}</span>
-                  <span className="badge badge-red">推荐</span>
-                </span>
-                <span className="step-focus-item-sub">{rec.reason}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="step-focus-group">
-          <div className="step-focus-group-title">
-            {generic ? '本书目录（也可自行选择）' : '核心五篇'}
-          </div>
-          {restCore.map((core) => (
-            <button
-              key={core.articleId}
-              type="button"
-              className={`step-focus-item${focusArticleId === core.articleId ? ' is-active' : ''}`}
-              title={core.solves}
-              onClick={() => void select(core.articleId, core.title)}
-            >
-              <span className="step-focus-item-head">
-                <span className="step-focus-item-title">{core.title}</span>
-              </span>
-              <span className="step-focus-item-sub">{core.solves}</span>
-            </button>
-          ))}
-        </div>
-
-        {extraReadings.length > 0 && (
-          <div className="step-focus-group">
-            <div className="step-focus-group-title">已加入的篇目</div>
-            {extraReadings.map((item) => (
-              <button
-                key={item.articleId}
-                type="button"
-                className={`step-focus-item${focusArticleId === item.articleId ? ' is-active' : ''}`}
-                onClick={() => setFocusArticleId(item.articleId)}
-              >
-                <span className="step-focus-item-head">
-                  <span className="step-focus-item-title">{item.title}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="step-focus-group">
-          <div className="step-focus-group-title">从全书搜索</div>
-          <input
-            className="input"
-            value={query}
-            placeholder="如：调查研究 / 群众路线"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          {searching && (
-            <div className="muted step-focus-search-tip">
-              <span className="spinner" /> 搜索中…
-            </div>
-          )}
-          {!searching && query.trim().length > 0 && hits.length === 0 && (
-            <div className="muted step-focus-search-tip">没有找到相关文章</div>
-          )}
-          {hits.map((hit) => (
-            <button
-              key={hit.id}
-              type="button"
-              className={`step-focus-item${focusArticleId === hit.id ? ' is-active' : ''}`}
-              title={hit.volume}
-              onClick={() => void select(hit.id, hit.title)}
-            >
-              <span className="step-focus-item-head">
-                <span className="step-focus-item-title">{hit.title}</span>
-              </span>
-              <span className="step-focus-item-sub">{hit.snippet}</span>
-            </button>
-          ))}
-        </div>
-      </aside>
+    <div className={mobile ? 'step-focus focus-mobile' : 'step-focus'}>
+      {mobile ? (
+        <FocusSheet title="篇目与推荐" open={tocOpen} onClose={() => setTocOpen(false)} side>
+          <label className="focus-collapse-setting">
+            <span>默认收起篇目栏</span>
+            <input
+              type="checkbox"
+              checked={defaultCollapsed}
+              onChange={(e) => void changeDefault(e.target.checked)}
+            />
+          </label>
+          {preferenceError && <p role="alert">{preferenceError}</p>}
+          {sidebar}
+          <button
+            className="btn btn-primary"
+            disabled={busy || !reading}
+            onClick={() => {
+              setTocOpen(false)
+              void findPassages()
+            }}
+          >
+            {busy
+              ? '正在标注…'
+              : reading?.passages.length
+                ? '重新标注当前篇目'
+                : '帮我找到该读的段落'}
+          </button>
+        </FocusSheet>
+      ) : (
+        sidebar
+      )}
 
       <section className="step-focus-main">
-        <div className="step-focus-toolbar">
+        {mobile && (
+          <button
+            type="button"
+            className="focus-toc-entry"
+            aria-expanded={tocOpen}
+            aria-haspopup="dialog"
+            onClick={() => setTocOpen(true)}
+          >
+            <List size={22} />
+            <strong>篇目与推荐</strong>
+            <span>{recommendations.length ? `推荐 ${recommendations.length} 篇` : '核心篇目'}</span>
+            <CaretDown size={18} />
+          </button>
+        )}
+        <div className={mobile ? 'step-focus-toolbar focus-desktop-only' : 'step-focus-toolbar'}>
           <button
             type="button"
             className="btn btn-primary btn-sm"
@@ -393,7 +485,11 @@ export function StepFocus({
               <span className="spinner" /> 正在加载原文…
             </div>
           )}
-          {!loadingArticle && !article && <div className="empty">在左侧选择一篇文章</div>}
+          {!loadingArticle && !article && (
+            <div className="empty">
+              {mobile ? '点击“篇目与推荐”选择一篇文章' : '在左侧选择一篇文章'}
+            </div>
+          )}
           {article && (
             <ArticleReader
               article={article}
@@ -401,45 +497,121 @@ export function StepFocus({
               focusQuestion={reading?.focusQuestion || undefined}
               scrollToParagraph={scrollTarget}
               compact
+              mobile={mobile}
               onParagraphClick={toggleParagraph}
               activeParagraph={activeParagraph}
             />
           )}
         </div>
 
-        {article && reading && (
-          <>
-            <div className="step-focus-splitter">
+        {mobile && article && reading ? (
+          <FocusSheet
+            title="阅读感悟"
+            open={reflectionOpen}
+            onClose={() => setReflectionOpen(false)}
+          >
+            {reflectionPanel}
+          </FocusSheet>
+        ) : (
+          article &&
+          reading && (
+            <>
+              <div className="step-focus-splitter">
+                <div
+                  className="step-focus-splitter-bar"
+                  title="拖动调整感悟框高度"
+                  onMouseDown={startDrag}
+                />
+                <button
+                  type="button"
+                  className="step-focus-splitter-btn"
+                  onClick={() => setPanelCollapsed((v) => !v)}
+                >
+                  {panelCollapsed ? '展开感悟框' : '收起感悟框'}
+                </button>
+              </div>
               <div
-                className="step-focus-splitter-bar"
-                title="拖动调整感悟框高度"
-                onMouseDown={startDrag}
-              />
-              <button
-                type="button"
-                className="step-focus-splitter-btn"
-                onClick={() => setPanelCollapsed((v) => !v)}
+                className={panelCollapsed ? 'step-focus-refl is-collapsed' : 'step-focus-refl'}
+                style={panelCollapsed ? undefined : { height: panelHeight }}
               >
-                {panelCollapsed ? '展开感悟框' : '收起感悟框'}
-              </button>
-            </div>
-            <div
-              className={panelCollapsed ? 'step-focus-refl is-collapsed' : 'step-focus-refl'}
-              style={panelCollapsed ? undefined : { height: panelHeight }}
-            >
-              <ReflectionPanel
-                article={article}
-                reflections={reading.reflections ?? []}
-                activeParagraph={activeParagraph}
-                onClearParagraph={() => setActiveParagraph(null)}
-                onAdd={addReflection}
-                onRemove={removeReflection}
-                onJump={jumpToParagraph}
-              />
-            </div>
-          </>
+                {reflectionPanel}
+              </div>
+            </>
+          )
         )}
       </section>
+      {mobile && (
+        <footer className="focus-bottom-actions">
+          <button onClick={() => setTocOpen(true)}>
+            <List size={21} />
+            篇目
+          </button>
+          <button disabled={!reading} onClick={() => setReflectionOpen(true)}>
+            <PencilSimple size={21} />
+            记感悟
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={!reading}
+            aria-label="我读完了，去写 3 条笔记"
+            onClick={() => void markReadDone().catch((e) => setErr(toMessage(e)))}
+          >
+            我读完了
+          </button>
+        </footer>
+      )}
     </div>
+  )
+}
+
+function FocusSheet({
+  title,
+  open,
+  onClose,
+  children,
+  side = false
+}: {
+  title: string
+  open: boolean
+  onClose: () => void
+  children: ReactNode
+  side?: boolean
+}) {
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const dialog = ref.current!
+    if (open && !dialog.open) dialog.showModal()
+    if (!open && dialog.open) dialog.close()
+  }, [open])
+  return (
+    <dialog
+      ref={ref}
+      className={`focus-sheet ${side ? 'focus-sheet-toc' : ''}`}
+      aria-label={title}
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          const r = e.currentTarget.getBoundingClientRect()
+          if (
+            e.clientX < r.left ||
+            e.clientX > r.right ||
+            e.clientY < r.top ||
+            e.clientY > r.bottom
+          )
+            onClose()
+        }
+      }}
+    >
+      <header>
+        <h2>{title}</h2>
+        <button type="button" aria-label={`关闭${title}`} onClick={onClose}>
+          <X size={23} />
+        </button>
+      </header>
+      <div className="focus-sheet-body">{children}</div>
+    </dialog>
   )
 }

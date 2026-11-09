@@ -1,4 +1,5 @@
 import type { SessionData, WorkbenchData } from '../types'
+import { createThinkingResultSchema } from './workbench-thinking'
 import {
   array,
   bool,
@@ -119,6 +120,7 @@ const fact = o({
 })
 export const intakeSchema = o({
   ...ai,
+  recommendation: opt(o({ method: oneOf('contradiction', 'routes', 'objSubj'), reason: s })),
   facts: array(fact),
   missing: strings,
   questions: array(o({ id: s, question: s, why: s, answer: s })),
@@ -206,6 +208,8 @@ export const wbActionSchema = o({
   progress: array(progressSchema),
   createdAt: s
 })
+export const thinkingResultSchema = createThinkingResultSchema(contextSchema, wbActionSchema)
+
 /** 工作清单里手工新增并关联工作台时允许用户提交的字段；不含来源、执行进展和生命周期状态。 */
 export const queuedActionInputSchema = o({
   id: s,
@@ -231,6 +235,9 @@ export const ledgerSchema = o({
   summary: s
 })
 export const formSchema = o({
+  situation: opt(s),
+  thinkingMethod: opt(oneOf('contradiction', 'objSubj')),
+  diagnosisMethods: opt(array(oneOf('contradiction', 'routes', 'objSubj'))),
   projectName: s,
   objective: s,
   timeScale: oneOf('', '7天', '30天', '90天', '1年', '5年'),
@@ -243,6 +250,13 @@ export const formSchema = o({
   swing: s
 })
 export const workbenchSchema = o({
+  thinking: opt(n(thinkingResultSchema)),
+  thinkingResults: opt(
+    o({
+      contradiction: opt(thinkingResultSchema),
+      objSubj: opt(thinkingResultSchema)
+    })
+  ),
   form: formSchema,
   intake: n(intakeSchema),
   diagnosis: o({
