@@ -2,25 +2,13 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { SpeechRequest } from '@shared/contracts/reader'
+import { SPEECH_KEY, speechCacheKey } from '@shared/sync/speech'
+export { speechCacheKey } from '@shared/sync/speech'
 
 const MAGIC = Buffer.from('MAOXUAN-SPEECH-1\n')
 const hash = (value: string | Uint8Array) => createHash('sha256').update(value).digest()
-/** Speed is applied by the audio player, so changing playback speed reuses the same MP3. */
-export function speechCacheKey(request: Pick<SpeechRequest, 'text' | 'voice'>): string {
-  return hash(
-    JSON.stringify({
-      version: 1,
-      provider: 'edge',
-      format: 'audio-24khz-48kbitrate-mono-mp3',
-      pitch: 0,
-      rate: 0,
-      volume: 0,
-      voice: request.voice,
-      text: request.text
-    })
-  ).toString('hex')
-}
 export interface SpeechCache {
+  read(key: string): Promise<Uint8Array | undefined>
   get(request: SpeechRequest, signal: AbortSignal): Promise<Uint8Array>
 }
 export function createSpeechCache(
@@ -62,18 +50,22 @@ export function createSpeechCache(
     }
     return audio
   }
+  async function readCached(key: string) {
+    if (!SPEECH_KEY.test(key)) throw Error('无效朗读缓存键')
+    const filename = `${key}.audio`
+    // Installation resources are immutable; use them directly without copying to userData.
+    return (
+      (options.bundledDirectory && (await read(path.join(options.bundledDirectory, filename)))) ||
+      read(path.join(directory, filename))
+    )
+  }
   return {
+    read: readCached,
     async get(request, signal) {
       signal.throwIfAborted()
       const key = speechCacheKey(request)
       const file = path.join(directory, `${key}.audio`)
-      // Installation resources are immutable; use them directly without copying to userData.
-      const bundled = options.bundledDirectory
-        ? await read(path.join(options.bundledDirectory, `${key}.audio`))
-        : undefined
-      signal.throwIfAborted()
-      if (bundled) return bundled
-      const cached = await read(file)
+      const cached = await readCached(key)
       signal.throwIfAborted()
       if (cached) return cached
       let job = jobs.get(key)

@@ -1,3 +1,6 @@
+import { DeviceSyncPanel } from '../features/sync/DeviceSyncPanel'
+import { AgentAccessPanel } from '../features/settings/AgentAccessPanel'
+import { FeatureSettingsPanel } from '../features/settings/FeatureSettingsPanel'
 import { ReaderPreferencesFields } from '../features/reader/ReaderOptions'
 import { ProxySettingsPanel } from '../features/settings/ProxySettingsPanel'
 import { useEffect, useState } from 'react'
@@ -91,6 +94,9 @@ export function SettingsPage() {
   return (
     <div className="set">
       <h1 className="set-title">设置</h1>
+      <FeatureSettingsPanel />
+      <DeviceSyncPanel />
+      {window.api.agent && <AgentAccessPanel access={window.api.agent} />}
       <p className="set-desc">
         配置兼容 Chat Completions 的模型服务。密钥在本机系统密钥存储中加密；请求发送至你配置的服务。
       </p>

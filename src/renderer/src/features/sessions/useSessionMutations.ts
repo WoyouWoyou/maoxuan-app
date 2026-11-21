@@ -30,7 +30,7 @@ export function useSessionMutations(
         const current = latest.current
         if (!current || current.id !== id) throw new Error('问题已切换，本次修改未保存')
         const updated = await work(current, mutationId)
-        if (latest.current?.id === id) {
+        if (latest.current?.id === id && updated.stateVersion >= latest.current.stateVersion) {
           latest.current = updated
           onApplied(updated)
         }

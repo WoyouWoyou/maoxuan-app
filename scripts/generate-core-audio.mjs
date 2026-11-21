@@ -10,8 +10,8 @@ const directory = path.resolve('resources/core-audio/v1')
 const progressFile = path.resolve('.codegen/core-audio-progress.json')
 const checkOnly = process.argv.includes('--check')
 const workers = Number(process.argv.find((arg) => arg.startsWith('--workers='))?.split('=')[1] ?? 3)
-if (!Number.isInteger(workers) || workers < 1 || workers > 4)
-  throw new Error('workers must be between 1 and 4')
+if (!Number.isInteger(workers) || workers < 1 || workers > 16)
+  throw new Error('workers must be between 1 and 16')
 const proxyUrl = process.env.SPEECH_PROXY_URL
 if (proxyUrl)
   setGlobalDispatcher(
@@ -19,6 +19,15 @@ if (proxyUrl)
   )
 const plan = await coreAudioPlan(tools)
 await fs.mkdir(directory, { recursive: true })
+// Preserve the shipped Xiaoxiao manifest while generating the new default voice.
+const manifestPath = path.join(directory, 'manifest.json')
+try {
+  const previous = JSON.parse(await fs.readFile(manifestPath, 'utf8'))
+  if (previous.voice === 'zh-CN-XiaoxiaoNeural')
+    await fs.copyFile(manifestPath, path.join(directory, 'zh-CN-XiaoxiaoNeural.manifest.json'))
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error
+}
 await fs.mkdir(path.dirname(progressFile), { recursive: true })
 const unique = new Map()
 for (const article of plan.articles)
@@ -139,7 +148,8 @@ try {
           )
         )
       }
-    const file = path.join(exports, `${article.title}-晓晓.mp3`)
+    const voiceLabel = tools.EDGE_VOICES.find((v) => v.id === plan.voice).label.split('（')[0]
+    const file = path.join(exports, `${article.title}-${voiceLabel}.mp3`)
     await fs.writeFile(file, Buffer.concat(full))
     const decoded = spawnSync('ffmpeg', ['-v', 'error', '-i', file, '-f', 'null', '-'], {
       encoding: 'utf8',

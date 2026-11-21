@@ -37,6 +37,7 @@ function seed(mode: 'reading' | 'workbench'): Session {
     id: mode,
     mode,
     title: 'AI 推广',
+    status: 'active',
     deletedAt: null,
     stateVersion: 1,
     data: emptySessionData()
@@ -78,6 +79,41 @@ beforeEach(() => {
   })
 })
 describe('AI action classification', () => {
+  it.each(['reading', 'workbench'] as const)(
+    'skips archived %s actions before calling the model',
+    async (mode) => {
+      const s = seed(mode)
+      s.status = 'archived'
+      const data = structuredClone(s.data)
+      expect(
+        await classifyActions([{ sessionId: mode, actionId: 'a1' }], '2026-10-29')
+      ).toMatchObject({ classified: 0, skipped: 1, failed: 0 })
+      expect(mocks.model).not.toHaveBeenCalled()
+      expect(s.data).toEqual(data)
+      s.status = 'active'
+      expect(
+        await classifyActions([{ sessionId: mode, actionId: 'a1' }], '2026-10-29')
+      ).toMatchObject({ classified: 1, skipped: 0, failed: 0 })
+    }
+  )
+  it.each(['reading', 'workbench'] as const)(
+    'discards a late classification when %s is archived during inference',
+    async (mode) => {
+      const s = seed(mode)
+      const data = structuredClone(s.data)
+      mocks.model.mockImplementationOnce(async () => {
+        s.status = 'archived'
+        s.stateVersion++
+        return { assignments: [{ id: 'a1', quadrant: 'do' }] }
+      })
+      expect(
+        await classifyActions([{ sessionId: mode, actionId: 'a1' }], '2026-10-29')
+      ).toMatchObject({ classified: 0, skipped: 1, failed: 0 })
+      expect(mocks.reading).not.toHaveBeenCalled()
+      expect(mocks.workbench).not.toHaveBeenCalled()
+      expect(s.data).toEqual(data)
+    }
+  )
   it('classifies default tasks and preserves manual edits made during inference', async () => {
     const items = new Map<string, import('../src/shared/types').ActionItem>()
     configureActions({

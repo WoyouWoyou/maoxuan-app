@@ -5,11 +5,14 @@ import {
   PlayIcon,
   PauseIcon,
   StopIcon,
-  BookOpenIcon
+  BookOpenIcon,
+  DownloadSimpleIcon
 } from '@phosphor-icons/react'
 import { ReaderOptions } from '../features/reader/ReaderOptions'
 import { useReaderPreferences } from '../features/reader/preferences'
 import { useSpeechPlayer } from '../features/reader/useSpeechPlayer'
+import { BUILTIN_BOOK_ID } from '@shared/contracts/library'
+import { articleSpeechKeys } from '@shared/sync/speech'
 import type { Article, Passage } from '@shared/types'
 import './ArticleReader.css'
 
@@ -19,10 +22,12 @@ export interface ArticleReaderProps {
   focusQuestion?: string
   scrollToParagraph?: number | null
   compact?: boolean
+  mobile?: boolean
   /** 提供后，段落编号变成可点击按钮（点击即关联 / 取消关联该段） */
   onParagraphClick?: (index: number) => void
   /** 当前“关联到感悟”的段落下标 */
   activeParagraph?: number | null
+  selectParagraphOnText?: boolean
 }
 
 function clip(text: string, max: number): string {
@@ -48,19 +53,28 @@ export function ArticleReader({
   focusQuestion,
   scrollToParagraph = null,
   compact = false,
+  mobile = false,
   onParagraphClick,
-  activeParagraph = null
+  activeParagraph = null,
+  selectParagraphOnText = false
 }: ArticleReaderProps) {
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const optionsRef = useRef<HTMLDivElement | null>(null)
   const optionsButtonRef = useRef<HTMLButtonElement | null>(null)
   const [optionsOpen, setOptionsOpen] = useState(false)
+  const [openedIndex, setOpenedIndex] = useState<number | null>(null)
   const [playerPosition, setPlayerPosition] = useState<{ top: number; left: number } | undefined>()
   const { preferences, loaded } = useReaderPreferences()
   const player = useSpeechPlayer(article.id, article.paragraphs, preferences)
+  const requestDownload =
+    article.bookId === BUILTIN_BOOK_ID ? window.api.speech.requestDownload : undefined
+  const mobileFocus = mobile && compact
+  function toggleParagraphActions(index: number) {
+    setOpenedIndex((previous) => (previous === index ? null : index))
+  }
   const playing = ['loading', 'playing', 'paused', 'error'].includes(player.status)
   useEffect(() => {
-    if (!playing || player.status === 'error') {
+    if (mobileFocus || !playing || player.status === 'error') {
       setPlayerPosition(undefined)
       return
     }
@@ -94,7 +108,7 @@ export function ArticleReader({
       window.removeEventListener('scroll', position, true)
       window.removeEventListener('resize', position)
     }
-  }, [playing, player.index, player.status, preferences.layout, optionsOpen])
+  }, [playing, player.index, player.status, preferences.layout, optionsOpen, mobileFocus])
   function closeOptions() {
     optionsRef.current?.hidePopover()
     optionsButtonRef.current?.focus()
@@ -121,10 +135,19 @@ export function ArticleReader({
     [passages]
   )
 
+  function downloadSpeech() {
+    requestDownload?.({
+      articleId: article.id,
+      title: article.title,
+      voice: preferences.voice,
+      keys: articleSpeechKeys(article.paragraphs, preferences.voice)
+    })
+  }
+
   function jumpTo(idx: number) {
     const el = bodyRef.current?.querySelector<HTMLElement>(`[data-idx="${idx}"]`)
     if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.scrollIntoView({ behavior: 'smooth', block: mobile ? 'start' : 'center' })
     el.classList.remove('reader-flash')
     void el.offsetWidth
     el.classList.add('reader-flash')
@@ -135,36 +158,112 @@ export function ArticleReader({
     if (scrollToParagraph === null) return
     const el = bodyRef.current?.querySelector<HTMLElement>(`[data-idx="${scrollToParagraph}"]`)
     if (!el) return
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.scrollIntoView({ behavior: 'smooth', block: mobile ? 'start' : 'center' })
     el.classList.add('reader-flash')
     const timer = window.setTimeout(() => el.classList.remove('reader-flash'), 1600)
     return () => window.clearTimeout(timer)
-  }, [scrollToParagraph, article.id])
+  }, [scrollToParagraph, article.id, mobile])
 
   // 窄容器里不再用侧栏目录（否则正文会被挤成竖条），改为顶部标签条（见 CSS 容器查询）
   const showSide = !compact && markList.length > 0
 
+  const markedParagraphs = markList.length > 0 && (
+    <nav className="reader-toc-strip" aria-label="标注段落">
+      <span className="reader-toc-strip-label">标注段落</span>
+      {markList.map((p, i) => (
+        <button
+          key={`${p.paragraphIndex}-${i}`}
+          type="button"
+          className={`reader-toc-item${mobile && activeParagraph === p.paragraphIndex ? ' is-active' : ''}`}
+          title={p.verified ? p.quote : `${p.quote}（未能逐字核对）`}
+          onClick={() => {
+            if (mobile && activeParagraph !== p.paragraphIndex)
+              onParagraphClick?.(p.paragraphIndex)
+            jumpTo(p.paragraphIndex)
+          }}
+        >
+          第 {p.paragraphIndex + 1} 段
+        </button>
+      ))}
+    </nav>
+  )
+
+  const playback = playing ? (
+    <div
+      className="reader-playback"
+      style={
+        playerPosition && !mobileFocus
+          ? { ...playerPosition, bottom: 'auto', right: 'auto' }
+          : undefined
+      }
+      role="region"
+      aria-label="朗读控制"
+    >
+      {player.status === 'error' ? (
+        <>
+          <span role="alert" className="reader-playback-error">
+            {player.error}
+          </span>
+          <button type="button" onClick={() => void player.retry()}>
+            重试
+          </button>
+          <button type="button" onClick={() => optionsRef.current?.showPopover()}>
+            语音设置
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="reader-play-pause"
+            aria-label={player.status === 'paused' ? '继续朗读' : '暂停朗读'}
+            onClick={player.togglePause}
+          >
+            {player.status === 'paused' ? (
+              <PlayIcon weight="fill" size={18} />
+            ) : (
+              <PauseIcon weight="fill" size={18} />
+            )}
+          </button>
+          <span className="reader-playback-progress" role="status">
+            {player.status === 'loading'
+              ? window.api.speech.localAudio ? '正在准备 · ' : '正在合成 · '
+              : player.status === 'paused'
+                ? '已暂停 · '
+                : ''}
+            第 {player.index + 1} / {article.paragraphs.length} 段
+          </span>
+          {player.cacheProgress.total > 0 && (
+            <span
+              className="reader-cache-progress"
+              title={
+                player.cacheProgress.failed
+                  ? '部分片段预生成失败，播放到该处时会重试'
+                  : '已准备好的音频保存在本地，再次播放优先使用缓存'
+              }
+            >
+              本地缓存 {player.cacheProgress.ready}/{player.cacheProgress.total}
+            </span>
+          )}
+        </>
+      )}
+      <button
+        type="button"
+        className="reader-stop"
+        aria-label="停止朗读"
+        onClick={player.stop}
+      >
+        <StopIcon weight="fill" size={16} />
+      </button>
+    </div>
+  ) : null
+
   return (
     <div
-      className={`reader reader-layout-${preferences.layout}${compact ? ' reader-compact' : ''}`}
+      className={`reader reader-layout-${preferences.layout}${compact ? ' reader-compact' : ''}${mobile ? ' reader-mobile' : ''}`}
     >
       <div className="reader-tools">
-        {markList.length > 0 ? (
-          <nav className="reader-toc-strip" aria-label="标注段落">
-            <span className="reader-toc-strip-label">标注段落</span>
-            {markList.map((p, i) => (
-              <button
-                key={`${p.paragraphIndex}-${i}`}
-                type="button"
-                className="reader-toc-item"
-                title={p.verified ? p.quote : `${p.quote}（未能逐字核对）`}
-                onClick={() => jumpTo(p.paragraphIndex)}
-              >
-                第 {p.paragraphIndex + 1} 段
-              </button>
-            ))}
-          </nav>
-        ) : null}
+        {!mobileFocus && markedParagraphs}
         <div className="reader-tool-actions">
           {player.status === 'done' && (
             <span role="status" className="reader-complete">
@@ -174,12 +273,23 @@ export function ArticleReader({
           {preferences.enabled && (
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost btn-sm reader-read-trigger"
               disabled={!loaded || !article.paragraphs.length}
               onClick={() => void player.start()}
             >
               <PlayIcon size={15} />
               朗读全文
+            </button>
+          )}
+          {mobile && requestDownload && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm reader-download-trigger"
+              disabled={!loaded || !article.paragraphs.length}
+              onClick={downloadSpeech}
+            >
+              {mobileFocus && <DownloadSimpleIcon size={16} />}
+              下载朗读
             </button>
           )}
           <button
@@ -188,12 +298,14 @@ export function ArticleReader({
             className={`btn btn-ghost btn-sm${optionsOpen ? ' is-open' : ''}`}
             aria-expanded={optionsOpen}
             aria-haspopup="dialog"
+            aria-label="阅读选项"
             onClick={() => optionsRef.current?.togglePopover()}
           >
-            <SlidersHorizontalIcon size={16} />
+            {(!mobile || mobileFocus) && <SlidersHorizontalIcon size={16} />}
             阅读选项
           </button>
         </div>
+        {mobileFocus && markedParagraphs}
       </div>
       <div
         ref={optionsRef}
@@ -206,189 +318,154 @@ export function ArticleReader({
         <ReaderOptions
           onClose={closeOptions}
           canRead={article.paragraphs.length > 0}
+          onDownload={
+            requestDownload &&
+            (() => {
+              closeOptions()
+              downloadSpeech()
+            })
+          }
           onRead={() => {
             closeOptions()
             void player.start()
           }}
         />
       </div>
-      {playing &&
-        createPortal(
-          <div
-            className="reader-playback"
-            style={
-              playerPosition ? { ...playerPosition, bottom: 'auto', right: 'auto' } : undefined
-            }
-            role="region"
-            aria-label="朗读控制"
-          >
-            {player.status === 'error' ? (
-              <>
-                <span role="alert" className="reader-playback-error">
-                  {player.error}
-                </span>
-                <button type="button" onClick={() => void player.retry()}>
-                  重试
-                </button>
-                <button type="button" onClick={() => optionsRef.current?.showPopover()}>
-                  语音设置
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="reader-play-pause"
-                  aria-label={player.status === 'paused' ? '继续朗读' : '暂停朗读'}
-                  onClick={player.togglePause}
-                >
-                  {player.status === 'paused' ? (
-                    <PlayIcon weight="fill" size={18} />
-                  ) : (
-                    <PauseIcon weight="fill" size={18} />
-                  )}
-                </button>
-                <span className="reader-playback-progress" role="status">
-                  {player.status === 'loading'
-                    ? '正在合成 · '
-                    : player.status === 'paused'
-                      ? '已暂停 · '
-                      : ''}
-                  第 {player.index + 1} / {article.paragraphs.length} 段
-                </span>
-                {player.cacheProgress.total > 0 && (
-                  <span
-                    className="reader-cache-progress"
-                    title={
-                      player.cacheProgress.failed
-                        ? '部分片段预生成失败，播放到该处时会重试'
-                        : '已准备好的音频保存在本地，再次播放优先使用缓存'
-                    }
-                  >
-                    本地缓存 {player.cacheProgress.ready}/{player.cacheProgress.total}
-                  </span>
-                )}
-              </>
-            )}
-            <button
-              type="button"
-              className="reader-stop"
-              aria-label="停止朗读"
-              onClick={player.stop}
-            >
-              <StopIcon weight="fill" size={16} />
-            </button>
-          </div>,
-          document.body
-        )}
+      {playback && (mobileFocus ? playback : createPortal(playback, document.body))}
 
-      {focusQuestion ? (
-        <div className="reader-focus">
-          <div className="reader-focus-label">带着这个问题读</div>
-          <p className="reader-focus-text">{focusQuestion}</p>
-        </div>
-      ) : null}
+      <div className="reader-document">
+        {focusQuestion ? (
+          <div className="reader-focus">
+            <div className="reader-focus-label">带着这个问题读</div>
+            <p className="reader-focus-text">{focusQuestion}</p>
+          </div>
+        ) : null}
 
-      <div className={showSide ? 'reader-grid has-side' : 'reader-grid'}>
-        <div className="reader-main">
-          {!compact ? (
-            <header className="reader-head">
-              <h1 className="reader-title serif">{article.title}</h1>
-              <div className="reader-volume">{article.volume}</div>
-            </header>
-          ) : null}
+        <div className={showSide ? 'reader-grid has-side' : 'reader-grid'}>
+          <div className="reader-main">
+            {!compact ? (
+              <header className="reader-head">
+                <h1 className="reader-title serif">{article.title}</h1>
+                <div className="reader-volume">{article.volume}</div>
+              </header>
+            ) : null}
 
-          <div className="reader-body serif" ref={bodyRef}>
-            {article.paragraphs.map((text, idx) => {
-              const hits = marks.get(idx)
-              const marked = hits !== undefined && hits.length > 0
-              const active = activeParagraph === idx
-              const classes = ['reader-p']
-              if (marked) classes.push('reader-mark')
-              if (active) classes.push('reader-active')
-              if (player.index === idx && playing) classes.push('reader-speaking')
-              return (
-                <p
-                  key={idx}
-                  data-idx={idx}
-                  className={classes.join(' ')}
-                  aria-current={player.index === idx && playing ? 'true' : undefined}
-                >
-                  {preferences.enabled && (
-                    <span className="reader-paragraph-actions">
-                      <button
-                        type="button"
-                        aria-label={`只读第 ${idx + 1} 段`}
-                        onClick={() => void player.start(idx, true)}
-                      >
-                        <BookOpenIcon size={14} />
-                        只读本段
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`从第 ${idx + 1} 段开始读`}
-                        onClick={() => void player.start(idx)}
-                      >
-                        <PlayIcon size={14} weight="fill" />
-                        从这里读
-                      </button>
-                    </span>
-                  )}
-                  {onParagraphClick ? (
+            <div className="reader-body serif" ref={bodyRef}>
+              {article.paragraphs.map((text, idx) => {
+                const hits = marks.get(idx)
+                const marked = hits !== undefined && hits.length > 0
+                const active = activeParagraph === idx
+                const actionsOpen = mobile && preferences.enabled && openedIndex === idx
+                const classes = ['reader-p']
+                if (marked) classes.push('reader-mark')
+                if (active) classes.push('reader-active')
+                if (player.index === idx && playing) classes.push('reader-speaking')
+                const actions = preferences.enabled && (!mobile || actionsOpen) && (
+                  <span className="reader-paragraph-actions">
                     <button
                       type="button"
-                      className="reader-no reader-no-btn"
-                      title="关联到感悟"
-                      onClick={() => onParagraphClick(idx)}
+                      aria-label={`只读第 ${idx + 1} 段`}
+                      onClick={() => void player.start(idx, true)}
                     >
-                      {idx + 1}
+                      <BookOpenIcon size={14} />
+                      {mobile ? '只播本段' : '只读本段'}
                     </button>
-                  ) : (
-                    <span className="reader-no">{idx + 1}</span>
-                  )}
-                  <span className="reader-content">
-                    <span className="reader-text">{renderText(text)}</span>
-                    {marked && hits ? (
-                      <span className="reader-why">
-                        {hits.map((p, i) => (
-                          <span className="reader-why-line" key={i}>
-                            ◆ {p.why}
-                            {p.verified ? null : (
-                              <span className="reader-unverified">（未能逐字核对）</span>
-                            )}
-                          </span>
-                        ))}
-                      </span>
-                    ) : null}
+                    <button
+                      type="button"
+                      aria-label={`从第 ${idx + 1} 段开始读`}
+                      onClick={() => void player.start(idx)}
+                    >
+                      <PlayIcon size={14} weight="fill" />
+                      从这里读
+                    </button>
                   </span>
-                </p>
-              )
-            })}
+                )
+                return (
+                  <p
+                    key={idx}
+                    data-idx={idx}
+                    className={classes.join(' ')}
+                    aria-current={player.index === idx && playing ? 'true' : undefined}
+                  >
+                    {!mobile && actions}
+                    {onParagraphClick || (mobile && preferences.enabled) ? (
+                      <button
+                        type="button"
+                        className="reader-no reader-no-btn"
+                        title={selectParagraphOnText ? `选择第 ${idx + 1} 段` : '关联到感悟'}
+                        aria-expanded={mobile && preferences.enabled ? actionsOpen : undefined}
+                        onClick={() => {
+                          onParagraphClick?.(idx)
+                          if (mobile && preferences.enabled) toggleParagraphActions(idx)
+                        }}
+                      >
+                        {mobile ? `第 ${idx + 1} 段` : idx + 1}
+                      </button>
+                    ) : (
+                      <span className="reader-no">{mobile ? `第 ${idx + 1} 段` : idx + 1}</span>
+                    )}
+                    <span className="reader-content">
+                      {mobile && actions}
+                      <span
+                        className="reader-text"
+                        onClick={
+                          selectParagraphOnText || (mobile && preferences.enabled)
+                            ? () => {
+                                if (mobile && window.getSelection()?.isCollapsed === false) return
+                                if (selectParagraphOnText) onParagraphClick?.(idx)
+                                if (mobile && preferences.enabled) toggleParagraphActions(idx)
+                              }
+                            : undefined
+                        }
+                      >
+                        {renderText(text)}
+                      </span>
+                      {marked && hits ? (
+                        <span className="reader-why">
+                          {hits.map((p, i) => (
+                            <span className="reader-why-line" key={i}>
+                              ◆ {p.why}
+                              {p.verified ? null : (
+                                <span className="reader-unverified">（未能逐字核对）</span>
+                              )}
+                            </span>
+                          ))}
+                        </span>
+                      ) : null}
+                    </span>
+                  </p>
+                )
+              })}
+            </div>
+
+            {article.paragraphs.length === 0 ? (
+              <div className="empty">这篇文章没有正文内容。</div>
+            ) : null}
           </div>
 
-          {article.paragraphs.length === 0 ? (
-            <div className="empty">这篇文章没有正文内容。</div>
+          {showSide ? (
+            <aside className="reader-side">
+              <div className="reader-side-title">标注目录</div>
+              <div className="reader-side-list">
+                {markList.map((p, i) => (
+                  <button
+                    key={i}
+                    className="reader-side-item"
+                    onClick={() => {
+                      if (mobile && activeParagraph !== p.paragraphIndex)
+                        onParagraphClick?.(p.paragraphIndex)
+                      jumpTo(p.paragraphIndex)
+                    }}
+                  >
+                    <span className="reader-side-no">第 {p.paragraphIndex + 1} 段</span>
+                    <span className="reader-side-quote">{clip(p.quote, 36)}</span>
+                    {p.verified ? null : <span className="reader-unverified">（未能逐字核对）</span>}
+                  </button>
+                ))}
+              </div>
+            </aside>
           ) : null}
         </div>
-
-        {showSide ? (
-          <aside className="reader-side">
-            <div className="reader-side-title">标注目录</div>
-            <div className="reader-side-list">
-              {markList.map((p, i) => (
-                <button
-                  key={i}
-                  className="reader-side-item"
-                  onClick={() => jumpTo(p.paragraphIndex)}
-                >
-                  <span className="reader-side-no">第 {p.paragraphIndex + 1} 段</span>
-                  <span className="reader-side-quote">{clip(p.quote, 36)}</span>
-                  {p.verified ? null : <span className="reader-unverified">（未能逐字核对）</span>}
-                </button>
-              ))}
-            </div>
-          </aside>
-        ) : null}
       </div>
     </div>
   )

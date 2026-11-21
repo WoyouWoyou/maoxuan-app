@@ -70,7 +70,7 @@ export function SourceDrawer({ area, onClose }: SourceDrawerProps) {
 
   return (
     <div className="wsd-mask" role="presentation" onClick={onClose}>
-      <aside className="wsd" onClick={e => e.stopPropagation()}>
+      <aside className="wsd" role="dialog" aria-modal="true" aria-label="原文依据" onClick={e => e.stopPropagation()}>
         <header className="wsd-head">
           <div className="wsd-title">原文依据</div>
           <span className="spacer" />

@@ -4,19 +4,23 @@ import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { coreAudioPlan, loadSpeechTools } from './core-audio-plan.mjs'
 
-export async function checkCoreAudio() {
+export async function checkCoreAudio(directory = path.resolve('resources/core-audio/v1')) {
+  await checkVoice(directory, 'manifest.json')
+  await checkVoice(directory, 'zh-CN-XiaoxiaoNeural.manifest.json', 'zh-CN-XiaoxiaoNeural')
+}
+
+async function checkVoice(directory, manifestName, voice) {
   const tools = await loadSpeechTools()
   try {
-    const directory = path.resolve('resources/core-audio/v1')
     let manifest
     try {
-      manifest = JSON.parse(await fs.readFile(path.join(directory, 'manifest.json'), 'utf8'))
+      manifest = JSON.parse(await fs.readFile(path.join(directory, manifestName), 'utf8'))
     } catch (error) {
       throw new Error('核心五篇音频清单缺失或无效，请先执行 npm run audio:generate', {
         cause: error
       })
     }
-    const expected = await coreAudioPlan(tools)
+    const expected = await coreAudioPlan(tools, voice)
     if (
       manifest.version !== expected.version ||
       manifest.voice !== expected.voice ||

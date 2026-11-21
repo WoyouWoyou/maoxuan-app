@@ -24,7 +24,7 @@ function daysLeft(deletedAt: string | null): number {
   return Math.max(0, Math.ceil((t + TRASH_RETENTION_DAYS * DAY_MS - Date.now()) / DAY_MS))
 }
 
-export function TrashPanel() {
+export function TrashPanel({ mobile = false }: { mobile?: boolean } = {}) {
   const [trash, setTrash] = useState<SessionSummary[]>([])
   const [archived, setArchived] = useState<SessionSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,7 +39,10 @@ export function TrashPanel() {
 
   const load = useCallback(async () => {
     try {
-      const [t, a] = await Promise.all([window.api.sessions.listTrash(), window.api.sessions.listArchived()])
+      const [t, a] = await Promise.all([
+        window.api.sessions.listTrash(),
+        window.api.sessions.listArchived()
+      ])
       setTrash(t)
       setArchived(a)
       setLoadError('')
@@ -95,21 +98,23 @@ export function TrashPanel() {
 
   return (
     <div className="tp-wrap">
-      <section className="card tp-block">
+      <section className="card tp-block" aria-label="回收站">
         <header className="tp-head">
           <span className="tp-title">回收站</span>
           <span className="tp-meta muted">
-            共 {trash.length} 个 · {TRASH_RETENTION_DAYS} 天后自动彻底删除
+            共 {trash.length} 个{!mobile && ` · ${TRASH_RETENTION_DAYS} 天后自动彻底删除`}
           </span>
           <span className="spacer" />
-          <button
-            type="button"
-            className="btn btn-sm btn-danger"
-            disabled={trash.length === 0 || busyId !== null}
-            onClick={() => setConfirmEmpty(true)}
-          >
-            清空回收站
-          </button>
+          {!mobile && (
+            <button
+              type="button"
+              className="btn btn-sm btn-danger"
+              disabled={trash.length === 0 || busyId !== null}
+              onClick={() => setConfirmEmpty(true)}
+            >
+              清空回收站
+            </button>
+          )}
         </header>
 
         {confirmEmpty ? (
@@ -142,7 +147,9 @@ export function TrashPanel() {
           </div>
         ) : null}
 
-        {!loading && trash.length === 0 ? <div className="tp-empty muted">回收站是空的。</div> : null}
+        {!loading && trash.length === 0 ? (
+          <div className="tp-empty muted">回收站是空的。</div>
+        ) : null}
 
         {trash.map((s) => {
           const d = daysLeft(s.deletedAt)
@@ -153,8 +160,13 @@ export function TrashPanel() {
                   {s.title}
                 </div>
                 <div className="tp-row-meta muted">
-                  删除于 {fmtDate(s.deletedAt ?? s.updatedAt)} · 剩余{' '}
-                  <span className={d <= 3 ? 'tp-urgent' : undefined}>{d}</span> 天
+                  删除于 {fmtDate(s.deletedAt ?? s.updatedAt)}
+                  {!mobile && (
+                    <>
+                      {' '}
+                      · 剩余 <span className={d <= 3 ? 'tp-urgent' : undefined}>{d}</span> 天
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -187,20 +199,24 @@ export function TrashPanel() {
                       className="btn btn-sm btn-ghost"
                       disabled={busyId !== null}
                       onClick={() =>
-                        void run(`restore:${s.id}`, 'trash', () => window.api.sessions.restore(s.id))
+                        void run(`restore:${s.id}`, 'trash', () =>
+                          window.api.sessions.restore(s.id)
+                        )
                       }
                     >
                       {busyId === `restore:${s.id}` ? <span className="spinner" /> : null}
                       恢复
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      disabled={busyId !== null}
-                      onClick={() => setRemovingId(s.id)}
-                    >
-                      彻底删除
-                    </button>
+                    {!mobile && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger"
+                        disabled={busyId !== null}
+                        onClick={() => setRemovingId(s.id)}
+                      >
+                        彻底删除
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -212,7 +228,7 @@ export function TrashPanel() {
         {trashError ? <div className="error-text tp-error">{trashError}</div> : null}
       </section>
 
-      <section className="card tp-block">
+      <section className="card tp-block" aria-label="已归档">
         <header className="tp-head">
           <span className="tp-title">已归档</span>
           <span className="tp-meta muted">共 {archived.length} 个</span>
@@ -224,7 +240,9 @@ export function TrashPanel() {
           </div>
         ) : null}
 
-        {!loading && archived.length === 0 ? <div className="tp-empty muted">没有归档的问题。</div> : null}
+        {!loading && archived.length === 0 ? (
+          <div className="tp-empty muted">没有归档的问题。</div>
+        ) : null}
 
         {archived.map((s) => (
           <div className="tp-row" key={s.id}>
@@ -249,7 +267,9 @@ export function TrashPanel() {
                 className="btn btn-sm btn-ghost"
                 disabled={busyId !== null}
                 onClick={() =>
-                  void run(`unarchive:${s.id}`, 'archive', () => window.api.sessions.unarchive(s.id))
+                  void run(`unarchive:${s.id}`, 'archive', () =>
+                    window.api.sessions.unarchive(s.id)
+                  )
                 }
               >
                 {busyId === `unarchive:${s.id}` ? <span className="spinner" /> : null}
@@ -259,7 +279,9 @@ export function TrashPanel() {
                 type="button"
                 className="btn btn-sm btn-danger"
                 disabled={busyId !== null}
-                onClick={() => void run(`trash:${s.id}`, 'archive', () => window.api.sessions.trash(s.id))}
+                onClick={() =>
+                  void run(`trash:${s.id}`, 'archive', () => window.api.sessions.trash(s.id))
+                }
               >
                 {busyId === `trash:${s.id}` ? <span className="spinner" /> : null}
                 移入回收站

@@ -1,3 +1,9 @@
+import { registerJournalHandlers } from './adapters/electron/journal-handlers'
+import {
+  getMarchProgress,
+  plantMarchTree,
+  collectMarchLandscape
+} from './modules/long-march/public'
 import {
   classifyActions,
   listActions,
@@ -5,6 +11,7 @@ import {
   editAction
 } from './modules/action-planning/public'
 import { register } from './adapters/electron/transport'
+import type { SpeechCache } from './adapters/speech/cache'
 import { registerSpeechHandlers } from './adapters/electron/speech-handlers'
 import { registerLibraryHandlers } from './adapters/electron/library-handlers'
 import { getSettings } from './modules/settings/public'
@@ -14,7 +21,11 @@ import { registerReadingHandlers } from './adapters/electron/reading-handlers'
 import { registerWorkbenchHandlers } from './adapters/electron/workbench-handlers'
 import { registerSettingsHandlers } from './adapters/electron/settings-handlers'
 import { registerChatHandlers } from './adapters/electron/chat-handlers'
-export function registerIpc(): void {
+export function registerIpc(speechCache: SpeechCache): void {
+  registerJournalHandlers()
+  register('march:get', getMarchProgress)
+  register('march:plant', plantMarchTree)
+  register('march:collect', collectMarchLandscape)
   register('actions:list', listActions)
   register('actions:create', createAction)
   register('actions:edit', editAction)
@@ -25,6 +36,6 @@ export function registerIpc(): void {
   registerReadingHandlers()
   registerWorkbenchHandlers()
   registerSettingsHandlers()
-  registerSpeechHandlers()
+  registerSpeechHandlers(speechCache)
   registerChatHandlers()
 }

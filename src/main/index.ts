@@ -8,6 +8,8 @@ import { openDatabase } from './adapters/sqlite/database'
 import { purgeExpiredTrash } from './modules/sessions/public'
 import { loadArticles } from './adapters/electron/builtin-library'
 import { registerIpc } from './ipc'
+import { createSpeechCache } from './adapters/speech/cache'
+import { synthesizeEdge } from './adapters/speech/edge'
 
 if (!app.isPackaged && process.env.MAOXUAN_USER_DATA) {
   fs.mkdirSync(process.env.MAOXUAN_USER_DATA, { recursive: true })
@@ -66,11 +68,20 @@ function createWindow(): void {
 app
   .whenReady()
   .then(async () => {
-    await bootstrap(openDatabase(path.join(app.getPath('userData'), 'maoxuan.db')))
+    const speechCache = createSpeechCache(
+      path.join(app.getPath('userData'), 'speech-cache', 'v1'),
+      synthesizeEdge,
+      {
+        bundledDirectory: app.isPackaged
+          ? path.join(process.resourcesPath, 'core-audio', 'v1')
+          : path.join(app.getAppPath(), 'resources', 'core-audio', 'v1')
+      }
+    )
+    await bootstrap(openDatabase(path.join(app.getPath('userData'), 'maoxuan.db')), speechCache)
     purgeTrash()
     setInterval(purgeTrash, PURGE_INTERVAL_MS)
     loadArticles()
-    registerIpc()
+    registerIpc(speechCache)
     createWindow()
 
     app.on('activate', () => {

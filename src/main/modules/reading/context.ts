@@ -6,36 +6,8 @@ import {
   listMessages
 } from '../sessions/public'
 export const problemSignature = (data: SessionData) => fingerprint(data.problem)
-export function readingInput(data: SessionData, purpose: string, articleId?: string): unknown {
-  const reading = data.readings.find((r) => r.articleId === articleId)
-  switch (purpose) {
-    case 'diagnose':
-    case 'reviseProblem':
-      return { problem: data.problem, diagnosis: data.diagnosis }
-    case 'findPassages':
-      return { problem: data.problem, articleId }
-    case 'reviewNotes':
-      return {
-        problem: data.problem,
-        diagnosis: data.diagnosis,
-        articleId,
-        notes: reading?.notes,
-        reflections: reading?.reflections,
-        passages: reading?.passages
-      }
-    case 'reviewSituation':
-    case 'mindset':
-      return {
-        problem: data.problem,
-        diagnosis: data.diagnosis,
-        readings: data.readings,
-        actions: data.actions,
-        reviews: data.reviews
-      }
-    default:
-      throw new Error('未知的阅读建议用途')
-  }
-}
+import { readingInput } from '@shared/engine/reading-input'
+export { readingInput } from '@shared/engine/reading-input'
 export function createReadingContext(s: Session, purpose: string, articleId?: string) {
   const ctx = createSuggestionContext(
     s,

@@ -1,4 +1,4 @@
-name: Build Windows installer
+name: Build desktop installers
 
 on:
   workflow_dispatch:
@@ -14,20 +14,39 @@ on:
       - 'src/**'
       - 'resources/**'
       - 'tests/**'
-      - 'scripts/run-tests.mjs'
-      - 'scripts/check-boundaries.mjs'
+      - 'scripts/**'
       - 'vitest.config.ts'
 
 permissions:
   contents: read
 
 concurrency:
-  group: windows-installer-${{ github.ref }}
+  group: desktop-installers-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: windows-2022
+    name: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows x64
+            runner: windows-2022
+            command: npm run dist:win -- --publish never
+            installer: '*-windows-x64-setup.exe'
+            artifact: maoxuan-windows-x64
+          - platform: macOS Apple Silicon
+            runner: macos-15
+            command: npm run dist -- --arm64 --publish never
+            installer: '*.dmg'
+            artifact: maoxuan-macos-arm64
+          - platform: macOS Intel
+            runner: macos-15-intel
+            command: npm run dist -- --x64 --publish never
+            installer: '*.dmg'
+            artifact: maoxuan-macos-x64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -45,22 +64,25 @@ jobs:
         run: npm test
       - name: Type check
         run: npm run typecheck
-      - name: Build Windows x64 installer
-        run: npm run dist:win
+      - name: Build installer
+        run: ${{ matrix.command }}
       - name: Generate SHA256 checksum
+        working-directory: dist
         shell: pwsh
+        env:
+          INSTALLER_PATTERN: ${{ matrix.installer }}
         run: |
-          $installers = @(Get-ChildItem dist/*-windows-x64-setup.exe)
-          if ($installers.Count -ne 1) { throw 'Expected exactly one Windows installer' }
+          $installers = @(Get-ChildItem -File -Filter $env:INSTALLER_PATTERN)
+          if ($installers.Count -ne 1) { throw 'Expected exactly one desktop installer' }
           $installer = $installers[0]
           $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $($installer.Name)" | Set-Content dist/SHA256SUMS.txt -Encoding utf8
-      - name: Upload Windows installer
+          "$hash  $($installer.Name)" | Set-Content SHA256SUMS.txt -Encoding utf8NoBOM
+      - name: Upload installer
         uses: actions/upload-artifact@v7
         with:
-          name: maoxuan-windows-x64
+          name: ${{ matrix.artifact }}
           path: |
-            dist/*-windows-x64-setup.exe
+            dist/${{ matrix.installer }}
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30

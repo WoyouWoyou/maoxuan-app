@@ -1,5 +1,7 @@
 import type { Settings } from '@shared/types'
 import {
+  getFeaturePreferences,
+  setFeaturePreferences,
   getReaderPreferences,
   setReaderPreferences,
   publicSettings,
@@ -11,6 +13,8 @@ import {
 import { testConnection } from '../../modules/model-runtime/public'
 import { register, toError } from './transport'
 export function registerSettingsHandlers(): void {
+  register('settings:getFeatures', getFeaturePreferences)
+  register('settings:setFeatures', setFeaturePreferences)
   register('settings:getReader', getReaderPreferences)
   register('settings:setReader', setReaderPreferences)
   register('settings:getProxy', () => getProxySettings())

@@ -1,5 +1,19 @@
+import { certificateStore } from './adapters/electron/sync-certificate'
+import { BUILTIN_BOOK_ID } from '@shared/contracts/library'
+import { createSpeechExchange } from './adapters/network/sync-speech'
+import type { SpeechCache } from './adapters/speech/cache'
+import { createLanSync } from './adapters/network/lan-sync'
+import { createSyncRepository } from './adapters/sqlite/sync-repository'
+import { dialog, ipcMain } from 'electron'
+import { app } from 'electron'
+import { join } from 'node:path'
+import { configureJournal } from './modules/journal/public'
+import { createJournalRepository } from './adapters/sqlite/journal-repository'
+import { createJournalAssets } from './adapters/electron/journal-assets'
+import { configureMarch } from './modules/long-march/public'
+import { createMarchRepository } from './adapters/sqlite/long-march-repository'
 import { configureActions } from './modules/action-planning/public'
-import { createActionRepository } from './adapters/sqlite/action-repository'
+import { createMarchObservedRepositories } from './adapters/sqlite/march-observer'
 import { createProxyController } from './adapters/network/proxy'
 import { session } from 'electron'
 import { createIndexRepository } from './adapters/sqlite/index-repository'
@@ -8,7 +22,6 @@ import { validateReadingSession } from './modules/reading/public'
 import { validateWorkbenchSession } from './modules/workbench/public'
 import { configureSettings, configureProxy } from './modules/settings/public'
 import { createSettingsRepository } from './adapters/sqlite/settings-repository'
-import { createSessionRepository } from './adapters/sqlite/session-repository'
 import { chatCompletionsTransport } from './adapters/model/chat-completions'
 import { configureImporting } from './modules/importing/public'
 import { createImportFilesAdapter } from './adapters/electron/import-files'
@@ -20,13 +33,69 @@ import { configureModels } from './modules/model-config/public'
 import { createModelConfigRepository } from './adapters/sqlite/model-config-repository'
 import { safeStorage } from 'electron'
 import { BrowserWindow } from 'electron'
-import { configureLibrary, requireBook } from './modules/library/public'
+import { configureLibrary, getChapter, requireBook } from './modules/library/public'
 import { configureTasks } from './modules/tasks/public'
 import { configureUsage, beginCall, finishCall } from './modules/usage/public'
 import { configureModelRuntime } from './modules/model-runtime/public'
 import { configureRetrieval } from './modules/retrieval/public'
-export async function bootstrap(handle: Database.Database): Promise<void> {
-  configureActions(createActionRepository(handle))
+import { createAgentHttp } from './adapters/network/agent-http'
+import { createAgentActionRequests } from './adapters/sqlite/agent-action-requests'
+import { register } from './adapters/electron/transport'
+import { createAgentActions } from './modules/agent-access/public'
+export async function bootstrap(handle: Database.Database, speechCache: SpeechCache): Promise<void> {
+  const lanSync = createLanSync(
+    {
+      ...createSyncRepository(
+        handle,
+        createJournalAssets(join(app.getPath('userData'), 'journal', 'assets'))
+      ),
+      speech: createSpeechExchange((id) => {
+        const article = getChapter(id)
+        return article?.bookId === BUILTIN_BOOK_ID ? article.paragraphs : undefined
+      }, speechCache)
+    },
+    undefined,
+    certificateStore(join(app.getPath('userData'), 'device-sync-certificate.enc')),
+    () => {
+      for (const window of BrowserWindow.getAllWindows()) window.webContents.send('sync:changed')
+    },
+    async (code, remote, signal) => {
+      const options = {
+        type: 'question' as const,
+        title: '设备同步确认',
+        message: `手机请求配对 · ${code}`,
+        detail: `请核对手机上显示的 6 位数字。确认相同后，允许这台手机（${remote}）同步。`,
+        buttons: ['取消', '允许同步'],
+        defaultId: 0,
+        cancelId: 0,
+        signal
+      }
+      const window = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+      if (!window) return false
+      return (await dialog.showMessageBox(window, options)).response === 1
+    }
+  )
+  for (const [channel, job] of [
+    ['sync:status', () => lanSync.status()],
+    ['sync:start', () => lanSync.start()],
+    ['sync:stop', () => lanSync.stop()]
+  ] as const) {
+    ipcMain.removeHandler(channel)
+    ipcMain.handle(channel, (_event, ...args: unknown[]) => {
+      if (args.length) throw Error('同步设置不接受参数')
+      return job()
+    })
+  }
+  app.once('before-quit', () => void lanSync.stop())
+  const march = configureMarch(createMarchRepository(handle))
+  const { sessions, actions } = createMarchObservedRepositories(handle, march)
+  configureJournal(
+    createJournalRepository(handle),
+    createJournalAssets(join(app.getPath('userData'), 'journal', 'assets')),
+    (id, createdAt) =>
+      march.observe([{ id: `journal:${id}:completed`, kind: 'journal', createdAt }])
+  )
+  configureActions(actions)
   configureImporting(createImportFilesAdapter())
   const secrets = {
     encrypt: (value: string) => {
@@ -43,7 +112,7 @@ export async function bootstrap(handle: Database.Database): Promise<void> {
     model: process.env.DEEPSEEK_MODEL
   })
   await configureProxy(createProxyController(() => [session.defaultSession]))
-  configureSessions(createSessionRepository(handle), {
+  configureSessions(sessions, {
     requireBook,
     validate: (session, next, restoring, step) =>
       session.mode === 'reading'
@@ -56,4 +125,22 @@ export async function bootstrap(handle: Database.Database): Promise<void> {
   configureUsage(createUsageRepository(handle))
   configureModelRuntime({ begin: beginCall, finish: finishCall }, chatCompletionsTransport)
   configureRetrieval(createIndexRepository(handle))
+
+  const agent = createAgentHttp(
+    createAgentActions(createAgentActionRequests(handle)),
+    !app.isPackaged && process.env.MAOXUAN_AGENT_CONFIG
+      ? process.env.MAOXUAN_AGENT_CONFIG
+      : join(app.getPath('home'), '.maoxuan', 'agent.json'),
+    (sessionId) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.webContents.isDestroyed()) window.webContents.send('agent:changed', sessionId)
+      }
+    }
+  )
+  register('agent:status', agent.status)
+  register('agent:start', agent.start)
+  register('agent:stop', agent.stop)
+  app.once('before-quit', () => {
+    void agent.stop().catch((error) => console.error('关闭 Agent 访问失败', error))
+  })
 }

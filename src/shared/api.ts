@@ -1,3 +1,12 @@
+import type { FeaturePreferences } from './contracts/features'
+import type {
+  JournalAttachment,
+  JournalCommand,
+  JournalResult,
+  JournalState,
+  JournalTransferResult
+} from './journal'
+import type { MarchProgress } from './long-march'
 import type { ActionEdit } from './actions'
 import type { ActionItem } from './types'
 import type { ActionReference, ClassificationResult } from './contracts/action-planning'
@@ -35,6 +44,7 @@ import type {
   WbCheck,
   WbContradiction,
   WbDecision,
+  WbDecisionRevision,
   WbIntake,
   WbObjSubj,
   WbRecapInput,
@@ -42,8 +52,61 @@ import type {
   WbRoutes
 } from './types'
 
+export interface AgentAccessStatus {
+  running: boolean
+  url?: string
+}
+
 /** Exposed by preload as `window.api`. Every method maps 1:1 to an ipcMain.handle channel named `${group}:${method}`. */
 export interface MaoxuanApi {
+  agent?: {
+    status(): Promise<AgentAccessStatus>
+    start(): Promise<AgentAccessStatus>
+    stop(): Promise<AgentAccessStatus>
+    onChanged(callback: (sessionId: string | null) => void): () => void
+  }
+  sync: {
+    onChanged?(callback: () => void): () => void
+    discover?(): Promise<import('./sync/protocol').SyncPeer[]>
+    requestLanPermission?(): Promise<boolean>
+    pair?(peer: import('./sync/protocol').SyncPeer, showCode: (code: string) => void): Promise<string>
+    exchange?(
+      peer: import('./sync/protocol').SyncPeer,
+      token: string,
+      strategy: import('./sync/protocol').SyncStrategy
+    ): Promise<{
+      count: number
+      achievements: boolean
+      attachments?: { transferred: number; pending: number; errors: string[] }
+      conflicts: {
+        key: string
+        local: import('./sync/protocol').SyncDocument
+        remote: import('./sync/protocol').SyncDocument
+      }[]
+    }>
+    downloadSpeech?(
+      peer: import('./sync/protocol').SyncPeer,
+      token: string,
+      request: import('./sync/speech').SpeechDownload,
+      progress: (ready: number, available: number) => void
+    ): Promise<{ ready: number; total: number }>
+    status(): Promise<import('./sync/protocol').SyncStatus>
+    start(): Promise<import('./sync/protocol').SyncStatus>
+    stop(): Promise<import('./sync/protocol').SyncStatus>
+  }
+  journal: {
+    list(): Promise<JournalState>
+    apply(command: JournalCommand): Promise<JournalResult>
+    attach(id: string, name: string, mime: string, bytes: Uint8Array): Promise<JournalAttachment>
+    media(id: string): Promise<JournalAttachment & { bytes: Uint8Array }>
+    import(target: string | null): Promise<JournalTransferResult>
+    export(folderId: string | null, noteId?: string): Promise<JournalTransferResult>
+  }
+  march: {
+    get(): Promise<MarchProgress>
+    plant(nodeId: string, requestId: string): Promise<MarchProgress>
+    collect(nodeId: string): Promise<MarchProgress>
+  }
   actions: {
     list(): Promise<ActionItem[]>
     create(edit: ActionEdit): Promise<ActionItem>
@@ -51,6 +114,9 @@ export interface MaoxuanApi {
     classify(refs: ActionReference[], today: string): Promise<ClassificationResult>
   }
   speech: {
+    localAudio?(request: SpeechRequest): Promise<Uint8Array | undefined>
+    systemAudio?(request: SpeechRequest): Promise<string>
+    requestDownload?(request: import('./sync/speech').SpeechDownload): void
     synthesize(request: SpeechRequest): Promise<Uint8Array>
     prefetch(request: SpeechRequest): Promise<void>
     cancel(id: string): Promise<void>
@@ -143,6 +209,7 @@ export interface MaoxuanApi {
       sessionId: string,
       articleId: string
     ): Promise<{ focusQuestion: string; passages: Passage[] }>
+    draftNotes(sessionId: string, articleId: string): Promise<ThreeNotes>
     reviewNotes(sessionId: string, articleId: string, notes: ThreeNotes): Promise<NoteFeedback>
     reviewSituation(sessionId: string, newSituation: string): Promise<Review>
     mindset(sessionId: string): Promise<Mindset>
@@ -160,13 +227,14 @@ export interface MaoxuanApi {
       step?: StepKey,
       mutationId?: string
     ): Promise<Session>
+    think(sessionId: string): Promise<import('./workbench-thinking').ThinkingResult>
     /** 整理 form + 已回答的追问 + 现有事实台账，输出新的 WbIntake（事实 id 延续旧台账）。 */
     intake(sessionId: string): Promise<WbIntake>
     contradiction(sessionId: string): Promise<WbContradiction>
     routes(sessionId: string): Promise<WbRoutes>
     objSubj(sessionId: string): Promise<WbObjSubj>
-    /** 综合三模块 → 决策快照，并附带硬规则 + 红队检查。若已有决策且有未通过检查，则按检查意见修复。 */
-    decide(sessionId: string): Promise<WbDecision>
+    /** 综合用户选定的诊断 → 决策快照，并附带硬规则 + 红队检查。若已有决策且有未通过检查，则按检查意见修复。 */
+    decide(sessionId: string, revision?: WbDecisionRevision): Promise<WbDecision>
     /** 对当前（可能被用户改过的）决策重新跑硬规则 + 红队检查。 */
     recheck(sessionId: string): Promise<WbCheck[]>
     /** 基于已确认的决策生成 7/30/90 天行动，并附带检查。 */
@@ -174,6 +242,8 @@ export interface MaoxuanApi {
     recap(sessionId: string, input: WbRecapInput): Promise<WbRecapResult>
   }
   settings: {
+    getFeatures(): Promise<FeaturePreferences>
+    setFeatures(preferences: FeaturePreferences): Promise<FeaturePreferences>
     getReader(): Promise<ReaderPreferences>
     setReader(preferences: ReaderPreferences): Promise<ReaderPreferences>
 

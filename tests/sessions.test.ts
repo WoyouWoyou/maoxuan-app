@@ -16,6 +16,7 @@ import {
   restoreVersion,
   decodeSessionData,
   archiveSession,
+  unarchiveSession,
   addMessage,
   listSessions
 } from '../src/main/modules/sessions/public'
@@ -31,6 +32,7 @@ import {
   type WbAction
 } from '../src/shared/types'
 import { readingCommands } from '../src/shared/contracts/reading'
+import { collectActions, newAction } from '../src/shared/actions'
 let db: Database.Database, session: Session
 const diagnostic = (): Diagnosis => ({
   restated: '建议',
@@ -103,6 +105,52 @@ beforeEach(() => {
 })
 afterEach(() => db.close())
 describe('one atomic session boundary', () => {
+  it.each(['reading', 'workbench'] as const)(
+    'preserves stored %s actions through archive and unarchive',
+    (mode) => {
+      const s = createSession('奶茶店选址', mode)
+      const commands = newAction(
+        s,
+        'site-visit',
+        {
+          text: '周六蹲点：数午晚高峰客流、500 米内同类店数量、问两家店的房租',
+          quadrant: 'plan',
+          dueDate: '2026-10-31',
+          purpose: '调查选址',
+          verify: '形成调查记录'
+        },
+        '2026-10-29'
+      )
+      const saved =
+        mode === 'reading'
+          ? applyCommands(
+              s.id,
+              commands.reading,
+              s.stateVersion,
+              '添加行动',
+              undefined,
+              'add-site-visit'
+            )
+          : applyWorkbench(
+              s.id,
+              commands.workbench,
+              s.stateVersion,
+              '添加行动',
+              undefined,
+              'add-site-visit'
+            )
+      const before = collectActions([saved])
+      expect(before).toHaveLength(1)
+      archiveSession(s.id)
+      const archived = getSession(s.id)!
+      expect(collectActions([archived])).toEqual([])
+      expect(archived.data).toEqual(saved.data)
+      unarchiveSession(s.id)
+      const restored = getSession(s.id)!
+      expect(collectActions([restored])).toEqual(before)
+      expect(restored.data).toEqual(saved.data)
+    }
+  )
   it('rejects competing stale writers in both modes and increments lifecycle versions', () => {
     const first = applyCommands(
       session.id,

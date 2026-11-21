@@ -1,20 +1,10 @@
-import { app } from 'electron'
-import path from 'node:path'
-import { createSpeechCache, type SpeechCache } from '../speech/cache'
+import type { SpeechCache } from '../speech/cache'
 import { ipcMain } from 'electron'
 import { validateIpcArguments } from '@shared/contracts/ipc'
 import type { SpeechRequest } from '@shared/contracts/reader'
 import { getReaderPreferences } from '../../modules/settings/public'
-import { synthesizeEdge } from '../speech/edge'
 
-export function registerSpeechHandlers(cache?: SpeechCache) {
-  const audioCache =
-    cache ??
-    createSpeechCache(path.join(app.getPath('userData'), 'speech-cache', 'v1'), synthesizeEdge, {
-      bundledDirectory: app.isPackaged
-        ? path.join(process.resourcesPath, 'core-audio', 'v1')
-        : path.join(app.getAppPath(), 'resources', 'core-audio', 'v1')
-    })
+export function registerSpeechHandlers(audioCache: SpeechCache) {
   const active = new Map<
     number,
     Map<string, { controller: AbortController; background: boolean }>

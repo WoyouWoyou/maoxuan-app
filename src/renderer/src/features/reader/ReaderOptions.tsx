@@ -5,6 +5,7 @@ import './reader-options.css'
 
 export function ReaderPreferencesFields() {
   const { preferences: p, update, loaded, error } = useReaderPreferences()
+  const mobileSpeech = !!window.api.speech.localAudio
   return (
     <fieldset className="reader-preferences" disabled={!loaded}>
       <legend className="sr-only">阅读偏好</legend>
@@ -50,7 +51,9 @@ export function ReaderPreferencesFields() {
             value={p.provider}
             onChange={(e) => update({ provider: e.target.value as 'edge' | 'system' })}
           >
-            <option value="edge">Edge 在线语音</option>
+            <option value="edge">
+              {mobileSpeech ? '优先播放已下载音频' : 'Edge 语音（优先离线音频）'}
+            </option>
             <option value="system">系统语音</option>
           </select>
         </label>
@@ -93,9 +96,13 @@ export function ReaderPreferencesFields() {
           跟随滚动
         </label>
         <p className="reader-option-hint">
-          {p.provider === 'edge'
-            ? '联网合成，正文发送至微软语音服务。免密钥的非官方接入，服务可能变化。'
-            : '可用声音取决于当前系统，缺少中文声音时请使用 Edge。'}
+          {mobileSpeech
+            ? p.provider === 'edge'
+              ? '已下载的片段可离线播放，其余片段使用系统中文语音。'
+              : '可用声音取决于手机系统已安装的中文语音包。'
+            : p.provider === 'edge'
+              ? '核心五篇内置云健与晓晓完整音频，可离线播放。其他篇目或音色需联网合成，正文发送至微软语音服务。'
+              : '可用声音取决于当前系统，缺少中文声音时请使用 Edge。'}
         </p>
       </div>
       {error && (
@@ -110,11 +117,13 @@ export function ReaderPreferencesFields() {
 export function ReaderOptions({
   onClose,
   onRead,
-  canRead
+  canRead,
+  onDownload
 }: {
   onClose(): void
   onRead(): void
   canRead: boolean
+  onDownload?(): void
 }) {
   const { preferences, loaded } = useReaderPreferences()
   return (
@@ -140,6 +149,16 @@ export function ReaderOptions({
         <PlayIcon size={17} weight="fill" />
         朗读全文
       </button>
+      {onDownload && (
+        <button
+          type="button"
+          className="btn reader-read-all"
+          disabled={!loaded || !canRead}
+          onClick={onDownload}
+        >
+          从电脑下载朗读
+        </button>
+      )}
     </>
   )
 }

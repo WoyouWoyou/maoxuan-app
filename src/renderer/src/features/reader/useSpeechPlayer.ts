@@ -18,6 +18,7 @@ export function useSpeechPlayer(
   const settle = useRef<(() => void) | undefined>(undefined)
   const speakingSystem = useRef(false)
   const run = useRef(0)
+  const playMedia = useRef<(() => void) | undefined>(undefined)
   const audio = useRef<HTMLAudioElement | null>(null)
   const url = useRef('')
   const requestId = useRef('')
@@ -26,6 +27,7 @@ export function useSpeechPlayer(
   const current = useRef(preferences)
   current.current = preferences
   function cleanAudio() {
+    playMedia.current = undefined
     if (audio.current) {
       audio.current.onended = null
       audio.current.onerror = null
@@ -67,10 +69,14 @@ export function useSpeechPlayer(
     const config = { ...current.current }
     lastSingle.current = single
     if (!config.enabled || !paragraphs[index]) return
+    const speech = window.api.speech
     const work = paragraphs
       .slice(index, single ? index + 1 : undefined)
       .flatMap((text, offset) =>
-        speechChunks(text).map((text) => ({ text, index: index + offset }))
+        (speech.localAudio && text === '*' ? [] : speechChunks(text)).map((text) => ({
+          text,
+          index: index + offset
+        }))
       )
     const ready = new Set<number>()
     let currentChunk = 0
@@ -79,20 +85,19 @@ export function useSpeechPlayer(
       ready.add(index)
       setCacheProgress((p) => ({ ...p, ready: ready.size }))
     }
-    if (config.provider === 'edge') setCacheProgress({ ready: 0, total: work.length, failed: 0 })
+    const useEdge = config.provider === 'edge'
+    const desktopEdge = useEdge && !speech.localAudio
+    if (desktopEdge) setCacheProgress({ ready: 0, total: work.length, failed: 0 })
     try {
       for (const [position, chunk] of work.entries()) {
         currentChunk = position
         if (token !== run.current) return
         setState({ status: paused.current ? 'paused' : 'loading', index: chunk.index, error: '' })
-        if (config.provider === 'edge') {
-          const id = crypto.randomUUID()
-          requestId.current = id
-          const bytes = await window.api.speech.synthesize({
-            id,
-            text: chunk.text,
-            voice: config.voice
-          })
+        const request = { id: crypto.randomUUID(), text: chunk.text, voice: config.voice }
+        let bytes: Uint8Array | undefined
+        if (desktopEdge) {
+          requestId.current = request.id
+          bytes = await speech.synthesize(request)
           if (token !== run.current) return
           requestId.current = ''
           markReady(position)
@@ -101,7 +106,7 @@ export function useSpeechPlayer(
             prefetch.current = prefetchSpeech(
               work.map((chunk) => chunk.text),
               config.voice,
-              window.api.speech,
+              speech,
               {
                 skip: (index) => index <= currentChunk || ready.has(index),
                 ready: markReady,
@@ -112,35 +117,54 @@ export function useSpeechPlayer(
               }
             )
           }
+        } else if (useEdge && speech.localAudio) {
+          bytes = await speech.localAudio(request)
+          if (token !== run.current) return
+        }
+
+        let source: string | undefined
+        if (bytes) {
           url.current = URL.createObjectURL(
             new Blob([new Uint8Array(bytes)], { type: 'audio/mpeg' })
           )
-          const media = new Audio(url.current)
+          source = url.current
+        } else if (speech.systemAudio) {
+          requestId.current = request.id
+          source = await speech.systemAudio(request)
+          if (token !== run.current) return
+        }
+        if (source) {
+          const media = new Audio(source)
           audio.current = media
           media.playbackRate = current.current.rate
           await new Promise<void>((resolve, reject) => {
             settle.current = resolve
-            media.onended = () => {
-              cleanAudio()
-              resolve()
-            }
+            media.onended = cleanAudio
             media.onerror = () => reject(new Error('音频播放失败，请重试'))
-            if (!paused.current) {
+            playMedia.current = () => {
               void media
                 .play()
                 .then(() => {
-                  if (token === run.current) {
-                    if (paused.current) media.pause()
-                    setState((s) => ({ ...s, status: paused.current ? 'paused' : 'playing' }))
-                  }
+                  if (audio.current !== media) return
+                  if (paused.current) media.pause()
+                  setState((s) => ({ ...s, status: paused.current ? 'paused' : 'playing' }))
                 })
-                .catch(reject)
+                .catch((error) => {
+                  if (audio.current === media && !paused.current && error?.name !== 'AbortError')
+                    reject(error)
+                })
             }
+            if (!paused.current) playMedia.current()
           })
         } else {
           const synth = window.speechSynthesis
           const voices = synth?.getVoices().filter((v) => /^zh/i.test(v.lang)) ?? []
-          if (!voices.length) throw new Error('当前系统没有可用的中文语音，请选择 Edge 在线语音')
+          if (!synth || !voices.length)
+            throw new Error(
+              speech.localAudio
+                ? '当前系统没有可用的中文语音，请安装中文语音包'
+                : '当前系统没有可用的中文语音，请选择 Edge 在线语音'
+            )
           await new Promise<void>((resolve, reject) => {
             settle.current = resolve
             speakingSystem.current = true
@@ -183,19 +207,16 @@ export function useSpeechPlayer(
   function togglePause() {
     if (state.status === 'error' || state.status === 'done' || state.status === 'idle') return
     paused.current = !paused.current
-    if (current.current.provider === 'system') {
+    if (speakingSystem.current) {
       if (paused.current) window.speechSynthesis.pause()
       else window.speechSynthesis.resume()
     } else if (paused.current) audio.current?.pause()
-    else if (audio.current)
-      void audio.current.play().catch((error) => {
-        setState((s) => ({ ...s, status: 'error', error: String(error) }))
-      })
+    else playMedia.current?.()
     setState((s) => ({
       ...s,
       status: paused.current
         ? 'paused'
-        : audio.current || current.current.provider === 'system'
+        : audio.current || speakingSystem.current
           ? 'playing'
           : 'loading'
     }))

@@ -21,12 +21,11 @@ export async function loadSpeechTools() {
     throw error
   }
 }
-export async function coreAudioPlan(tools) {
+export async function coreAudioPlan(tools, voice = tools.DEFAULT_READER_PREFERENCES.voice) {
   const articles = JSON.parse(await fs.readFile('resources/articles.json', 'utf8'))
     .filter((article) => article.isCore)
     .sort((a, b) => a.coreOrder - b.coreOrder)
   if (articles.length !== 5) throw new Error('内置核心篇目必须恰好为五篇')
-  const voice = tools.DEFAULT_READER_PREFERENCES.voice
   return {
     version: 1,
     voice,

@@ -42,8 +42,9 @@ export interface ActionEdit {
   verify?: string
 }
 export function collectActions(sessions: Session[]): HubAction[] {
+  // 归档只隐藏行动，取消归档后继续使用原行动的规划和执行状态。
   return sessions
-    .filter((s) => !s.deletedAt)
+    .filter((s) => !s.deletedAt && s.status === 'active')
     .flatMap((s) => {
       const base = {
         sessionId: s.id,
@@ -142,6 +143,7 @@ export function newAction(
 } {
   if (!edit.text?.trim()) throw new Error('请填写任务名称')
   if (s.deletedAt) throw new Error('原问题已移入回收站，请先恢复')
+  if (s.status === 'archived') throw new Error('原问题已归档，请先取消归档')
   const base = {
     id,
     status: 'todo' as const,

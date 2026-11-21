@@ -358,7 +358,7 @@
 .reader-p {
   position: relative;
 }
-.reader-p:has(.reader-paragraph-actions) {
+.reader:not(.reader-mobile) .reader-p:has(.reader-paragraph-actions) {
   padding-top: 34px;
   margin-bottom: 8px;
 }
