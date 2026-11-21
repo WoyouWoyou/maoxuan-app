@@ -33,7 +33,7 @@ jobs:
         include:
           - platform: Windows x64
             runner: windows-2022
-            command: npm run dist:win -- --publish never
+            command: npm run dist:win
             installer: '*-windows-x64-setup.exe'
             artifact: maoxuan-windows-x64
           - platform: macOS Apple Silicon
