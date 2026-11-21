@@ -38,12 +38,14 @@ jobs:
             artifact: maoxuan-windows-x64
           - platform: macOS Apple Silicon
             runner: macos-15
-            command: npm run dist -- --arm64 --publish never
+            command: npm run dist -- --arm64 --publish never --config.mac.identity=- --config.mac.hardenedRuntime=false
+            mac_arch: arm64
             installer: '*.dmg'
             artifact: maoxuan-macos-arm64
           - platform: macOS Intel
             runner: macos-15-intel
-            command: npm run dist -- --x64 --publish never
+            command: npm run dist -- --x64 --publish never --config.mac.identity=- --config.mac.hardenedRuntime=false
+            mac_arch: x64
             installer: '*.dmg'
             artifact: maoxuan-macos-x64
     runs-on: ${{ matrix.runner }}
@@ -66,6 +68,21 @@ jobs:
         run: npm run typecheck
       - name: Build installer
         run: ${{ matrix.command }}
+      - name: Verify macOS application signature and architecture
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          EXPECTED_ARCH: ${{ matrix.mac_arch }}
+        run: |
+          set -euo pipefail
+          apps=(dist/mac*/*.app)
+          test "${#apps[@]}" -eq 1
+          app="${apps[0]}"
+          codesign --verify --deep --strict "$app"
+          executable=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Contents/Info.plist")
+          expected="$EXPECTED_ARCH"
+          if [[ "$expected" == x64 ]]; then expected=x86_64; fi
+          test "$(lipo -archs "$app/Contents/MacOS/$executable")" = "$expected"
       - name: Generate SHA256 checksum
         working-directory: dist
         shell: pwsh
